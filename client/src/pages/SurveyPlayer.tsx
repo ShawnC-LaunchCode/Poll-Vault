@@ -16,7 +16,7 @@ import QuestionRenderer from "@/components/survey/QuestionRenderer";
 import ProgressBar from "@/components/survey/ProgressBar";
 
 export default function SurveyPlayer() {
-  const { token, publicLink } = useParams();
+  const { identifier } = useParams();
   const { toast } = useToast();
   
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
@@ -34,11 +34,10 @@ export default function SurveyPlayer() {
   const [surveyStartTime, setSurveyStartTime] = useState<number | null>(null);
   const questionFocusTimeouts = useRef<Record<string, NodeJS.Timeout>>({});
 
-  // Determine if this is an anonymous survey
-  const surveyIdentifier = publicLink || token;
-  const isAnonymousAccess = !!publicLink;
+  // Use the identifier from URL params
+  const surveyIdentifier = identifier;
   
-  // Load survey data
+  // Load survey data - try token-based first, then anonymous if that fails
   const { data: surveyData, isLoading, error } = useQuery<{
     survey: Survey;
     pages?: SurveyPageWithQuestions[];
@@ -47,7 +46,25 @@ export default function SurveyPlayer() {
     alreadyCompleted?: boolean;
     submittedAt?: string;
   }>({
-    queryKey: [isAnonymousAccess ? "/api/anonymous-survey" : "/api/survey", surveyIdentifier],
+    queryKey: ["/api/survey-by-identifier", surveyIdentifier],
+    queryFn: async () => {
+      // First try as a token-based survey
+      try {
+        const response = await fetch(`/api/survey/${surveyIdentifier}`);
+        if (response.ok) {
+          return await response.json();
+        }
+      } catch (error) {
+        // Continue to try anonymous
+      }
+      
+      // If token-based fails, try as anonymous survey
+      const response = await fetch(`/api/anonymous-survey/${surveyIdentifier}`);
+      if (!response.ok) {
+        throw new Error(`Survey not found: ${response.status}`);
+      }
+      return await response.json();
+    },
     retry: false,
   });
   
@@ -73,13 +90,13 @@ export default function SurveyPlayer() {
         const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         setSessionId(newSessionId);
         
-        return await apiRequest("POST", `/api/anonymous-survey/${publicLink}/start-response`, {
+        return await apiRequest("POST", `/api/anonymous-survey/${surveyIdentifier}/start-response`, {
           sessionId: newSessionId,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           screenResolution: `${screen.width}x${screen.height}`
         });
       } else {
-        return await apiRequest("POST", `/api/survey/${token}/start-response`, {});
+        return await apiRequest("POST", `/api/survey/${surveyIdentifier}/start-response`, {});
       }
     },
     onSuccess: (data) => {
@@ -151,12 +168,12 @@ export default function SurveyPlayer() {
   const submitMutation = useMutation({
     mutationFn: async (responseData: any) => {
       if (isAnonymous) {
-        return await apiRequest("POST", `/api/anonymous-survey/${publicLink}/response`, {
+        return await apiRequest("POST", `/api/anonymous-survey/${surveyIdentifier}/response`, {
           ...responseData,
           responseId
         });
       } else {
-        return await apiRequest("POST", `/api/survey/${token}/response`, responseData);
+        return await apiRequest("POST", `/api/survey/${surveyIdentifier}/response`, responseData);
       }
     },
     onSuccess: async () => {
