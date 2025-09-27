@@ -1,10 +1,12 @@
+import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { type LucideIcon } from "lucide-react";
 
 interface StatsCardProps {
   title: string;
   value: string | number;
-  icon: string;
+  icon: LucideIcon;
   iconColor?: string;
   change?: string;
   changeLabel?: string;
@@ -51,8 +53,8 @@ export default function StatsCard({
               {value}
             </p>
           </div>
-          <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-            <i className={`${icon} ${iconColor} text-xl`} data-testid="icon-stats"></i>
+          <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center" data-testid="icon-stats">
+            {React.createElement(icon, { className: `h-6 w-6 ${iconColor}` })}
           </div>
         </div>
         {change && changeLabel && (

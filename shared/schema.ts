@@ -258,6 +258,53 @@ export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
 export interface DashboardStats {
   totalSurveys: number;
   activeSurveys: number;
+  draftSurveys: number;
+  closedSurveys: number;
   totalResponses: number;
   completionRate: number;
+  avgResponsesPerSurvey: number;
+  recentActivity: ActivityItem[];
+}
+
+export interface ActivityItem {
+  id: string;
+  type: 'survey_created' | 'survey_published' | 'response_received' | 'survey_closed';
+  title: string;
+  description: string;
+  timestamp: Date;
+  surveyId?: string;
+  responseId?: string;
+}
+
+export interface SurveyAnalytics {
+  surveyId: string;
+  title: string;
+  responseCount: number;
+  completionRate: number;
+  avgCompletionTime: number; // in minutes
+  lastResponseAt: Date | null;
+  status: string;
+}
+
+export interface ResponseTrend {
+  date: string;
+  count: number;
+  completed: number;
+}
+
+export interface BulkOperationRequest {
+  surveyIds: string[];
+  operation: 'close' | 'open' | 'delete' | 'archive';
+}
+
+export interface BulkOperationResult {
+  success: boolean;
+  updatedCount: number;
+  errors: string[];
+}
+
+export interface SurveyDuplication {
+  originalId: string;
+  title: string;
+  includeResponses?: boolean;
 }

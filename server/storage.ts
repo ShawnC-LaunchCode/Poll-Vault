@@ -22,9 +22,16 @@ import {
   type Answer,
   type InsertAnswer,
   type AnalyticsEvent,
+  type DashboardStats,
+  type ActivityItem,
+  type SurveyAnalytics,
+  type ResponseTrend,
+  type BulkOperationRequest,
+  type BulkOperationResult,
+  type SurveyDuplication,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, count } from "drizzle-orm";
+import { eq, desc, and, count, sql, gte, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -76,13 +83,19 @@ export interface IStorage {
   createAnalyticsEvent(event: Omit<AnalyticsEvent, 'id' | 'timestamp'>): Promise<AnalyticsEvent>;
   getAnalyticsByResponse(responseId: string): Promise<AnalyticsEvent[]>;
   
-  // Dashboard stats
-  getDashboardStats(creatorId: string): Promise<{
-    totalSurveys: number;
-    activeSurveys: number;
-    totalResponses: number;
-    completionRate: number;
-  }>;
+  // Enhanced dashboard analytics
+  getDashboardStats(creatorId: string): Promise<DashboardStats>;
+  getSurveyAnalytics(creatorId: string): Promise<SurveyAnalytics[]>;
+  getResponseTrends(creatorId: string, days?: number): Promise<ResponseTrend[]>;
+  getRecentActivity(creatorId: string, limit?: number): Promise<ActivityItem[]>;
+  
+  // Bulk operations
+  bulkUpdateSurveyStatus(surveyIds: string[], status: string, creatorId: string): Promise<BulkOperationResult>;
+  bulkDeleteSurveys(surveyIds: string[], creatorId: string): Promise<BulkOperationResult>;
+  
+  // Survey management
+  duplicateSurvey(surveyId: string, newTitle: string, creatorId: string): Promise<Survey>;
+  archiveSurvey(surveyId: string, creatorId: string): Promise<Survey>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -345,13 +358,8 @@ export class DatabaseStorage implements IStorage {
       .orderBy(analyticsEvents.timestamp);
   }
   
-  // Dashboard stats
-  async getDashboardStats(creatorId: string): Promise<{
-    totalSurveys: number;
-    activeSurveys: number;
-    totalResponses: number;
-    completionRate: number;
-  }> {
+  // Enhanced dashboard analytics
+  async getDashboardStats(creatorId: string): Promise<DashboardStats> {
     const [totalSurveysResult] = await db
       .select({ count: count() })
       .from(surveys)
@@ -361,6 +369,16 @@ export class DatabaseStorage implements IStorage {
       .select({ count: count() })
       .from(surveys)
       .where(and(eq(surveys.creatorId, creatorId), eq(surveys.status, 'open')));
+
+    const [draftSurveysResult] = await db
+      .select({ count: count() })
+      .from(surveys)
+      .where(and(eq(surveys.creatorId, creatorId), eq(surveys.status, 'draft')));
+
+    const [closedSurveysResult] = await db
+      .select({ count: count() })
+      .from(surveys)
+      .where(and(eq(surveys.creatorId, creatorId), eq(surveys.status, 'closed')));
 
     const [totalResponsesResult] = await db
       .select({ count: count() })
@@ -374,16 +392,338 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(surveys, eq(responses.surveyId, surveys.id))
       .where(and(eq(surveys.creatorId, creatorId), eq(responses.completed, true)));
 
+    const totalSurveys = totalSurveysResult.count;
     const totalResponses = totalResponsesResult.count;
     const completedResponses = completedResponsesResult.count;
     const completionRate = totalResponses > 0 ? Math.round((completedResponses / totalResponses) * 100) : 0;
+    const avgResponsesPerSurvey = totalSurveys > 0 ? Math.round((totalResponses / totalSurveys) * 10) / 10 : 0;
+
+    // Get recent activity
+    const recentActivity = await this.getRecentActivity(creatorId, 5);
 
     return {
-      totalSurveys: totalSurveysResult.count,
+      totalSurveys,
       activeSurveys: activeSurveysResult.count,
+      draftSurveys: draftSurveysResult.count,
+      closedSurveys: closedSurveysResult.count,
       totalResponses,
       completionRate,
+      avgResponsesPerSurvey,
+      recentActivity,
     };
+  }
+
+  async getSurveyAnalytics(creatorId: string): Promise<SurveyAnalytics[]> {
+    const surveysData = await db
+      .select({
+        surveyId: surveys.id,
+        title: surveys.title,
+        status: surveys.status,
+      })
+      .from(surveys)
+      .where(eq(surveys.creatorId, creatorId))
+      .orderBy(desc(surveys.updatedAt));
+
+    const analytics: SurveyAnalytics[] = [];
+
+    for (const survey of surveysData) {
+      const [responseCountResult] = await db
+        .select({ count: count() })
+        .from(responses)
+        .where(eq(responses.surveyId, survey.surveyId));
+
+      const [completedCountResult] = await db
+        .select({ count: count() })
+        .from(responses)
+        .where(and(eq(responses.surveyId, survey.surveyId), eq(responses.completed, true)));
+
+      const [lastResponseResult] = await db
+        .select({ submittedAt: responses.submittedAt })
+        .from(responses)
+        .where(eq(responses.surveyId, survey.surveyId))
+        .orderBy(desc(responses.submittedAt))
+        .limit(1);
+
+      const responseCount = responseCountResult.count;
+      const completedCount = completedCountResult.count;
+      const completionRate = responseCount > 0 ? Math.round((completedCount / responseCount) * 100) : 0;
+
+      analytics.push({
+        surveyId: survey.surveyId,
+        title: survey.title,
+        responseCount,
+        completionRate,
+        avgCompletionTime: 5, // Placeholder - would need more complex analytics
+        lastResponseAt: lastResponseResult?.submittedAt || null,
+        status: survey.status,
+      });
+    }
+
+    return analytics;
+  }
+
+  async getResponseTrends(creatorId: string, days: number = 30): Promise<ResponseTrend[]> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const trendsData = await db
+      .select({
+        date: sql<string>`DATE(${responses.createdAt})`,
+        total: count(),
+        completed: sql<number>`SUM(CASE WHEN ${responses.completed} THEN 1 ELSE 0 END)`,
+      })
+      .from(responses)
+      .leftJoin(surveys, eq(responses.surveyId, surveys.id))
+      .where(and(
+        eq(surveys.creatorId, creatorId),
+        gte(responses.createdAt, startDate)
+      ))
+      .groupBy(sql`DATE(${responses.createdAt})`)
+      .orderBy(sql`DATE(${responses.createdAt})`);
+
+    return trendsData.map(row => ({
+      date: row.date,
+      count: row.total,
+      completed: Number(row.completed),
+    }));
+  }
+
+  async getRecentActivity(creatorId: string, limit: number = 10): Promise<ActivityItem[]> {
+    const activities: ActivityItem[] = [];
+
+    // Recent survey creations/updates
+    const recentSurveys = await db
+      .select({
+        id: surveys.id,
+        title: surveys.title,
+        status: surveys.status,
+        createdAt: surveys.createdAt,
+        updatedAt: surveys.updatedAt,
+      })
+      .from(surveys)
+      .where(eq(surveys.creatorId, creatorId))
+      .orderBy(desc(surveys.updatedAt))
+      .limit(limit);
+
+    for (const survey of recentSurveys) {
+      const createdTime = survey.createdAt?.getTime() || 0;
+      const updatedTime = survey.updatedAt?.getTime() || 0;
+      
+      activities.push({
+        id: randomUUID(),
+        type: createdTime === updatedTime ? 'survey_created' : 'survey_published',
+        title: survey.title,
+        description: createdTime === updatedTime 
+          ? 'Survey was created' 
+          : `Survey status changed to ${survey.status}`,
+        timestamp: survey.updatedAt || survey.createdAt || new Date(),
+        surveyId: survey.id,
+      });
+    }
+
+    // Recent responses
+    const recentResponses = await db
+      .select({
+        responseId: responses.id,
+        surveyId: responses.surveyId,
+        surveyTitle: surveys.title,
+        submittedAt: responses.submittedAt,
+        completed: responses.completed,
+      })
+      .from(responses)
+      .leftJoin(surveys, eq(responses.surveyId, surveys.id))
+      .where(eq(surveys.creatorId, creatorId))
+      .orderBy(desc(responses.createdAt))
+      .limit(limit);
+
+    for (const response of recentResponses) {
+      if (response.submittedAt) {
+        activities.push({
+          id: randomUUID(),
+          type: 'response_received',
+          title: response.surveyTitle || 'Unknown Survey',
+          description: response.completed ? 'Response completed' : 'Response received',
+          timestamp: response.submittedAt,
+          surveyId: response.surveyId,
+          responseId: response.responseId,
+        });
+      }
+    }
+
+    // Sort all activities by timestamp and return limited results
+    return activities
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, limit);
+  }
+
+  // Bulk operations
+  async bulkUpdateSurveyStatus(surveyIds: string[], status: string, creatorId: string): Promise<BulkOperationResult> {
+    try {
+      // Verify all surveys belong to the creator
+      const foundSurveys = await db
+        .select({ id: surveys.id })
+        .from(surveys)
+        .where(and(
+          inArray(surveys.id, surveyIds),
+          eq(surveys.creatorId, creatorId)
+        ));
+
+      if (foundSurveys.length !== surveyIds.length) {
+        return {
+          success: false,
+          updatedCount: 0,
+          errors: ['Some surveys not found or access denied'],
+        };
+      }
+
+      // Update survey statuses
+      await db
+        .update(surveys)
+        .set({ 
+          status: status as any,
+          updatedAt: new Date(),
+        })
+        .where(and(
+          inArray(surveys.id, surveyIds),
+          eq(surveys.creatorId, creatorId)
+        ));
+
+      return {
+        success: true,
+        updatedCount: foundSurveys.length,
+        errors: [],
+      };
+    } catch (error) {
+      return {
+        success: false,
+        updatedCount: 0,
+        errors: [error instanceof Error ? error.message : 'Unknown error'],
+      };
+    }
+  }
+
+  async bulkDeleteSurveys(surveyIds: string[], creatorId: string): Promise<BulkOperationResult> {
+    try {
+      // Verify all surveys belong to the creator
+      const surveysToDelete = await db
+        .select({ id: surveys.id })
+        .from(surveys)
+        .where(and(
+          inArray(surveys.id, surveyIds),
+          eq(surveys.creatorId, creatorId)
+        ));
+
+      if (surveysToDelete.length !== surveyIds.length) {
+        return {
+          success: false,
+          updatedCount: 0,
+          errors: ['Some surveys not found or access denied'],
+        };
+      }
+
+      // Delete surveys (cascade deletes will handle related data)
+      await db
+        .delete(surveys)
+        .where(and(
+          inArray(surveys.id, surveyIds),
+          eq(surveys.creatorId, creatorId)
+        ));
+
+      return {
+        success: true,
+        updatedCount: surveysToDelete.length,
+        errors: [],
+      };
+    } catch (error) {
+      return {
+        success: false,
+        updatedCount: 0,
+        errors: [error instanceof Error ? error.message : 'Unknown error'],
+      };
+    }
+  }
+
+  // Survey management
+  async duplicateSurvey(surveyId: string, newTitle: string, creatorId: string): Promise<Survey> {
+    const originalSurvey = await db
+      .select()
+      .from(surveys)
+      .where(and(eq(surveys.id, surveyId), eq(surveys.creatorId, creatorId)))
+      .limit(1);
+
+    if (!originalSurvey.length) {
+      throw new Error('Survey not found or access denied');
+    }
+
+    const original = originalSurvey[0];
+
+    // Create new survey
+    const [newSurvey] = await db
+      .insert(surveys)
+      .values({
+        title: newTitle,
+        description: original.description,
+        creatorId,
+        status: 'draft',
+      })
+      .returning();
+
+    // Duplicate pages and questions
+    const pages = await db
+      .select()
+      .from(surveyPages)
+      .where(eq(surveyPages.surveyId, surveyId))
+      .orderBy(surveyPages.order);
+
+    for (const page of pages) {
+      const [newPage] = await db
+        .insert(surveyPages)
+        .values({
+          surveyId: newSurvey.id,
+          title: page.title,
+          order: page.order,
+        })
+        .returning();
+
+      const pageQuestions = await db
+        .select()
+        .from(questions)
+        .where(eq(questions.pageId, page.id))
+        .orderBy(questions.order);
+
+      for (const question of pageQuestions) {
+        await db
+          .insert(questions)
+          .values({
+            pageId: newPage.id,
+            type: question.type,
+            title: question.title,
+            description: question.description,
+            required: question.required,
+            options: question.options,
+            order: question.order,
+          });
+      }
+    }
+
+    return newSurvey;
+  }
+
+  async archiveSurvey(surveyId: string, creatorId: string): Promise<Survey> {
+    const [archivedSurvey] = await db
+      .update(surveys)
+      .set({ 
+        status: 'closed',
+        updatedAt: new Date(),
+      })
+      .where(and(eq(surveys.id, surveyId), eq(surveys.creatorId, creatorId)))
+      .returning();
+
+    if (!archivedSurvey) {
+      throw new Error('Survey not found or access denied');
+    }
+
+    return archivedSurvey;
   }
 }
 

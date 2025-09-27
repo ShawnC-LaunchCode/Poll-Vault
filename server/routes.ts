@@ -355,7 +355,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Dashboard stats
+  // Enhanced dashboard analytics
   app.get('/api/dashboard/stats', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -364,6 +364,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
       res.status(500).json({ message: "Failed to fetch dashboard stats" });
+    }
+  });
+
+  app.get('/api/dashboard/analytics', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const analytics = await storage.getSurveyAnalytics(userId);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching survey analytics:", error);
+      res.status(500).json({ message: "Failed to fetch survey analytics" });
+    }
+  });
+
+  app.get('/api/dashboard/trends', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const days = parseInt(req.query.days as string) || 30;
+      const trends = await storage.getResponseTrends(userId, days);
+      res.json(trends);
+    } catch (error) {
+      console.error("Error fetching response trends:", error);
+      res.status(500).json({ message: "Failed to fetch response trends" });
+    }
+  });
+
+  app.get('/api/dashboard/activity', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const activity = await storage.getRecentActivity(userId, limit);
+      res.json(activity);
+    } catch (error) {
+      console.error("Error fetching recent activity:", error);
+      res.status(500).json({ message: "Failed to fetch recent activity" });
+    }
+  });
+
+  // Bulk operations
+  app.post('/api/surveys/bulk/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { surveyIds, status } = req.body;
+      
+      if (!Array.isArray(surveyIds) || !status) {
+        return res.status(400).json({ message: "Invalid request data" });
+      }
+
+      const result = await storage.bulkUpdateSurveyStatus(surveyIds, status, userId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error in bulk status update:", error);
+      res.status(500).json({ message: "Failed to update survey statuses" });
+    }
+  });
+
+  app.post('/api/surveys/bulk/delete', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { surveyIds } = req.body;
+      
+      if (!Array.isArray(surveyIds)) {
+        return res.status(400).json({ message: "Invalid request data" });
+      }
+
+      const result = await storage.bulkDeleteSurveys(surveyIds, userId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error in bulk delete:", error);
+      res.status(500).json({ message: "Failed to delete surveys" });
+    }
+  });
+
+  // Survey management
+  app.post('/api/surveys/:id/duplicate', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const surveyId = req.params.id;
+      const { title } = req.body;
+      
+      if (!title) {
+        return res.status(400).json({ message: "Title is required" });
+      }
+
+      const duplicatedSurvey = await storage.duplicateSurvey(surveyId, title, userId);
+      res.json(duplicatedSurvey);
+    } catch (error) {
+      console.error("Error duplicating survey:", error);
+      res.status(500).json({ message: "Failed to duplicate survey" });
+    }
+  });
+
+  app.post('/api/surveys/:id/archive', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const surveyId = req.params.id;
+
+      const archivedSurvey = await storage.archiveSurvey(surveyId, userId);
+      res.json(archivedSurvey);
+    } catch (error) {
+      console.error("Error archiving survey:", error);
+      res.status(500).json({ message: "Failed to archive survey" });
     }
   });
 
