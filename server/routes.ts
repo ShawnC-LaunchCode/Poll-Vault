@@ -19,7 +19,7 @@ declare global {
 }
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertSurveySchema, insertSurveyPageSchema, insertQuestionSchema, insertLoopGroupSubquestionSchema, insertConditionalRuleSchema, insertRecipientSchema, insertResponseSchema, insertAnswerSchema, insertAnalyticsEventSchema } from "@shared/schema";
+import { insertSurveySchema, insertSurveyPageSchema, insertQuestionSchema, insertLoopGroupSubquestionSchema, insertConditionalRuleSchema, insertRecipientSchema, insertGlobalRecipientSchema, insertResponseSchema, insertAnswerSchema, insertAnalyticsEventSchema } from "@shared/schema";
 import { sendNotificationEmail } from "./services/emailService";
 import { upload, isFileTypeAccepted, deleteFile, getFilePath, fileExists } from "./services/fileService";
 import { exportService, type ExportOptions } from "./services/exportService";
@@ -561,6 +561,194 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching recipients:", error);
       res.status(500).json({ message: "Failed to fetch recipients" });
+    }
+  });
+
+  // Global recipient routes
+  app.post('/api/recipients/global', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized - no user ID" });
+      }
+      
+      // Check for duplicate email within creator's global recipients
+      const existingRecipient = await storage.getGlobalRecipientByCreatorAndEmail(userId, req.body.email);
+      if (existingRecipient) {
+        return res.status(409).json({ message: "Email already exists in your global recipient list" });
+      }
+      
+      const globalRecipientData = insertGlobalRecipientSchema.parse({ ...req.body, creatorId: userId });
+      const globalRecipient = await storage.createGlobalRecipient(globalRecipientData);
+      res.json(globalRecipient);
+    } catch (error) {
+      console.error("Error creating global recipient:", error);
+      res.status(500).json({ message: "Failed to create global recipient" });
+    }
+  });
+
+  app.get('/api/recipients/global', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized - no user ID" });
+      }
+      
+      const globalRecipients = await storage.getGlobalRecipientsByCreator(userId);
+      res.json(globalRecipients);
+    } catch (error) {
+      console.error("Error fetching global recipients:", error);
+      res.status(500).json({ message: "Failed to fetch global recipients" });
+    }
+  });
+
+  app.get('/api/recipients/global/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized - no user ID" });
+      }
+      
+      const globalRecipient = await storage.getGlobalRecipient(req.params.id);
+      if (!globalRecipient) {
+        return res.status(404).json({ message: "Global recipient not found" });
+      }
+      
+      // Check if user owns this global recipient
+      if (globalRecipient.creatorId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      res.json(globalRecipient);
+    } catch (error) {
+      console.error("Error fetching global recipient:", error);
+      res.status(500).json({ message: "Failed to fetch global recipient" });
+    }
+  });
+
+  app.put('/api/recipients/global/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized - no user ID" });
+      }
+      
+      const globalRecipient = await storage.getGlobalRecipient(req.params.id);
+      if (!globalRecipient) {
+        return res.status(404).json({ message: "Global recipient not found" });
+      }
+      
+      // Check if user owns this global recipient
+      if (globalRecipient.creatorId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      // If email is being updated, check for duplicates
+      if (req.body.email && req.body.email !== globalRecipient.email) {
+        const existingRecipient = await storage.getGlobalRecipientByCreatorAndEmail(userId, req.body.email);
+        if (existingRecipient && existingRecipient.id !== req.params.id) {
+          return res.status(409).json({ message: "Email already exists in your global recipient list" });
+        }
+      }
+      
+      const updates = insertGlobalRecipientSchema.partial().parse(req.body);
+      const updatedGlobalRecipient = await storage.updateGlobalRecipient(req.params.id, updates);
+      res.json(updatedGlobalRecipient);
+    } catch (error) {
+      console.error("Error updating global recipient:", error);
+      res.status(500).json({ message: "Failed to update global recipient" });
+    }
+  });
+
+  app.delete('/api/recipients/global/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized - no user ID" });
+      }
+      
+      const globalRecipient = await storage.getGlobalRecipient(req.params.id);
+      if (!globalRecipient) {
+        return res.status(404).json({ message: "Global recipient not found" });
+      }
+      
+      // Check if user owns this global recipient
+      if (globalRecipient.creatorId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      await storage.deleteGlobalRecipient(req.params.id);
+      res.json({ message: "Global recipient deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting global recipient:", error);
+      res.status(500).json({ message: "Failed to delete global recipient" });
+    }
+  });
+
+  // Bulk delete global recipients
+  app.delete('/api/recipients/global/bulk', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized - no user ID" });
+      }
+      
+      const { ids } = req.body;
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ message: "Recipient IDs are required" });
+      }
+      
+      const result = await storage.bulkDeleteGlobalRecipients(ids, userId);
+      
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error("Error bulk deleting global recipients:", error);
+      res.status(500).json({ message: "Failed to bulk delete global recipients" });
+    }
+  });
+
+  // Bulk add global recipients to survey
+  app.post('/api/surveys/:surveyId/recipients/bulk-from-global', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized - no user ID" });
+      }
+      
+      const survey = await storage.getSurvey(req.params.surveyId);
+      if (!survey || survey.creatorId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const { globalRecipientIds } = req.body;
+      if (!globalRecipientIds || !Array.isArray(globalRecipientIds) || globalRecipientIds.length === 0) {
+        return res.status(400).json({ message: "Global recipient IDs are required" });
+      }
+      
+      const newRecipients = await storage.bulkAddGlobalRecipientsToSurvey(
+        req.params.surveyId, 
+        globalRecipientIds, 
+        userId
+      );
+      
+      res.json({
+        message: `Successfully added ${newRecipients.length} recipients to survey`,
+        recipients: newRecipients,
+        addedCount: newRecipients.length
+      });
+    } catch (error) {
+      console.error("Error bulk adding global recipients to survey:", error);
+      if (error.message.includes("All selected recipients are already in this survey")) {
+        res.status(409).json({ message: error.message });
+      } else if (error.message.includes("No valid global recipients found")) {
+        res.status(404).json({ message: error.message });
+      } else {
+        res.status(500).json({ message: "Failed to add recipients to survey" });
+      }
     }
   });
 

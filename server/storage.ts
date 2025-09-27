@@ -6,6 +6,7 @@ import {
   loopGroupSubquestions,
   conditionalRules,
   recipients,
+  globalRecipients,
   responses,
   answers,
   analyticsEvents,
@@ -26,6 +27,8 @@ import {
   type QuestionWithSubquestions,
   type Recipient,
   type InsertRecipient,
+  type GlobalRecipient,
+  type InsertGlobalRecipient,
   type Response,
   type InsertResponse,
   type Answer,
@@ -102,6 +105,17 @@ export interface IStorage {
   getRecipientByToken(token: string): Promise<Recipient | undefined>;
   getRecipientsBySurvey(surveyId: string): Promise<Recipient[]>;
   updateRecipient(id: string, updates: Partial<InsertRecipient>): Promise<Recipient>;
+  
+  // Global recipient operations
+  createGlobalRecipient(globalRecipient: InsertGlobalRecipient): Promise<GlobalRecipient>;
+  getGlobalRecipient(id: string): Promise<GlobalRecipient | undefined>;
+  getGlobalRecipientsByCreator(creatorId: string): Promise<GlobalRecipient[]>;
+  updateGlobalRecipient(id: string, updates: Partial<InsertGlobalRecipient>): Promise<GlobalRecipient>;
+  deleteGlobalRecipient(id: string): Promise<void>;
+  getGlobalRecipientByCreatorAndEmail(creatorId: string, email: string): Promise<GlobalRecipient | undefined>;
+  bulkDeleteGlobalRecipients(ids: string[], creatorId: string): Promise<BulkOperationResult>;
+  bulkAddGlobalRecipientsToSurvey(surveyId: string, globalRecipientIds: string[], creatorId: string): Promise<Recipient[]>;
+  checkRecipientDuplicatesInSurvey(surveyId: string, emails: string[]): Promise<string[]>;
   
   // Response operations
   createResponse(response: InsertResponse): Promise<Response>;
@@ -430,6 +444,147 @@ export class DatabaseStorage implements IStorage {
       .where(eq(recipients.id, id))
       .returning();
     return updatedRecipient;
+  }
+  
+  // Global recipient operations
+  async createGlobalRecipient(globalRecipient: InsertGlobalRecipient): Promise<GlobalRecipient> {
+    const [newGlobalRecipient] = await db
+      .insert(globalRecipients)
+      .values({ ...globalRecipient, updatedAt: new Date() })
+      .returning();
+    return newGlobalRecipient;
+  }
+
+  async getGlobalRecipient(id: string): Promise<GlobalRecipient | undefined> {
+    const [globalRecipient] = await db.select().from(globalRecipients).where(eq(globalRecipients.id, id));
+    return globalRecipient;
+  }
+
+  async getGlobalRecipientsByCreator(creatorId: string): Promise<GlobalRecipient[]> {
+    return await db
+      .select()
+      .from(globalRecipients)
+      .where(eq(globalRecipients.creatorId, creatorId))
+      .orderBy(desc(globalRecipients.createdAt));
+  }
+
+  async updateGlobalRecipient(id: string, updates: Partial<InsertGlobalRecipient>): Promise<GlobalRecipient> {
+    const [updatedGlobalRecipient] = await db
+      .update(globalRecipients)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(globalRecipients.id, id))
+      .returning();
+    return updatedGlobalRecipient;
+  }
+
+  async deleteGlobalRecipient(id: string): Promise<void> {
+    await db
+      .delete(globalRecipients)
+      .where(eq(globalRecipients.id, id));
+  }
+
+  async getGlobalRecipientByCreatorAndEmail(creatorId: string, email: string): Promise<GlobalRecipient | undefined> {
+    const [globalRecipient] = await db
+      .select()
+      .from(globalRecipients)
+      .where(and(eq(globalRecipients.creatorId, creatorId), eq(globalRecipients.email, email)));
+    return globalRecipient;
+  }
+
+  async bulkDeleteGlobalRecipients(ids: string[], creatorId: string): Promise<BulkOperationResult> {
+    try {
+      // Verify ownership of all recipients before deletion
+      const recipientsToDelete = await db
+        .select()
+        .from(globalRecipients)
+        .where(and(inArray(globalRecipients.id, ids), eq(globalRecipients.creatorId, creatorId)));
+
+      if (recipientsToDelete.length !== ids.length) {
+        return {
+          success: false,
+          message: "Some recipients not found or access denied",
+          processedCount: 0,
+          totalCount: ids.length
+        };
+      }
+
+      await db
+        .delete(globalRecipients)
+        .where(and(inArray(globalRecipients.id, ids), eq(globalRecipients.creatorId, creatorId)));
+
+      return {
+        success: true,
+        message: `Successfully deleted ${ids.length} global recipients`,
+        processedCount: ids.length,
+        totalCount: ids.length
+      };
+    } catch (error) {
+      console.error("Error in bulk delete global recipients:", error);
+      return {
+        success: false,
+        message: "Failed to bulk delete global recipients",
+        processedCount: 0,
+        totalCount: ids.length
+      };
+    }
+  }
+
+  async bulkAddGlobalRecipientsToSurvey(surveyId: string, globalRecipientIds: string[], creatorId: string): Promise<Recipient[]> {
+    // Get the global recipients and verify ownership
+    const globalRecipientsToAdd = await db
+      .select()
+      .from(globalRecipients)
+      .where(and(inArray(globalRecipients.id, globalRecipientIds), eq(globalRecipients.creatorId, creatorId)));
+
+    if (globalRecipientsToAdd.length === 0) {
+      throw new Error("No valid global recipients found");
+    }
+
+    // Check for duplicates in the survey
+    const existingRecipients = await db
+      .select()
+      .from(recipients)
+      .where(eq(recipients.surveyId, surveyId));
+
+    const existingEmails = new Set(existingRecipients.map(r => r.email.toLowerCase()));
+    const recipientsToAdd = globalRecipientsToAdd.filter(gr => 
+      !existingEmails.has(gr.email.toLowerCase())
+    );
+
+    if (recipientsToAdd.length === 0) {
+      throw new Error("All selected recipients are already in this survey");
+    }
+
+    // Create survey recipients from global recipients
+    const newRecipients: Recipient[] = [];
+    for (const globalRecipient of recipientsToAdd) {
+      const token = randomUUID();
+      const recipientData = {
+        surveyId,
+        name: globalRecipient.name,
+        email: globalRecipient.email,
+        token
+      };
+      
+      const [newRecipient] = await db
+        .insert(recipients)
+        .values(recipientData)
+        .returning();
+      
+      newRecipients.push(newRecipient);
+    }
+
+    return newRecipients;
+  }
+
+  async checkRecipientDuplicatesInSurvey(surveyId: string, emails: string[]): Promise<string[]> {
+    const existingRecipients = await db
+      .select()
+      .from(recipients)
+      .where(eq(recipients.surveyId, surveyId));
+
+    const existingEmails = new Set(existingRecipients.map(r => r.email.toLowerCase()));
+    return emails.filter(email => existingEmails.has(email.toLowerCase()));
   }
   
   // Response operations

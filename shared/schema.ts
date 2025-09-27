@@ -159,6 +159,22 @@ export const recipients = pgTable("recipients", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Global recipients table (creator-owned, not tied to specific surveys)
+export const globalRecipients = pgTable("global_recipients", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  creatorId: varchar("creator_id").references(() => users.id).notNull(),
+  name: varchar("name").notNull(),
+  email: varchar("email").notNull(),
+  tags: text("tags").array(), // Optional tags for categorization/grouping
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  // Indices for performance
+  index("global_recipients_creator_idx").on(table.creatorId),
+  index("global_recipients_email_idx").on(table.email),
+  index("global_recipients_creator_email_idx").on(table.creatorId, table.email),
+]);
+
 // Responses table
 export const responses = pgTable("responses", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -238,6 +254,7 @@ export const anonymousResponseTracking = pgTable("anonymous_response_tracking", 
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   surveys: many(surveys),
+  globalRecipients: many(globalRecipients),
 }));
 
 export const surveysRelations = relations(surveys, ({ one, many }) => ({
@@ -281,6 +298,13 @@ export const recipientsRelations = relations(recipients, ({ one, many }) => ({
     references: [surveys.id],
   }),
   responses: many(responses),
+}));
+
+export const globalRecipientsRelations = relations(globalRecipients, ({ one }) => ({
+  creator: one(users, {
+    fields: [globalRecipients.creatorId],
+    references: [users.id],
+  }),
 }));
 
 export const responsesRelations = relations(responses, ({ one, many }) => ({
@@ -332,6 +356,7 @@ export const insertQuestionSchema = createInsertSchema(questions).omit({ id: tru
 export const insertLoopGroupSubquestionSchema = createInsertSchema(loopGroupSubquestions).omit({ id: true, createdAt: true });
 export const insertConditionalRuleSchema = createInsertSchema(conditionalRules).omit({ id: true, createdAt: true });
 export const insertRecipientSchema = createInsertSchema(recipients).omit({ id: true, createdAt: true, token: true });
+export const insertGlobalRecipientSchema = createInsertSchema(globalRecipients).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertResponseSchema = createInsertSchema(responses).omit({ id: true, createdAt: true });
 export const insertAnswerSchema = createInsertSchema(answers).omit({ id: true, createdAt: true });
 export const insertAnonymousResponseTrackingSchema = createInsertSchema(anonymousResponseTracking).omit({ id: true, createdAt: true });
@@ -365,6 +390,8 @@ export type ConditionalRule = typeof conditionalRules.$inferSelect;
 export type InsertConditionalRule = typeof insertConditionalRuleSchema._type;
 export type Recipient = typeof recipients.$inferSelect;
 export type InsertRecipient = typeof insertRecipientSchema._type;
+export type GlobalRecipient = typeof globalRecipients.$inferSelect;
+export type InsertGlobalRecipient = typeof insertGlobalRecipientSchema._type;
 export type Response = typeof responses.$inferSelect;
 export type InsertResponse = typeof insertResponseSchema._type;
 export type Answer = typeof answers.$inferSelect;

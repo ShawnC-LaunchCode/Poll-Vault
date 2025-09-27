@@ -30,7 +30,7 @@ export default function Sidebar() {
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
             <i className="fas fa-poll text-primary-foreground text-sm"></i>
           </div>
-          <span className="text-xl font-bold text-foreground">SurveyPro</span>
+          <span className="text-xl font-bold text-foreground">Poll Vault</span>
         </div>
       </div>
 
