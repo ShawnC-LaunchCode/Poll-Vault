@@ -16,14 +16,16 @@ import QuestionRenderer from "@/components/survey/QuestionRenderer";
 import ProgressBar from "@/components/survey/ProgressBar";
 
 export default function SurveyPlayer() {
-  const { token } = useParams();
+  const { token, publicLink } = useParams();
   const { toast } = useToast();
   
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [answerIds, setAnswerIds] = useState<Record<string, string>>({});
   const [responseId, setResponseId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const [visibleQuestions, setVisibleQuestions] = useState<Record<string, boolean>>({});
   
   // Time tracking state
@@ -32,17 +34,29 @@ export default function SurveyPlayer() {
   const [surveyStartTime, setSurveyStartTime] = useState<number | null>(null);
   const questionFocusTimeouts = useRef<Record<string, NodeJS.Timeout>>({});
 
+  // Determine if this is an anonymous survey
+  const surveyIdentifier = publicLink || token;
+  const isAnonymousAccess = !!publicLink;
+  
   // Load survey data
   const { data: surveyData, isLoading, error } = useQuery<{
     survey: Survey;
     pages?: SurveyPageWithQuestions[];
-    recipient: Recipient;
-    alreadyCompleted: boolean;
+    recipient?: Recipient;
+    anonymous?: boolean;
+    alreadyCompleted?: boolean;
     submittedAt?: string;
   }>({
-    queryKey: ["/api/survey", token],
+    queryKey: [isAnonymousAccess ? "/api/anonymous-survey" : "/api/survey", surveyIdentifier],
     retry: false,
   });
+  
+  // Set anonymous state when survey data loads
+  useEffect(() => {
+    if (surveyData) {
+      setIsAnonymous(!!surveyData.anonymous);
+    }
+  }, [surveyData]);
 
   // Load conditional rules for the survey
   const { data: conditionalRules = [] } = useQuery<ConditionalRule[]>({
@@ -54,28 +68,44 @@ export default function SurveyPlayer() {
   // Create response mutation (called when user starts answering)
   const createResponseMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("POST", `/api/survey/${token}/start-response`, {});
+      if (isAnonymous) {
+        // Generate session ID for anonymous surveys
+        const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        setSessionId(newSessionId);
+        
+        return await apiRequest("POST", `/api/anonymous-survey/${publicLink}/start-response`, {
+          sessionId: newSessionId,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          screenResolution: `${screen.width}x${screen.height}`
+        });
+      } else {
+        return await apiRequest("POST", `/api/survey/${token}/start-response`, {});
+      }
     },
     onSuccess: (data) => {
-      setResponseId(data.id);
+      setResponseId(data.responseId || data.id);
+      if (data.sessionId) {
+        setSessionId(data.sessionId);
+      }
       setSurveyStartTime(Date.now());
       
       // Track survey start event
       trackAnalyticsEvent({
-        responseId: data.id,
+        responseId: data.responseId || data.id,
         surveyId: surveyData?.survey?.id || '',
         event: 'survey_start',
         data: {
           timestamp: Date.now(),
           userAgent: navigator.userAgent,
           screenResolution: `${screen.width}x${screen.height}`,
+          anonymous: isAnonymous
         },
       });
     },
     onError: (error) => {
       toast({
         title: "Error",
-        description: "Failed to start response. Please try again.",
+        description: error.message || "Failed to start response. Please try again.",
         variant: "destructive",
       });
     },
@@ -120,7 +150,14 @@ export default function SurveyPlayer() {
   // Submit response mutation
   const submitMutation = useMutation({
     mutationFn: async (responseData: any) => {
-      return await apiRequest("POST", `/api/survey/${token}/response`, responseData);
+      if (isAnonymous) {
+        return await apiRequest("POST", `/api/anonymous-survey/${publicLink}/response`, {
+          ...responseData,
+          responseId
+        });
+      } else {
+        return await apiRequest("POST", `/api/survey/${token}/response`, responseData);
+      }
     },
     onSuccess: async () => {
       setIsSubmitted(true);
@@ -461,6 +498,21 @@ export default function SurveyPlayer() {
   const currentPage = pages?.[currentPageIndex];
   const totalPages = pages?.length || 0;
   const progress = ((currentPageIndex + 1) / totalPages) * 100;
+  
+  // Anonymous survey header component
+  const AnonymousHeader = () => (
+    isAnonymous && (
+      <div className="bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800 px-4 py-2">
+        <div className="flex items-center justify-center space-x-2 text-blue-700 dark:text-blue-300">
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+          <span className="text-sm font-medium">Anonymous Survey</span>
+          <span className="text-xs opacity-75">Your responses are not linked to your identity</span>
+        </div>
+      </div>
+    )
+  );
 
   const handleAnswerChange = (questionId: string, value: any) => {
     setAnswers(prev => ({
@@ -559,10 +611,15 @@ export default function SurveyPlayer() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Anonymous Survey Indicator */}
+      <AnonymousHeader />
+      
       {/* Mobile Header */}
       <div className="lg:hidden bg-card border-b border-border px-4 py-3">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-foreground">Survey</span>
+          <span className="text-sm font-medium text-foreground">
+            {isAnonymous ? 'Anonymous Survey' : 'Survey'}
+          </span>
         </div>
       </div>
 

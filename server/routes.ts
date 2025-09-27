@@ -672,6 +672,212 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Anonymous survey configuration routes
+  app.post('/api/surveys/:id/anonymous', isAuthenticated, async (req: any, res) => {
+    try {
+      const survey = await storage.getSurvey(req.params.id);
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
+      }
+      
+      if (survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const { accessType, anonymousConfig } = req.body;
+      
+      const updatedSurvey = await storage.enableAnonymousAccess(req.params.id, {
+        accessType,
+        anonymousConfig
+      });
+      
+      res.json({
+        survey: updatedSurvey,
+        publicLink: `${req.protocol}://${req.get('host')}/survey/${updatedSurvey.publicLink}`
+      });
+    } catch (error) {
+      console.error("Error enabling anonymous access:", error);
+      res.status(500).json({ message: "Failed to enable anonymous access" });
+    }
+  });
+
+  app.delete('/api/surveys/:id/anonymous', isAuthenticated, async (req: any, res) => {
+    try {
+      const survey = await storage.getSurvey(req.params.id);
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
+      }
+      
+      if (survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const updatedSurvey = await storage.disableAnonymousAccess(req.params.id);
+      res.json(updatedSurvey);
+    } catch (error) {
+      console.error("Error disabling anonymous access:", error);
+      res.status(500).json({ message: "Failed to disable anonymous access" });
+    }
+  });
+
+  // Anonymous survey access routes (no authentication required)
+  app.get('/api/anonymous-survey/:publicLink', async (req, res) => {
+    try {
+      const survey = await storage.getSurveyByPublicLink(req.params.publicLink);
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
+      }
+      
+      if (!survey.allowAnonymous || survey.status !== 'open') {
+        return res.status(404).json({ message: "Survey not available for anonymous access" });
+      }
+      
+      const pages = await storage.getSurveyPages(survey.id);
+      
+      // Get questions for each page, including subquestions for loop groups
+      for (const page of pages) {
+        (page as any).questions = await storage.getQuestionsWithSubquestionsByPage(page.id);
+      }
+      
+      const surveyData = {
+        survey: {
+          ...survey,
+          // Don't expose sensitive creator information in anonymous access
+          creatorId: undefined
+        },
+        pages,
+        anonymous: true
+      };
+      
+      res.json(surveyData);
+    } catch (error) {
+      console.error("Error fetching anonymous survey:", error);
+      res.status(500).json({ message: "Failed to fetch survey" });
+    }
+  });
+
+  app.post('/api/anonymous-survey/:publicLink/start-response', async (req, res) => {
+    try {
+      const survey = await storage.getSurveyByPublicLink(req.params.publicLink);
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
+      }
+      
+      if (!survey.allowAnonymous || survey.status !== 'open') {
+        return res.status(404).json({ message: "Survey not available for anonymous access" });
+      }
+      
+      // Get IP address and session info
+      const ipAddress = req.ip || req.connection.remoteAddress || 'unknown';
+      const userAgent = req.get('user-agent');
+      const sessionId = req.body.sessionId || `session_${Date.now()}_${Math.random().toString(36)}`;
+      
+      // Check if anonymous response is allowed based on survey configuration
+      const canRespond = await storage.checkAnonymousResponseLimit(survey.id, ipAddress, sessionId);
+      if (!canRespond) {
+        return res.status(429).json({ 
+          message: "Response limit reached",
+          error: "You have already responded to this survey or the response limit has been reached."
+        });
+      }
+      
+      // Create anonymous response
+      const anonymousMetadata = {
+        browserInfo: {
+          userAgent,
+          language: req.get('accept-language'),
+          timezone: req.body.timezone
+        },
+        deviceInfo: {
+          isMobile: /Mobile|Android|iPhone|iPad/.test(userAgent || ''),
+          screenResolution: req.body.screenResolution
+        },
+        accessInfo: {
+          referrer: req.get('referer'),
+          entryTime: Date.now()
+        }
+      };
+      
+      const response = await storage.createAnonymousResponse({
+        surveyId: survey.id,
+        ipAddress,
+        userAgent,
+        sessionId,
+        anonymousMetadata
+      });
+      
+      // Create tracking record for response limiting
+      await storage.createAnonymousResponseTracking({
+        surveyId: survey.id,
+        ipAddress,
+        sessionId,
+        responseId: response.id
+      });
+      
+      res.json({ responseId: response.id, sessionId });
+    } catch (error) {
+      console.error("Error starting anonymous response:", error);
+      res.status(500).json({ message: "Failed to start anonymous response" });
+    }
+  });
+
+  app.post('/api/anonymous-survey/:publicLink/response', async (req, res) => {
+    try {
+      const survey = await storage.getSurveyByPublicLink(req.params.publicLink);
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
+      }
+      
+      if (!survey.allowAnonymous || survey.status !== 'open') {
+        return res.status(404).json({ message: "Survey not available for anonymous access" });
+      }
+      
+      const { responseId, answers } = req.body;
+      
+      // Verify the response exists and is anonymous
+      const response = await storage.getResponse(responseId);
+      if (!response || !response.isAnonymous || response.surveyId !== survey.id) {
+        return res.status(400).json({ message: "Invalid response" });
+      }
+      
+      // Update response to completed
+      const updatedResponse = await storage.updateResponse(responseId, {
+        completed: true,
+        submittedAt: new Date()
+      });
+      
+      // Save answers
+      if (answers && Array.isArray(answers)) {
+        for (const answerData of answers) {
+          const answer = insertAnswerSchema.parse({
+            ...answerData,
+            responseId: responseId
+          });
+          await storage.createAnswer(answer);
+        }
+      }
+      
+      // Send notification email to creator (anonymous)
+      const creator = await storage.getUser(survey.creatorId);
+      if (creator && creator.email) {
+        await sendNotificationEmail(
+          creator.email,
+          survey.title,
+          'Anonymous User',
+          `${process.env.REPLIT_DOMAINS?.split(',')[0]}/responses/${responseId}`
+        );
+      }
+      
+      res.json({
+        id: updatedResponse.id,
+        message: "Response submitted successfully"
+      });
+    } catch (error) {
+      console.error("Error submitting anonymous response:", error);
+      res.status(500).json({ message: "Failed to submit anonymous response" });
+    }
+  });
+
   // Responses routes
   app.get('/api/surveys/:surveyId/responses', isAuthenticated, async (req: any, res) => {
     try {

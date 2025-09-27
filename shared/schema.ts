@@ -77,6 +77,9 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Anonymous access type enum
+export const anonymousAccessTypeEnum = pgEnum('anonymous_access_type', ['disabled', 'unlimited', 'one_per_ip', 'one_per_session']);
+
 // Surveys table
 export const surveys = pgTable("surveys", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -84,6 +87,11 @@ export const surveys = pgTable("surveys", {
   description: text("description"),
   creatorId: varchar("creator_id").references(() => users.id).notNull(),
   status: surveyStatusEnum("status").default('draft').notNull(),
+  // Anonymous survey configuration
+  allowAnonymous: boolean("allow_anonymous").default(false),
+  anonymousAccessType: anonymousAccessTypeEnum("anonymous_access_type").default('disabled'),
+  publicLink: varchar("public_link").unique(), // Generated public UUID for anonymous access
+  anonymousConfig: jsonb("anonymous_config"), // Additional anonymous survey settings
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -155,9 +163,15 @@ export const recipients = pgTable("recipients", {
 export const responses = pgTable("responses", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   surveyId: uuid("survey_id").references(() => surveys.id, { onDelete: 'cascade' }).notNull(),
-  recipientId: uuid("recipient_id").references(() => recipients.id).notNull(),
+  recipientId: uuid("recipient_id").references(() => recipients.id), // Made optional for anonymous responses
   completed: boolean("completed").default(false),
   submittedAt: timestamp("submitted_at"),
+  // Anonymous response metadata
+  isAnonymous: boolean("is_anonymous").default(false),
+  ipAddress: varchar("ip_address"), // For anonymous response tracking and limiting
+  userAgent: text("user_agent"), // For analytics
+  sessionId: varchar("session_id"), // For one_per_session limiting
+  anonymousMetadata: jsonb("anonymous_metadata"), // Additional anonymous response data
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -205,6 +219,20 @@ export const analyticsEvents = pgTable("analytics_events", {
   // Composite indices for common query patterns
   index("analytics_survey_question_event_idx").on(table.surveyId, table.questionId, table.event),
   index("analytics_survey_page_event_idx").on(table.surveyId, table.pageId, table.event),
+]);
+
+// Anonymous response tracking table for IP/session limiting
+export const anonymousResponseTracking = pgTable("anonymous_response_tracking", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  surveyId: uuid("survey_id").references(() => surveys.id, { onDelete: 'cascade' }).notNull(),
+  ipAddress: varchar("ip_address").notNull(),
+  sessionId: varchar("session_id"),
+  responseId: uuid("response_id").references(() => responses.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  // Indices for anonymous response limiting
+  index("anonymous_tracking_survey_ip_idx").on(table.surveyId, table.ipAddress),
+  index("anonymous_tracking_survey_session_idx").on(table.surveyId, table.sessionId),
 ]);
 
 // Relations
@@ -266,6 +294,18 @@ export const responsesRelations = relations(responses, ({ one, many }) => ({
   }),
   answers: many(answers),
   analyticsEvents: many(analyticsEvents),
+  anonymousTracking: many(anonymousResponseTracking),
+}));
+
+export const anonymousResponseTrackingRelations = relations(anonymousResponseTracking, ({ one }) => ({
+  survey: one(surveys, {
+    fields: [anonymousResponseTracking.surveyId],
+    references: [surveys.id],
+  }),
+  response: one(responses, {
+    fields: [anonymousResponseTracking.responseId],
+    references: [responses.id],
+  }),
 }));
 
 export const answersRelations = relations(answers, ({ one, many }) => ({
@@ -286,7 +326,7 @@ export const answersRelations = relations(answers, ({ one, many }) => ({
 
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertSurveySchema = createInsertSchema(surveys).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSurveySchema = createInsertSchema(surveys).omit({ id: true, createdAt: true, updatedAt: true, publicLink: true });
 export const insertSurveyPageSchema = createInsertSchema(surveyPages).omit({ id: true, createdAt: true });
 export const insertQuestionSchema = createInsertSchema(questions).omit({ id: true, createdAt: true });
 export const insertLoopGroupSubquestionSchema = createInsertSchema(loopGroupSubquestions).omit({ id: true, createdAt: true });
@@ -294,6 +334,7 @@ export const insertConditionalRuleSchema = createInsertSchema(conditionalRules).
 export const insertRecipientSchema = createInsertSchema(recipients).omit({ id: true, createdAt: true, token: true });
 export const insertResponseSchema = createInsertSchema(responses).omit({ id: true, createdAt: true });
 export const insertAnswerSchema = createInsertSchema(answers).omit({ id: true, createdAt: true });
+export const insertAnonymousResponseTrackingSchema = createInsertSchema(anonymousResponseTracking).omit({ id: true, createdAt: true });
 
 // Analytics event validation schema with strict validation
 export const insertAnalyticsEventSchema = createInsertSchema(analyticsEvents).omit({ 
@@ -329,6 +370,8 @@ export type InsertResponse = typeof insertResponseSchema._type;
 export type Answer = typeof answers.$inferSelect;
 export type InsertAnswer = typeof insertAnswerSchema._type;
 export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
+export type AnonymousResponseTracking = typeof anonymousResponseTracking.$inferSelect;
+export type InsertAnonymousResponseTracking = typeof insertAnonymousResponseTrackingSchema._type;
 
 // Additional API response types
 export interface DashboardStats {
@@ -519,4 +562,31 @@ export interface ConditionalEvaluationResult {
   visible: boolean;
   required: boolean;
   reason?: string; // For debugging
+}
+
+// Anonymous survey configuration types
+export interface AnonymousSurveyConfig {
+  maxResponsesPerIP?: number; // For custom limiting
+  cooldownPeriodHours?: number; // Time between responses from same IP
+  collectUserAgent?: boolean;
+  collectTimestamp?: boolean;
+  requireCaptcha?: boolean; // Future extension
+  customMessage?: string; // Message shown to anonymous users
+}
+
+// Anonymous response metadata
+export interface AnonymousResponseMetadata {
+  browserInfo?: {
+    userAgent: string;
+    language: string;
+    timezone: string;
+  };
+  deviceInfo?: {
+    isMobile: boolean;
+    screenResolution: string;
+  };
+  accessInfo?: {
+    referrer?: string;
+    entryTime: number;
+  };
 }

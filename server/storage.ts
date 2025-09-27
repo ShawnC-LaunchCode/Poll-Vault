@@ -10,6 +10,7 @@ import {
   answers,
   analyticsEvents,
   files,
+  anonymousResponseTracking,
   type User,
   type UpsertUser,
   type Survey,
@@ -43,6 +44,9 @@ import {
   type CompletionFunnelData,
   type TimeSpentData,
   type EngagementMetrics,
+  type AnonymousResponseTracking,
+  type InsertAnonymousResponseTracking,
+  type AnonymousSurveyConfig,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, count, sql, gte, inArray } from "drizzle-orm";
@@ -150,6 +154,25 @@ export interface IStorage {
   getFilesByAnswer(answerId: string): Promise<FileMetadata[]>;
   deleteFile(id: string): Promise<void>;
   deleteFilesByAnswer(answerId: string): Promise<void>;
+  
+  // Anonymous survey operations
+  getSurveyByPublicLink(publicLink: string): Promise<Survey | undefined>;
+  generatePublicLink(surveyId: string): Promise<string>;
+  enableAnonymousAccess(surveyId: string, config: { accessType: string; anonymousConfig?: AnonymousSurveyConfig }): Promise<Survey>;
+  disableAnonymousAccess(surveyId: string): Promise<Survey>;
+  
+  // Anonymous response operations
+  createAnonymousResponse(data: {
+    surveyId: string;
+    ipAddress: string;
+    userAgent?: string;
+    sessionId?: string;
+    anonymousMetadata?: any;
+  }): Promise<Response>;
+  checkAnonymousResponseLimit(surveyId: string, ipAddress: string, sessionId?: string): Promise<boolean>;
+  createAnonymousResponseTracking(tracking: InsertAnonymousResponseTracking): Promise<AnonymousResponseTracking>;
+  getAnonymousResponsesBySurvey(surveyId: string): Promise<Response[]>;
+  getAnonymousResponseCount(surveyId: string): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1323,6 +1346,164 @@ export class DatabaseStorage implements IStorage {
 
   async deleteFilesByAnswer(answerId: string): Promise<void> {
     await db.delete(files).where(eq(files.answerId, answerId));
+  }
+
+  // Anonymous survey operations
+  async getSurveyByPublicLink(publicLink: string): Promise<Survey | undefined> {
+    const [survey] = await db.select().from(surveys).where(eq(surveys.publicLink, publicLink));
+    return survey;
+  }
+
+  async generatePublicLink(surveyId: string): Promise<string> {
+    const publicLink = randomUUID();
+    await db
+      .update(surveys)
+      .set({ 
+        publicLink,
+        updatedAt: new Date()
+      })
+      .where(eq(surveys.id, surveyId));
+    return publicLink;
+  }
+
+  async enableAnonymousAccess(surveyId: string, config: { accessType: string; anonymousConfig?: AnonymousSurveyConfig }): Promise<Survey> {
+    const publicLink = randomUUID();
+    const [updatedSurvey] = await db
+      .update(surveys)
+      .set({
+        allowAnonymous: true,
+        anonymousAccessType: config.accessType as any,
+        publicLink,
+        anonymousConfig: config.anonymousConfig ? JSON.stringify(config.anonymousConfig) : null,
+        updatedAt: new Date()
+      })
+      .where(eq(surveys.id, surveyId))
+      .returning();
+    
+    if (!updatedSurvey) {
+      throw new Error('Survey not found');
+    }
+    
+    return updatedSurvey;
+  }
+
+  async disableAnonymousAccess(surveyId: string): Promise<Survey> {
+    const [updatedSurvey] = await db
+      .update(surveys)
+      .set({
+        allowAnonymous: false,
+        anonymousAccessType: 'disabled',
+        publicLink: null,
+        anonymousConfig: null,
+        updatedAt: new Date()
+      })
+      .where(eq(surveys.id, surveyId))
+      .returning();
+    
+    if (!updatedSurvey) {
+      throw new Error('Survey not found');
+    }
+    
+    return updatedSurvey;
+  }
+
+  async createAnonymousResponse(data: {
+    surveyId: string;
+    ipAddress: string;
+    userAgent?: string;
+    sessionId?: string;
+    anonymousMetadata?: any;
+  }): Promise<Response> {
+    const [newResponse] = await db.insert(responses).values({
+      surveyId: data.surveyId,
+      recipientId: null, // No recipient for anonymous responses
+      isAnonymous: true,
+      ipAddress: data.ipAddress,
+      userAgent: data.userAgent,
+      sessionId: data.sessionId,
+      anonymousMetadata: data.anonymousMetadata ? JSON.stringify(data.anonymousMetadata) : null,
+      completed: false
+    }).returning();
+    
+    return newResponse;
+  }
+
+  async checkAnonymousResponseLimit(surveyId: string, ipAddress: string, sessionId?: string): Promise<boolean> {
+    // Get survey configuration first
+    const survey = await this.getSurvey(surveyId);
+    if (!survey || !survey.allowAnonymous) {
+      return false; // Survey doesn't allow anonymous responses
+    }
+
+    const accessType = survey.anonymousAccessType;
+    
+    switch (accessType) {
+      case 'unlimited':
+        return true; // No limits
+      
+      case 'one_per_ip':
+        // Check if this IP has already responded
+        const existingIPResponse = await db
+          .select()
+          .from(anonymousResponseTracking)
+          .where(
+            and(
+              eq(anonymousResponseTracking.surveyId, surveyId),
+              eq(anonymousResponseTracking.ipAddress, ipAddress)
+            )
+          )
+          .limit(1);
+        return existingIPResponse.length === 0;
+      
+      case 'one_per_session':
+        if (!sessionId) return false;
+        // Check if this session has already responded
+        const existingSessionResponse = await db
+          .select()
+          .from(anonymousResponseTracking)
+          .where(
+            and(
+              eq(anonymousResponseTracking.surveyId, surveyId),
+              eq(anonymousResponseTracking.sessionId, sessionId)
+            )
+          )
+          .limit(1);
+        return existingSessionResponse.length === 0;
+      
+      default:
+        return false; // Unknown access type, deny access
+    }
+  }
+
+  async createAnonymousResponseTracking(tracking: InsertAnonymousResponseTracking): Promise<AnonymousResponseTracking> {
+    const [newTracking] = await db.insert(anonymousResponseTracking).values(tracking).returning();
+    return newTracking;
+  }
+
+  async getAnonymousResponsesBySurvey(surveyId: string): Promise<Response[]> {
+    return await db
+      .select()
+      .from(responses)
+      .where(
+        and(
+          eq(responses.surveyId, surveyId),
+          eq(responses.isAnonymous, true)
+        )
+      )
+      .orderBy(desc(responses.createdAt));
+  }
+
+  async getAnonymousResponseCount(surveyId: string): Promise<number> {
+    const [result] = await db
+      .select({ count: count() })
+      .from(responses)
+      .where(
+        and(
+          eq(responses.surveyId, surveyId),
+          eq(responses.isAnonymous, true)
+        )
+      );
+    return result.count || 0;
   }
 }
 
