@@ -232,8 +232,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Survey not available" });
       }
       
+      // Check if recipient has already submitted a response
+      const existingResponse = await storage.getResponseByRecipient(recipient.id);
+      if (existingResponse) {
+        return res.json({ 
+          survey, 
+          recipient, 
+          alreadyCompleted: true,
+          submittedAt: existingResponse.submittedAt
+        });
+      }
+      
       const pages = await storage.getSurveyPages(recipient.surveyId);
-      const surveyData = { survey, pages, recipient };
+      const surveyData = { survey, pages, recipient, alreadyCompleted: false };
       
       // Get questions for each page
       for (const page of pages) {
@@ -252,6 +263,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const recipient = await storage.getRecipientByToken(req.params.token);
       if (!recipient) {
         return res.status(404).json({ message: "Survey not found" });
+      }
+      
+      // Check if recipient has already submitted a response
+      const existingResponse = await storage.getResponseByRecipient(recipient.id);
+      if (existingResponse) {
+        return res.status(400).json({ 
+          message: "Response already submitted",
+          alreadyCompleted: true,
+          submittedAt: existingResponse.submittedAt
+        });
       }
       
       const responseData = insertResponseSchema.parse({

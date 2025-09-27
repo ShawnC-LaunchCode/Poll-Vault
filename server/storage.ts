@@ -63,6 +63,7 @@ export interface IStorage {
   createResponse(response: InsertResponse): Promise<Response>;
   getResponse(id: string): Promise<Response | undefined>;
   getResponsesBySurvey(surveyId: string): Promise<Response[]>;
+  getResponseByRecipient(recipientId: string): Promise<Response | undefined>;
   updateResponse(id: string, updates: Partial<InsertResponse>): Promise<Response>;
   
   // Answer operations
@@ -250,6 +251,15 @@ export class DatabaseStorage implements IStorage {
       .from(responses)
       .where(eq(responses.surveyId, surveyId))
       .orderBy(desc(responses.createdAt));
+  }
+
+  async getResponseByRecipient(recipientId: string): Promise<Response | undefined> {
+    const [response] = await db
+      .select()
+      .from(responses)
+      .where(and(eq(responses.recipientId, recipientId), eq(responses.completed, true)))
+      .orderBy(desc(responses.submittedAt));
+    return response;
   }
 
   async updateResponse(id: string, updates: Partial<InsertResponse>): Promise<Response> {
