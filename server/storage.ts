@@ -3,6 +3,7 @@ import {
   surveys,
   surveyPages,
   questions,
+  loopGroupSubquestions,
   recipients,
   responses,
   answers,
@@ -15,6 +16,9 @@ import {
   type InsertSurveyPage,
   type Question,
   type InsertQuestion,
+  type LoopGroupSubquestion,
+  type InsertLoopGroupSubquestion,
+  type QuestionWithSubquestions,
   type Recipient,
   type InsertRecipient,
   type Response,
@@ -55,9 +59,19 @@ export interface IStorage {
   
   // Question operations
   createQuestion(question: InsertQuestion): Promise<Question>;
+  getQuestion(id: string): Promise<Question | undefined>;
   getQuestionsByPage(pageId: string): Promise<Question[]>;
+  getQuestionsWithSubquestionsByPage(pageId: string): Promise<QuestionWithSubquestions[]>;
   updateQuestion(id: string, updates: Partial<InsertQuestion>): Promise<Question>;
   deleteQuestion(id: string): Promise<void>;
+  
+  // Loop group subquestion operations
+  createLoopGroupSubquestion(subquestion: InsertLoopGroupSubquestion): Promise<LoopGroupSubquestion>;
+  getLoopGroupSubquestion(id: string): Promise<LoopGroupSubquestion | undefined>;
+  getLoopGroupSubquestions(loopQuestionId: string): Promise<LoopGroupSubquestion[]>;
+  updateLoopGroupSubquestion(id: string, updates: Partial<InsertLoopGroupSubquestion>): Promise<LoopGroupSubquestion>;
+  deleteLoopGroupSubquestion(id: string): Promise<void>;
+  deleteLoopGroupSubquestionsByLoopId(loopQuestionId: string): Promise<void>;
   
   // Recipient operations
   createRecipient(recipient: InsertRecipient): Promise<Recipient>;
@@ -207,8 +221,70 @@ export class DatabaseStorage implements IStorage {
     return updatedQuestion;
   }
 
+  async getQuestion(id: string): Promise<Question | undefined> {
+    const [question] = await db.select().from(questions).where(eq(questions.id, id));
+    return question;
+  }
+
   async deleteQuestion(id: string): Promise<void> {
     await db.delete(questions).where(eq(questions.id, id));
+  }
+
+  async getQuestionsWithSubquestionsByPage(pageId: string): Promise<QuestionWithSubquestions[]> {
+    const questionsData = await db
+      .select()
+      .from(questions)
+      .where(eq(questions.pageId, pageId))
+      .orderBy(questions.order);
+
+    const result: QuestionWithSubquestions[] = [];
+    
+    for (const question of questionsData) {
+      if (question.type === 'loop_group') {
+        const subquestions = await this.getLoopGroupSubquestions(question.id);
+        result.push({ ...question, subquestions });
+      } else {
+        result.push(question);
+      }
+    }
+    
+    return result;
+  }
+  
+  // Loop group subquestion operations
+  async createLoopGroupSubquestion(subquestion: InsertLoopGroupSubquestion): Promise<LoopGroupSubquestion> {
+    const [newSubquestion] = await db.insert(loopGroupSubquestions).values(subquestion).returning();
+    return newSubquestion;
+  }
+
+  async getLoopGroupSubquestion(id: string): Promise<LoopGroupSubquestion | undefined> {
+    const [subquestion] = await db.select().from(loopGroupSubquestions).where(eq(loopGroupSubquestions.id, id));
+    return subquestion;
+  }
+
+  async getLoopGroupSubquestions(loopQuestionId: string): Promise<LoopGroupSubquestion[]> {
+    return await db
+      .select()
+      .from(loopGroupSubquestions)
+      .where(eq(loopGroupSubquestions.loopQuestionId, loopQuestionId))
+      .orderBy(loopGroupSubquestions.order);
+  }
+
+  async updateLoopGroupSubquestion(id: string, updates: Partial<InsertLoopGroupSubquestion>): Promise<LoopGroupSubquestion> {
+    const [updatedSubquestion] = await db
+      .update(loopGroupSubquestions)
+      .set(updates)
+      .where(eq(loopGroupSubquestions.id, id))
+      .returning();
+    return updatedSubquestion;
+  }
+
+  async deleteLoopGroupSubquestion(id: string): Promise<void> {
+    await db.delete(loopGroupSubquestions).where(eq(loopGroupSubquestions.id, id));
+  }
+
+  async deleteLoopGroupSubquestionsByLoopId(loopQuestionId: string): Promise<void> {
+    await db.delete(loopGroupSubquestions).where(eq(loopGroupSubquestions.loopQuestionId, loopQuestionId));
   }
   
   // Recipient operations

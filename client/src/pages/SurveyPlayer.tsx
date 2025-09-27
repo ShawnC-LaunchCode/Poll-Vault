@@ -3,11 +3,11 @@ import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { Survey, SurveyPage, Recipient, Question } from "@shared/schema";
+import type { Survey, SurveyPage, Recipient, Question, QuestionWithSubquestions } from "@shared/schema";
 
 // Extended type for survey player API response
 interface SurveyPageWithQuestions extends SurveyPage {
-  questions?: Question[];
+  questions?: QuestionWithSubquestions[];
 }
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -137,8 +137,8 @@ export default function SurveyPlayer() {
   }
 
   const { survey, pages, recipient } = surveyData;
-  const currentPage = pages[currentPageIndex];
-  const totalPages = pages.length;
+  const currentPage = pages?.[currentPageIndex];
+  const totalPages = pages?.length || 0;
   const progress = ((currentPageIndex + 1) / totalPages) * 100;
 
   const handleAnswerChange = (questionId: string, value: any) => {
@@ -149,10 +149,32 @@ export default function SurveyPlayer() {
   };
 
   const canProceed = () => {
-    if (!currentPage.questions) return true;
+    if (!currentPage?.questions) return true;
     
-    const requiredQuestions = currentPage.questions.filter((q) => q.required);
-    return requiredQuestions.every((q) => answers[q.id] !== undefined && answers[q.id] !== null && answers[q.id] !== "");
+    return currentPage.questions.every((question) => {
+      if (!question.required) return true;
+      
+      const answer = answers[question.id];
+      
+      if (question.type === 'loop_group') {
+        // For loop groups, check that all required subquestions in all instances are answered
+        if (!Array.isArray(answer) || answer.length === 0) return false;
+        
+        const minIterations = (question.loopConfig as any)?.minIterations || 1;
+        if (answer.length < minIterations) return false;
+        
+        return answer.every((instance: any) => {
+          if (!question.subquestions) return true;
+          return question.subquestions.every((subquestion) => {
+            if (!subquestion.required) return true;
+            const subAnswer = instance.answers?.[subquestion.id];
+            return subAnswer !== undefined && subAnswer !== null && subAnswer !== "";
+          });
+        });
+      } else {
+        return answer !== undefined && answer !== null && answer !== "";
+      }
+    });
   };
 
   const handleNext = () => {
@@ -170,10 +192,36 @@ export default function SurveyPlayer() {
   };
 
   const handleSubmit = () => {
-    const formattedAnswers = Object.entries(answers).map(([questionId, value]) => ({
-      questionId,
-      value: typeof value === 'object' ? value : { text: value }
-    }));
+    const formattedAnswers: any[] = [];
+    
+    Object.entries(answers).forEach(([questionId, value]) => {
+      const question = pages?.flatMap(p => p.questions || []).find(q => q.id === questionId);
+      
+      if (question?.type === 'loop_group' && Array.isArray(value)) {
+        // Handle loop group answers
+        value.forEach((instance: any, loopIndex: number) => {
+          if (instance.answers && question.subquestions) {
+            question.subquestions.forEach((subquestion) => {
+              const subAnswer = instance.answers[subquestion.id];
+              if (subAnswer !== undefined && subAnswer !== null && subAnswer !== "") {
+                formattedAnswers.push({
+                  questionId: questionId,
+                  subquestionId: subquestion.id,
+                  loopIndex: loopIndex,
+                  value: typeof subAnswer === 'object' ? subAnswer : { text: subAnswer }
+                });
+              }
+            });
+          }
+        });
+      } else if (value !== undefined && value !== null && value !== "") {
+        // Handle regular question answers
+        formattedAnswers.push({
+          questionId,
+          value: typeof value === 'object' ? value : { text: value }
+        });
+      }
+    });
 
     submitMutation.mutate({ answers: formattedAnswers });
   };
@@ -210,32 +258,40 @@ export default function SurveyPlayer() {
           </div>
 
           {/* Current Page */}
-          <Card>
-            <CardContent className="p-6">
-              <div className="space-y-6">
-                {currentPage.title && (
-                  <h2 className="text-lg font-semibold text-foreground" data-testid="text-page-title">
-                    {currentPage.title}
-                  </h2>
-                )}
+          {currentPage && (
+            <Card>
+              <CardContent className="p-6">
+                <div className="space-y-6">
+                  {currentPage.title && (
+                    <h2 className="text-lg font-semibold text-foreground" data-testid="text-page-title">
+                      {currentPage.title}
+                    </h2>
+                  )}
 
-                {/* Questions */}
-                {currentPage.questions && currentPage.questions.map((question) => (
+                  {/* Questions */}
+                  {currentPage.questions && currentPage.questions.map((question) => (
                   <QuestionRenderer
                     key={question.id}
                     question={{
                       ...question,
                       description: question.description || undefined,
                       required: question.required ?? false,
-                      options: Array.isArray(question.options) ? question.options : undefined
-                    }}
+                      options: Array.isArray(question.options) ? question.options : undefined,
+                      loopConfig: question.loopConfig as any,
+                      subquestions: question.subquestions?.map(sq => ({
+                        ...sq,
+                        description: sq.description || undefined,
+                        required: sq.required ?? false
+                      })) || undefined
+                    } as any}
                     value={answers[question.id]}
                     onChange={(value) => handleAnswerChange(question.id, value)}
                   />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Navigation */}
           <div className="flex items-center justify-between">

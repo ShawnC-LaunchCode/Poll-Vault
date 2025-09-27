@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { Question } from "@shared/schema";
+import type { Question, QuestionWithSubquestions, LoopGroupConfig, LoopGroupSubquestion } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,6 +26,24 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
     description: string;
     required: boolean;
     options: string[];
+    loopConfig?: LoopGroupConfig;
+  }>({
+    type: "short_text",
+    title: "",
+    description: "",
+    required: false,
+    options: [],
+    loopConfig: undefined
+  });
+
+  const [subquestions, setSubquestions] = useState<LoopGroupSubquestion[]>([]);
+  const [showSubquestionForm, setShowSubquestionForm] = useState(false);
+  const [subquestionData, setSubquestionData] = useState<{
+    type: string;
+    title: string;
+    description: string;
+    required: boolean;
+    options: string[];
   }>({
     type: "short_text",
     title: "",
@@ -37,7 +55,7 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
   const [isEditing, setIsEditing] = useState(false);
 
   // Load questions for this page
-  const { data: questions, isLoading: questionsLoading } = useQuery<Question[]>({
+  const { data: questions, isLoading: questionsLoading } = useQuery<QuestionWithSubquestions[]>({
     queryKey: ["/api/pages", pageId, "questions"],
     enabled: !!pageId,
     retry: false,
@@ -57,20 +75,31 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
         title: selectedQuestionData.title,
         description: selectedQuestionData.description || "",
         required: selectedQuestionData.required || false,
-        options: (selectedQuestionData.options as string[]) || []
+        options: (selectedQuestionData.options as string[]) || [],
+        loopConfig: selectedQuestionData.loopConfig as LoopGroupConfig || undefined
       });
       setIsEditing(true);
+      
+      // Load subquestions if this is a loop group
+      if (selectedQuestionData.type === 'loop_group') {
+        const questionWithSubs = questions?.find(q => q.id === selectedQuestionData.id) as QuestionWithSubquestions;
+        if (questionWithSubs?.subquestions) {
+          setSubquestions(questionWithSubs.subquestions);
+        }
+      }
     } else {
       setQuestionData({
         type: "short_text",
         title: "",
         description: "",
         required: false,
-        options: []
+        options: [],
+        loopConfig: undefined
       });
+      setSubquestions([]);
       setIsEditing(false);
     }
-  }, [selectedQuestionData]);
+  }, [selectedQuestionData, questions]);
 
   // Create question mutation
   const createQuestionMutation = useMutation({
@@ -100,6 +129,16 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
 
   const resetForm = () => {
     setQuestionData({
+      type: "short_text",
+      title: "",
+      description: "",
+      required: false,
+      options: [],
+      loopConfig: undefined
+    });
+    setSubquestions([]);
+    setShowSubquestionForm(false);
+    setSubquestionData({
       type: "short_text",
       title: "",
       description: "",
@@ -156,9 +195,101 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
     { value: "radio", label: "Radio Button", icon: "fas fa-dot-circle" },
     { value: "yes_no", label: "Yes/No", icon: "fas fa-check" },
     { value: "date_time", label: "Date/Time", icon: "fas fa-calendar" },
+    { value: "loop_group", label: "Loop Group", icon: "fas fa-repeat" },
   ];
 
   const needsOptions = ["multiple_choice", "radio"].includes(questionData.type);
+  const isLoopGroup = questionData.type === "loop_group";
+  const subQuestionNeedsOptions = ["multiple_choice", "radio"].includes(subquestionData.type);
+
+  // Handle loop configuration changes
+  const updateLoopConfig = (field: keyof LoopGroupConfig, value: any) => {
+    setQuestionData(prev => ({
+      ...prev,
+      loopConfig: {
+        minIterations: prev.loopConfig?.minIterations || 1,
+        maxIterations: prev.loopConfig?.maxIterations || 5,
+        addButtonText: prev.loopConfig?.addButtonText || "Add Item",
+        removeButtonText: prev.loopConfig?.removeButtonText || "Remove",
+        allowReorder: prev.loopConfig?.allowReorder || false,
+        ...prev.loopConfig,
+        [field]: value
+      }
+    }));
+  };
+
+  // Mutations for subquestions
+  const createSubquestionMutation = useMutation({
+    mutationFn: async (data: any) => {
+      if (!selectedQuestion) throw new Error("No loop question selected");
+      const subquestionCount = subquestions.length;
+      return await apiRequest("POST", `/api/questions/${selectedQuestion}/subquestions`, {
+        ...data,
+        order: subquestionCount + 1
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/pages", pageId, "questions"] });
+      setShowSubquestionForm(false);
+      setSubquestionData({
+        type: "short_text",
+        title: "",
+        description: "",
+        required: false,
+        options: []
+      });
+      toast({
+        title: "Success",
+        description: "Subquestion created successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveSubquestion = () => {
+    if (!subquestionData.title) {
+      toast({
+        title: "Error",
+        description: "Subquestion title is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const data = {
+      ...subquestionData,
+      options: subquestionData.options.length > 0 ? subquestionData.options : null
+    };
+
+    createSubquestionMutation.mutate(data);
+  };
+
+  const addSubquestionOption = () => {
+    setSubquestionData(prev => ({
+      ...prev,
+      options: [...prev.options, ""]
+    }));
+  };
+
+  const updateSubquestionOption = (index: number, value: string) => {
+    setSubquestionData(prev => ({
+      ...prev,
+      options: prev.options.map((opt, i) => i === index ? value : opt)
+    }));
+  };
+
+  const removeSubquestionOption = (index: number) => {
+    setSubquestionData(prev => ({
+      ...prev,
+      options: prev.options.filter((_, i) => i !== index)
+    }));
+  };
 
   return (
     <div className="space-y-6">
@@ -220,6 +351,67 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
             </label>
           </div>
 
+          {/* Loop Group Configuration */}
+          {isLoopGroup && (
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-foreground">Loop Configuration</label>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Minimum Items</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={questionData.loopConfig?.minIterations || 1}
+                    onChange={(e) => updateLoopConfig('minIterations', parseInt(e.target.value) || 1)}
+                    data-testid="input-loop-min"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Maximum Items</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={questionData.loopConfig?.maxIterations || 5}
+                    onChange={(e) => updateLoopConfig('maxIterations', parseInt(e.target.value) || 5)}
+                    data-testid="input-loop-max"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Add Button Text</label>
+                  <Input
+                    placeholder="Add Item"
+                    value={questionData.loopConfig?.addButtonText || "Add Item"}
+                    onChange={(e) => updateLoopConfig('addButtonText', e.target.value)}
+                    data-testid="input-loop-add-button-text"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Remove Button Text</label>
+                  <Input
+                    placeholder="Remove"
+                    value={questionData.loopConfig?.removeButtonText || "Remove"}
+                    onChange={(e) => updateLoopConfig('removeButtonText', e.target.value)}
+                    data-testid="input-loop-remove-button-text"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="flex items-center space-x-2">
+                  <Checkbox
+                    checked={questionData.loopConfig?.allowReorder || false}
+                    onCheckedChange={(checked) => updateLoopConfig('allowReorder', !!checked)}
+                    data-testid="checkbox-loop-allow-reorder"
+                  />
+                  <span className="text-sm text-foreground">Allow Reordering</span>
+                </label>
+              </div>
+            </div>
+          )}
+
           {/* Options for Multiple Choice/Radio */}
           {needsOptions && (
             <div className="space-y-2">
@@ -274,6 +466,156 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
           </div>
         </CardContent>
       </Card>
+
+      {/* Subquestion Management for Loop Groups */}
+      {isLoopGroup && isEditing && selectedQuestion && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Loop Subquestions</span>
+              <Button
+                onClick={() => setShowSubquestionForm(!showSubquestionForm)}
+                size="sm"
+                data-testid="button-add-subquestion"
+              >
+                <i className="fas fa-plus mr-2"></i>
+                Add Subquestion
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Add Subquestion Form */}
+            {showSubquestionForm && (
+              <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
+                <div className="grid grid-cols-3 gap-3">
+                  <Select value={subquestionData.type} onValueChange={(value) => setSubquestionData(prev => ({ ...prev, type: value }))}>
+                    <SelectTrigger data-testid="select-subquestion-type">
+                      <SelectValue placeholder="Question Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="short_text">Short Text</SelectItem>
+                      <SelectItem value="long_text">Long Text</SelectItem>
+                      <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
+                      <SelectItem value="radio">Radio Button</SelectItem>
+                      <SelectItem value="yes_no">Yes/No</SelectItem>
+                      <SelectItem value="date_time">Date/Time</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    placeholder="Subquestion title"
+                    value={subquestionData.title}
+                    onChange={(e) => setSubquestionData(prev => ({ ...prev, title: e.target.value }))}
+                    data-testid="input-subquestion-title"
+                  />
+                  <Input
+                    placeholder="Description (optional)"
+                    value={subquestionData.description}
+                    onChange={(e) => setSubquestionData(prev => ({ ...prev, description: e.target.value }))}
+                    data-testid="input-subquestion-description"
+                  />
+                </div>
+
+                <div className="flex items-center space-x-4">
+                  <label className="flex items-center space-x-2">
+                    <Checkbox
+                      checked={subquestionData.required}
+                      onCheckedChange={(checked) => setSubquestionData(prev => ({ ...prev, required: !!checked }))}
+                      data-testid="checkbox-subquestion-required"
+                    />
+                    <span className="text-sm text-foreground">Required</span>
+                  </label>
+                </div>
+
+                {/* Options for Subquestion Multiple Choice/Radio */}
+                {subQuestionNeedsOptions && (
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-foreground">Answer Options</label>
+                    <div className="space-y-2">
+                      {subquestionData.options.map((option, index) => (
+                        <div key={index} className="flex items-center space-x-2">
+                          <Input
+                            placeholder={`Option ${index + 1}`}
+                            value={option}
+                            onChange={(e) => updateSubquestionOption(index, e.target.value)}
+                            data-testid={`input-subquestion-option-${index}`}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeSubquestionOption(index)}
+                            data-testid={`button-remove-subquestion-option-${index}`}
+                          >
+                            <i className="fas fa-trash text-sm"></i>
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        variant="ghost"
+                        onClick={addSubquestionOption}
+                        className="flex items-center space-x-2 text-primary hover:text-primary/80 text-sm"
+                        data-testid="button-add-subquestion-option"
+                      >
+                        <i className="fas fa-plus"></i>
+                        <span>Add Option</span>
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowSubquestionForm(false)}
+                    size="sm"
+                    data-testid="button-cancel-subquestion"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSaveSubquestion}
+                    disabled={createSubquestionMutation.isPending}
+                    size="sm"
+                    data-testid="button-save-subquestion"
+                  >
+                    {createSubquestionMutation.isPending ? "Saving..." : "Save Subquestion"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Existing Subquestions List */}
+            {subquestions.length > 0 && (
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-foreground">Existing Subquestions</label>
+                {subquestions.map((subquestion, index) => (
+                  <div
+                    key={subquestion.id}
+                    className="p-3 border rounded-lg bg-card"
+                    data-testid={`card-subquestion-${subquestion.id}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-sm font-medium text-foreground">{subquestion.title}</span>
+                        <span className="text-xs text-muted-foreground ml-2">({subquestion.type})</span>
+                      </div>
+                      {subquestion.required && (
+                        <span className="text-xs text-destructive">Required</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {subquestions.length === 0 && !showSubquestionForm && (
+              <div className="text-center py-6 text-muted-foreground">
+                <i className="fas fa-plus-circle text-2xl mb-2"></i>
+                <p className="text-sm">No subquestions added yet. Click "Add Subquestion" to get started.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Existing Questions List */}
       {questions && questions.length > 0 && (

@@ -84,6 +84,7 @@ export const questions = pgTable("questions", {
   description: text("description"),
   required: boolean("required").default(false),
   options: jsonb("options"), // For multiple choice, radio options
+  loopConfig: jsonb("loop_config"), // For loop groups: {minIterations, maxIterations, addButtonText, removeButtonText}
   order: integer("order").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -98,6 +99,7 @@ export const loopGroupSubquestions = pgTable("loop_group_subquestions", {
   required: boolean("required").default(false),
   options: jsonb("options"),
   order: integer("order").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Conditional rules table
@@ -137,6 +139,7 @@ export const answers = pgTable("answers", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   responseId: uuid("response_id").references(() => responses.id, { onDelete: 'cascade' }).notNull(),
   questionId: uuid("question_id").references(() => questions.id).notNull(),
+  subquestionId: uuid("subquestion_id").references(() => loopGroupSubquestions.id), // For loop group subquestion answers
   loopIndex: integer("loop_index"), // For loop group answers
   value: jsonb("value").notNull(), // Stores answer data as JSON
   createdAt: timestamp("created_at").defaultNow(),
@@ -195,6 +198,13 @@ export const questionsRelations = relations(questions, ({ one, many }) => ({
   answers: many(answers),
 }));
 
+export const loopGroupSubquestionsRelations = relations(loopGroupSubquestions, ({ one }) => ({
+  loopQuestion: one(questions, {
+    fields: [loopGroupSubquestions.loopQuestionId],
+    references: [questions.id],
+  }),
+}));
+
 export const recipientsRelations = relations(recipients, ({ one, many }) => ({
   survey: one(surveys, {
     fields: [recipients.surveyId],
@@ -225,6 +235,10 @@ export const answersRelations = relations(answers, ({ one, many }) => ({
     fields: [answers.questionId],
     references: [questions.id],
   }),
+  subquestion: one(loopGroupSubquestions, {
+    fields: [answers.subquestionId],
+    references: [loopGroupSubquestions.id],
+  }),
   files: many(files),
 }));
 
@@ -233,6 +247,7 @@ export const insertUserSchema = createInsertSchema(users).omit({ id: true, creat
 export const insertSurveySchema = createInsertSchema(surveys).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSurveyPageSchema = createInsertSchema(surveyPages).omit({ id: true, createdAt: true });
 export const insertQuestionSchema = createInsertSchema(questions).omit({ id: true, createdAt: true });
+export const insertLoopGroupSubquestionSchema = createInsertSchema(loopGroupSubquestions).omit({ id: true, createdAt: true });
 export const insertRecipientSchema = createInsertSchema(recipients).omit({ id: true, createdAt: true, token: true });
 export const insertResponseSchema = createInsertSchema(responses).omit({ id: true, createdAt: true });
 export const insertAnswerSchema = createInsertSchema(answers).omit({ id: true, createdAt: true });
@@ -246,6 +261,8 @@ export type SurveyPage = typeof surveyPages.$inferSelect;
 export type InsertSurveyPage = typeof insertSurveyPageSchema._type;
 export type Question = typeof questions.$inferSelect;
 export type InsertQuestion = typeof insertQuestionSchema._type;
+export type LoopGroupSubquestion = typeof loopGroupSubquestions.$inferSelect;
+export type InsertLoopGroupSubquestion = typeof insertLoopGroupSubquestionSchema._type;
 export type Recipient = typeof recipients.$inferSelect;
 export type InsertRecipient = typeof insertRecipientSchema._type;
 export type Response = typeof responses.$inferSelect;
@@ -307,4 +324,24 @@ export interface SurveyDuplication {
   originalId: string;
   title: string;
   includeResponses?: boolean;
+}
+
+// Loop group configuration types
+export interface LoopGroupConfig {
+  minIterations: number;
+  maxIterations: number;
+  addButtonText?: string;
+  removeButtonText?: string;
+  allowReorder?: boolean;
+}
+
+// Extended question type with subquestions for frontend usage
+export interface QuestionWithSubquestions extends Question {
+  subquestions?: LoopGroupSubquestion[];
+}
+
+// Loop instance data for responses
+export interface LoopInstanceData {
+  instanceIndex: number;
+  answers: Record<string, any>;
 }

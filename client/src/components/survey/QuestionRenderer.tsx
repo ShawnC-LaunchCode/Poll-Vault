@@ -5,6 +5,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+interface LoopGroupSubquestion {
+  id: string;
+  type: string;
+  title: string;
+  description?: string | null;
+  required: boolean | null;
+  options?: string[] | unknown;
+}
 
 interface QuestionRendererProps {
   question: {
@@ -14,6 +24,14 @@ interface QuestionRendererProps {
     description?: string;
     required: boolean;
     options?: string[];
+    loopConfig?: {
+      minIterations: number;
+      maxIterations: number;
+      addButtonText?: string;
+      removeButtonText?: string;
+      allowReorder?: boolean;
+    };
+    subquestions?: LoopGroupSubquestion[];
   };
   value?: any;
   onChange: (value: any) => void;
@@ -21,6 +39,68 @@ interface QuestionRendererProps {
 
 export default function QuestionRenderer({ question, value, onChange }: QuestionRendererProps) {
   const [fileUploads, setFileUploads] = useState<File[]>([]);
+  
+  // Initialize loop instances if needed
+  const initializeLoopInstances = () => {
+    if (question.type === 'loop_group' && (!value || !Array.isArray(value))) {
+      const minIterations = question.loopConfig?.minIterations || 1;
+      const initialInstances = Array.from({ length: minIterations }, (_, index) => ({
+        instanceIndex: index,
+        answers: {}
+      }));
+      onChange(initialInstances);
+      return initialInstances;
+    }
+    return value || [];
+  };
+
+  // Handle loop instance value changes
+  const handleLoopInstanceChange = (instanceIndex: number, subquestionId: string, value: any) => {
+    const instances = initializeLoopInstances();
+    const updatedInstances = instances.map((instance: any) => {
+      if (instance.instanceIndex === instanceIndex) {
+        return {
+          ...instance,
+          answers: {
+            ...instance.answers,
+            [subquestionId]: value
+          }
+        };
+      }
+      return instance;
+    });
+    onChange(updatedInstances);
+  };
+
+  // Add new loop instance
+  const addLoopInstance = () => {
+    const instances = initializeLoopInstances();
+    const maxIterations = question.loopConfig?.maxIterations || 5;
+    
+    if (instances.length < maxIterations) {
+      const newInstance = {
+        instanceIndex: instances.length,
+        answers: {}
+      };
+      onChange([...instances, newInstance]);
+    }
+  };
+
+  // Remove loop instance
+  const removeLoopInstance = (instanceIndex: number) => {
+    const instances = initializeLoopInstances();
+    const minIterations = question.loopConfig?.minIterations || 1;
+    
+    if (instances.length > minIterations) {
+      const updatedInstances = instances
+        .filter((instance: any) => instance.instanceIndex !== instanceIndex)
+        .map((instance: any, index: number) => ({
+          ...instance,
+          instanceIndex: index
+        }));
+      onChange(updatedInstances);
+    }
+  };
 
   const handleFileUpload = (files: FileList | null) => {
     if (files) {
@@ -37,6 +117,93 @@ export default function QuestionRenderer({ question, value, onChange }: Question
     } else {
       onChange(currentValues.filter((v: string) => v !== optionValue));
     }
+  };
+
+  // Render subquestion within a loop instance
+  const renderSubquestion = (subquestion: LoopGroupSubquestion, instanceIndex: number, instanceValue: any) => {
+    const subquestionValue = instanceValue?.answers?.[subquestion.id];
+    
+    return (
+      <div key={`${instanceIndex}-${subquestion.id}`} className="space-y-2">
+        <label className="block text-sm font-medium text-foreground">
+          {subquestion.title}
+          {subquestion.required && <span className="text-destructive ml-1">*</span>}
+        </label>
+        {subquestion.description && (
+          <p className="text-xs text-muted-foreground">{subquestion.description}</p>
+        )}
+        <QuestionRenderer
+          question={{
+            ...subquestion,
+            description: subquestion.description || undefined,
+            required: subquestion.required ?? false,
+            options: Array.isArray(subquestion.options) ? subquestion.options : undefined
+          } as any}
+          value={subquestionValue}
+          onChange={(value) => handleLoopInstanceChange(instanceIndex, subquestion.id, value)}
+        />
+      </div>
+    );
+  };
+
+  // Render loop group with instances
+  const renderLoopGroup = () => {
+    const instances = initializeLoopInstances();
+    const minIterations = question.loopConfig?.minIterations || 1;
+    const maxIterations = question.loopConfig?.maxIterations || 5;
+    const addButtonText = question.loopConfig?.addButtonText || "Add Item";
+    const removeButtonText = question.loopConfig?.removeButtonText || "Remove";
+
+    return (
+      <div className="space-y-4" data-testid={`loop-group-${question.id}`}>
+        {instances.map((instance: any, index: number) => (
+          <Card key={`instance-${index}`} className="relative">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between">
+                <span className="text-base font-medium">
+                  Item #{index + 1}
+                </span>
+                {instances.length > minIterations && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeLoopInstance(index)}
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    data-testid={`button-remove-instance-${index}`}
+                  >
+                    <i className="fas fa-trash mr-1"></i>
+                    {removeButtonText}
+                  </Button>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {question.subquestions?.map((subquestion) => 
+                renderSubquestion(subquestion, index, instance)
+              )}
+            </CardContent>
+          </Card>
+        ))}
+
+        {instances.length < maxIterations && (
+          <div className="flex justify-center">
+            <Button
+              variant="outline"
+              onClick={addLoopInstance}
+              className="flex items-center space-x-2"
+              data-testid="button-add-loop-instance"
+            >
+              <i className="fas fa-plus"></i>
+              <span>{addButtonText}</span>
+            </Button>
+          </div>
+        )}
+
+        <div className="text-xs text-muted-foreground">
+          {instances.length} of {maxIterations} items (minimum: {minIterations})
+        </div>
+      </div>
+    );
   };
 
   const renderInput = () => {
@@ -156,6 +323,9 @@ export default function QuestionRenderer({ question, value, onChange }: Question
             )}
           </div>
         );
+
+      case 'loop_group':
+        return renderLoopGroup();
 
       default:
         return (

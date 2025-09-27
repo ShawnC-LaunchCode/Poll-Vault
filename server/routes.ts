@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertSurveySchema, insertSurveyPageSchema, insertQuestionSchema, insertRecipientSchema, insertResponseSchema, insertAnswerSchema } from "@shared/schema";
+import { insertSurveySchema, insertSurveyPageSchema, insertQuestionSchema, insertLoopGroupSubquestionSchema, insertRecipientSchema, insertResponseSchema, insertAnswerSchema } from "@shared/schema";
 import { sendNotificationEmail } from "./services/emailService";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -179,11 +179,137 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
       
-      const questions = await storage.getQuestionsByPage(req.params.pageId);
+      // Use the new method that includes subquestions for loop groups
+      const questions = await storage.getQuestionsWithSubquestionsByPage(req.params.pageId);
       res.json(questions);
     } catch (error) {
       console.error("Error fetching questions:", error);
       res.status(500).json({ message: "Failed to fetch questions" });
+    }
+  });
+
+  // Loop group subquestion routes
+  app.post('/api/questions/:questionId/subquestions', isAuthenticated, async (req: any, res) => {
+    try {
+      // First, verify that the question belongs to a survey owned by the authenticated user
+      const question = await storage.getQuestion(req.params.questionId);
+      if (!question) {
+        return res.status(404).json({ message: "Question not found" });
+      }
+      
+      const page = await storage.getSurveyPage(question.pageId);
+      if (!page) {
+        return res.status(404).json({ message: "Page not found" });
+      }
+      
+      const survey = await storage.getSurvey(page.surveyId);
+      if (!survey || survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      // Verify this is a loop group question
+      if (question.type !== 'loop_group') {
+        return res.status(400).json({ message: "Question is not a loop group" });
+      }
+      
+      const subquestionData = insertLoopGroupSubquestionSchema.parse({ 
+        ...req.body, 
+        loopQuestionId: req.params.questionId 
+      });
+      const subquestion = await storage.createLoopGroupSubquestion(subquestionData);
+      res.json(subquestion);
+    } catch (error) {
+      console.error("Error creating subquestion:", error);
+      res.status(500).json({ message: "Failed to create subquestion" });
+    }
+  });
+
+  app.get('/api/questions/:questionId/subquestions', isAuthenticated, async (req: any, res) => {
+    try {
+      // First, verify that the question belongs to a survey owned by the authenticated user
+      const question = await storage.getQuestion(req.params.questionId);
+      if (!question) {
+        return res.status(404).json({ message: "Question not found" });
+      }
+      
+      const page = await storage.getSurveyPage(question.pageId);
+      if (!page) {
+        return res.status(404).json({ message: "Page not found" });
+      }
+      
+      const survey = await storage.getSurvey(page.surveyId);
+      if (!survey || survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const subquestions = await storage.getLoopGroupSubquestions(req.params.questionId);
+      res.json(subquestions);
+    } catch (error) {
+      console.error("Error fetching subquestions:", error);
+      res.status(500).json({ message: "Failed to fetch subquestions" });
+    }
+  });
+
+  app.put('/api/subquestions/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Verify access through the loop question
+      const subquestion = await storage.getLoopGroupSubquestion(req.params.id);
+      if (!subquestion) {
+        return res.status(404).json({ message: "Subquestion not found" });
+      }
+      
+      const question = await storage.getQuestion(subquestion.loopQuestionId);
+      if (!question) {
+        return res.status(404).json({ message: "Question not found" });
+      }
+      
+      const page = await storage.getSurveyPage(question.pageId);
+      if (!page) {
+        return res.status(404).json({ message: "Page not found" });
+      }
+      
+      const survey = await storage.getSurvey(page.surveyId);
+      if (!survey || survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const updates = insertLoopGroupSubquestionSchema.partial().parse(req.body);
+      const updatedSubquestion = await storage.updateLoopGroupSubquestion(req.params.id, updates);
+      res.json(updatedSubquestion);
+    } catch (error) {
+      console.error("Error updating subquestion:", error);
+      res.status(500).json({ message: "Failed to update subquestion" });
+    }
+  });
+
+  app.delete('/api/subquestions/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Verify access through the loop question
+      const subquestion = await storage.getLoopGroupSubquestion(req.params.id);
+      if (!subquestion) {
+        return res.status(404).json({ message: "Subquestion not found" });
+      }
+      
+      const question = await storage.getQuestion(subquestion.loopQuestionId);
+      if (!question) {
+        return res.status(404).json({ message: "Question not found" });
+      }
+      
+      const page = await storage.getSurveyPage(question.pageId);
+      if (!page) {
+        return res.status(404).json({ message: "Page not found" });
+      }
+      
+      const survey = await storage.getSurvey(page.surveyId);
+      if (!survey || survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      await storage.deleteLoopGroupSubquestion(req.params.id);
+      res.json({ message: "Subquestion deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting subquestion:", error);
+      res.status(500).json({ message: "Failed to delete subquestion" });
     }
   });
 
@@ -246,9 +372,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pages = await storage.getSurveyPages(recipient.surveyId);
       const surveyData = { survey, pages, recipient, alreadyCompleted: false };
       
-      // Get questions for each page
+      // Get questions for each page, including subquestions for loop groups
       for (const page of pages) {
-        (page as any).questions = await storage.getQuestionsByPage(page.id);
+        (page as any).questions = await storage.getQuestionsWithSubquestionsByPage(page.id);
       }
       
       res.json(surveyData);
