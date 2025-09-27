@@ -412,7 +412,7 @@ export default function Recipients() {
         recipient.name.toLowerCase().includes(globalSearchTerm.toLowerCase()) ||
         recipient.email.toLowerCase().includes(globalSearchTerm.toLowerCase());
       
-      const matchesTag = !globalFilterTag || 
+      const matchesTag = !globalFilterTag || globalFilterTag === "all-tags" ||
         recipient.tags?.some(tag => tag.toLowerCase().includes(globalFilterTag.toLowerCase()));
       
       return matchesSearch && matchesTag;
@@ -433,7 +433,7 @@ export default function Recipients() {
         recipient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         recipient.email.toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchesTag = !filterTag || 
+      const matchesTag = !filterTag || filterTag === "all-tags" ||
         recipient.tags?.some(tag => tag.toLowerCase().includes(filterTag.toLowerCase()));
       
       return matchesSearch && matchesTag;
@@ -628,7 +628,7 @@ export default function Recipients() {
                             <SelectValue placeholder="Filter by tag" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="" data-testid="option-all-tags">All Tags</SelectItem>
+                            <SelectItem value="all-tags" data-testid="option-all-tags">All Tags</SelectItem>
                             {getAllTags().map((tag) => (
                               <SelectItem key={tag} value={tag} data-testid={`option-tag-${tag}`}>
                                 {tag}
@@ -726,7 +726,7 @@ export default function Recipients() {
                             </div>
                             <h3 className="text-lg font-medium text-foreground mb-2">No global recipients found</h3>
                             <p className="text-muted-foreground mb-4">
-                              {globalSearchTerm || globalFilterTag 
+                              {globalSearchTerm || (globalFilterTag && globalFilterTag !== "all-tags")
                                 ? "Try adjusting your search or filter criteria" 
                                 : "You haven't added any global recipients yet"}
                             </p>
@@ -917,7 +917,7 @@ export default function Recipients() {
                           <SelectValue placeholder="Filter by tag" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">All Tags</SelectItem>
+                          <SelectItem value="all-tags">All Tags</SelectItem>
                           {availableTags.map((tag) => (
                             <SelectItem key={tag} value={tag}>
                               {tag}
@@ -1042,14 +1042,14 @@ export default function Recipients() {
                         <Users className="text-muted-foreground w-8 h-8" />
                       </div>
                       <h3 className="text-lg font-medium text-foreground mb-2">
-                        {searchTerm || filterTag ? "No recipients found" : "No global recipients yet"}
+                        {searchTerm || (filterTag && filterTag !== "all-tags") ? "No recipients found" : "No global recipients yet"}
                       </h3>
                       <p className="text-muted-foreground mb-4">
-                        {searchTerm || filterTag 
+                        {searchTerm || (filterTag && filterTag !== "all-tags")
                           ? "Try adjusting your search or filter criteria"
                           : "Build your global recipient database to reuse across surveys"}
                       </p>
-                      {!searchTerm && !filterTag && (
+                      {!searchTerm && (!filterTag || filterTag === "all-tags") && (
                         <Button onClick={() => setIsGlobalDialogOpen(true)} data-testid="button-add-first-global-recipient">
                           <Plus className="w-4 h-4 mr-2" />
                           Add First Global Recipient
