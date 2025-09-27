@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { FileUpload } from "@/components/ui/file-upload";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -31,14 +32,15 @@ interface QuestionRendererProps {
       removeButtonText?: string;
       allowReorder?: boolean;
     };
+    // fileUploadConfig is now stored in options for file_upload questions
     subquestions?: LoopGroupSubquestion[];
   };
   value?: any;
   onChange: (value: any) => void;
+  answerId?: string; // For file uploads
 }
 
-export default function QuestionRenderer({ question, value, onChange }: QuestionRendererProps) {
-  const [fileUploads, setFileUploads] = useState<File[]>([]);
+export default function QuestionRenderer({ question, value, onChange, answerId }: QuestionRendererProps) {
   
   // Initialize loop instances if needed
   const initializeLoopInstances = () => {
@@ -102,12 +104,8 @@ export default function QuestionRenderer({ question, value, onChange }: Question
     }
   };
 
-  const handleFileUpload = (files: FileList | null) => {
-    if (files) {
-      const fileArray = Array.from(files);
-      setFileUploads(fileArray);
-      onChange(fileArray.map(f => ({ name: f.name, size: f.size, type: f.type })));
-    }
+  const handleFileUpload = (files: any[]) => {
+    onChange(files);
   };
 
   const handleMultipleChoice = (optionValue: string, checked: boolean) => {
@@ -300,28 +298,17 @@ export default function QuestionRenderer({ question, value, onChange }: Question
         );
 
       case 'file_upload':
+        // For file_upload questions, the config is stored in question.options
+        const fileConfig = question.options as any;
         return (
-          <div className="space-y-4">
-            <Input
-              type="file"
-              multiple
-              onChange={(e) => handleFileUpload(e.target.files)}
-              data-testid={`file-question-${question.id}`}
-            />
-            {fileUploads.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground">Selected files:</p>
-                {fileUploads.map((file, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
-                    <span className="text-sm text-foreground">{file.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {(file.size / 1024).toFixed(1)} KB
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <FileUpload
+            config={fileConfig}
+            onFilesUploaded={handleFileUpload}
+            onFileRemoved={() => {}} // Handle file removal if needed
+            initialFiles={Array.isArray(value) ? value : []}
+            answerId={answerId}
+            data-testid={`file-question-${question.id}`}
+          />
         );
 
       case 'loop_group':

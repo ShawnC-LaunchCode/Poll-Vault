@@ -395,6 +395,32 @@ export interface QuestionWithConditionalLogic extends Question {
   conditionalRules?: ConditionalRule[];
 }
 
+// File upload configuration types
+export interface FileUploadConfig {
+  acceptedTypes: string[]; // e.g., ['image/*', '.pdf', '.doc', '.docx']
+  maxFileSize: number; // in bytes
+  maxFiles: number; // maximum number of files
+  required: boolean;
+  allowMultiple: boolean;
+}
+
+// File metadata type
+export interface FileMetadata {
+  id: string;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  uploadedAt: Date;
+}
+
+// File upload response type
+export interface FileUploadResponse {
+  success: boolean;
+  files: FileMetadata[];
+  errors?: string[];
+}
+
 // Condition evaluation result
 export interface ConditionalEvaluationResult {
   questionId: string;

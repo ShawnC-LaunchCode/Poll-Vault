@@ -9,6 +9,7 @@ import {
   responses,
   answers,
   analyticsEvents,
+  files,
   type User,
   type UpsertUser,
   type Survey,
@@ -36,6 +37,7 @@ import {
   type BulkOperationRequest,
   type BulkOperationResult,
   type SurveyDuplication,
+  type FileMetadata,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, count, sql, gte, inArray } from "drizzle-orm";
@@ -122,6 +124,19 @@ export interface IStorage {
   // Survey management
   duplicateSurvey(surveyId: string, newTitle: string, creatorId: string): Promise<Survey>;
   archiveSurvey(surveyId: string, creatorId: string): Promise<Survey>;
+  
+  // File operations
+  createFile(fileData: {
+    answerId: string;
+    filename: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+  }): Promise<FileMetadata>;
+  getFile(id: string): Promise<FileMetadata | undefined>;
+  getFilesByAnswer(answerId: string): Promise<FileMetadata[]>;
+  deleteFile(id: string): Promise<void>;
+  deleteFilesByAnswer(answerId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -856,6 +871,59 @@ export class DatabaseStorage implements IStorage {
     }
 
     return archivedSurvey;
+  }
+
+  // File operations
+  async createFile(fileData: {
+    answerId: string;
+    filename: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+  }): Promise<FileMetadata> {
+    const [newFile] = await db.insert(files).values(fileData).returning();
+    return {
+      id: newFile.id,
+      filename: newFile.filename,
+      originalName: newFile.originalName,
+      mimeType: newFile.mimeType,
+      size: newFile.size,
+      uploadedAt: newFile.uploadedAt!
+    };
+  }
+
+  async getFile(id: string): Promise<FileMetadata | undefined> {
+    const [file] = await db.select().from(files).where(eq(files.id, id));
+    if (!file) return undefined;
+    
+    return {
+      id: file.id,
+      filename: file.filename,
+      originalName: file.originalName,
+      mimeType: file.mimeType,
+      size: file.size,
+      uploadedAt: file.uploadedAt!
+    };
+  }
+
+  async getFilesByAnswer(answerId: string): Promise<FileMetadata[]> {
+    const fileList = await db.select().from(files).where(eq(files.answerId, answerId));
+    return fileList.map(file => ({
+      id: file.id,
+      filename: file.filename,
+      originalName: file.originalName,
+      mimeType: file.mimeType,
+      size: file.size,
+      uploadedAt: file.uploadedAt!
+    }));
+  }
+
+  async deleteFile(id: string): Promise<void> {
+    await db.delete(files).where(eq(files.id, id));
+  }
+
+  async deleteFilesByAnswer(answerId: string): Promise<void> {
+    await db.delete(files).where(eq(files.answerId, answerId));
   }
 }
 

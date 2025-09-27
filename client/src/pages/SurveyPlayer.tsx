@@ -21,6 +21,8 @@ export default function SurveyPlayer() {
   
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [answerIds, setAnswerIds] = useState<Record<string, string>>({});
+  const [responseId, setResponseId] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [visibleQuestions, setVisibleQuestions] = useState<Record<string, boolean>>({});
 
@@ -41,6 +43,41 @@ export default function SurveyPlayer() {
     queryKey: ["/api/surveys", surveyData?.survey?.id, "conditional-rules"],
     enabled: !!surveyData?.survey?.id,
     retry: false,
+  });
+
+  // Create response mutation (called when user starts answering)
+  const createResponseMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/survey/${token}/start-response`, {});
+    },
+    onSuccess: (data) => {
+      setResponseId(data.id);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to start response. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create answer mutation (called when user answers a question)
+  const createAnswerMutation = useMutation({
+    mutationFn: async ({ questionId, value }: { questionId: string; value: any }) => {
+      if (!responseId) throw new Error("No response ID available");
+      return await apiRequest("POST", "/api/answers", {
+        responseId,
+        questionId,
+        value: typeof value === 'object' ? value : { text: value }
+      });
+    },
+    onSuccess: (data, variables) => {
+      setAnswerIds(prev => ({
+        ...prev,
+        [variables.questionId]: data.id
+      }));
+    },
   });
 
   // Submit response mutation
@@ -181,6 +218,16 @@ export default function SurveyPlayer() {
       ...prev,
       [questionId]: value
     }));
+
+    // Create response if it doesn't exist
+    if (!responseId && surveyData?.survey) {
+      createResponseMutation.mutate();
+    }
+
+    // Create or update answer if response exists and we don't have an answer ID yet
+    if (responseId && !answerIds[questionId]) {
+      createAnswerMutation.mutate({ questionId, value });
+    }
   };
 
   const canProceed = () => {
@@ -313,7 +360,7 @@ export default function SurveyPlayer() {
                       ...question,
                       description: question.description || undefined,
                       required: question.required ?? false,
-                      options: Array.isArray(question.options) ? question.options : undefined,
+                      options: question.type === 'file_upload' ? question.options : (Array.isArray(question.options) ? question.options : undefined),
                       loopConfig: question.loopConfig as any,
                       subquestions: question.subquestions?.map(sq => ({
                         ...sq,
@@ -323,6 +370,7 @@ export default function SurveyPlayer() {
                     } as any}
                     value={answers[question.id]}
                     onChange={(value) => handleAnswerChange(question.id, value)}
+                    answerId={answerIds[question.id]}
                   />
                   ))}
                 </div>

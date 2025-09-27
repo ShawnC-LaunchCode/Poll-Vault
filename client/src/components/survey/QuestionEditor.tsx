@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { Question, QuestionWithSubquestions, LoopGroupConfig, LoopGroupSubquestion, ConditionalRule, ConditionalLogicConfig } from "@shared/schema";
+import type { Question, QuestionWithSubquestions, LoopGroupConfig, LoopGroupSubquestion, ConditionalRule, ConditionalLogicConfig, FileUploadConfig } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,6 +32,7 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
     options: string[];
     loopConfig?: LoopGroupConfig;
     conditionalLogic?: ConditionalLogicConfig;
+    fileUploadConfig?: FileUploadConfig;
   }>({
     type: "short_text",
     title: "",
@@ -39,7 +40,8 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
     required: false,
     options: [],
     loopConfig: undefined,
-    conditionalLogic: undefined
+    conditionalLogic: undefined,
+    fileUploadConfig: undefined
   });
 
   const [subquestions, setSubquestions] = useState<LoopGroupSubquestion[]>([]);
@@ -100,7 +102,15 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
         description: selectedQuestionData.description || "",
         required: selectedQuestionData.required || false,
         options: (selectedQuestionData.options as string[]) || [],
-        loopConfig: selectedQuestionData.loopConfig as LoopGroupConfig || undefined
+        loopConfig: selectedQuestionData.loopConfig as LoopGroupConfig || undefined,
+        fileUploadConfig: selectedQuestionData.type === 'file_upload' ? 
+          (selectedQuestionData.options as any) || {
+            acceptedTypes: [],
+            maxFileSize: 10 * 1024 * 1024,
+            maxFiles: 5,
+            required: selectedQuestionData.required || false,
+            allowMultiple: true
+          } : undefined
       });
       setIsEditing(true);
       
@@ -185,7 +195,8 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
 
     const data = {
       ...questionData,
-      options: questionData.options.length > 0 ? questionData.options : null
+      options: questionData.options.length > 0 ? questionData.options : 
+               isFileUpload && questionData.fileUploadConfig ? questionData.fileUploadConfig : null
     };
 
     createQuestionMutation.mutate(data);
@@ -219,11 +230,13 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
     { value: "radio", label: "Radio Button", icon: "fas fa-dot-circle" },
     { value: "yes_no", label: "Yes/No", icon: "fas fa-check" },
     { value: "date_time", label: "Date/Time", icon: "fas fa-calendar" },
+    { value: "file_upload", label: "File Upload", icon: "fas fa-upload" },
     { value: "loop_group", label: "Loop Group", icon: "fas fa-repeat" },
   ];
 
   const needsOptions = ["multiple_choice", "radio"].includes(questionData.type);
   const isLoopGroup = questionData.type === "loop_group";
+  const isFileUpload = questionData.type === "file_upload";
   const subQuestionNeedsOptions = ["multiple_choice", "radio"].includes(subquestionData.type);
 
   // Handle loop configuration changes
@@ -237,6 +250,22 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
         removeButtonText: prev.loopConfig?.removeButtonText || "Remove",
         allowReorder: prev.loopConfig?.allowReorder || false,
         ...prev.loopConfig,
+        [field]: value
+      }
+    }));
+  };
+
+  // Handle file upload configuration changes
+  const updateFileUploadConfig = (field: keyof FileUploadConfig, value: any) => {
+    setQuestionData(prev => ({
+      ...prev,
+      fileUploadConfig: {
+        acceptedTypes: prev.fileUploadConfig?.acceptedTypes || [],
+        maxFileSize: prev.fileUploadConfig?.maxFileSize || 10 * 1024 * 1024, // 10MB default
+        maxFiles: prev.fileUploadConfig?.maxFiles || 5,
+        required: prev.fileUploadConfig?.required || false,
+        allowMultiple: prev.fileUploadConfig?.allowMultiple || true,
+        ...prev.fileUploadConfig,
         [field]: value
       }
     }));
@@ -431,6 +460,63 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
                     data-testid="checkbox-loop-allow-reorder"
                   />
                   <span className="text-sm text-foreground">Allow Reordering</span>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* File Upload Configuration */}
+          {isFileUpload && (
+            <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+              <div className="flex items-center space-x-2">
+                <i className="fas fa-upload text-primary"></i>
+                <label className="text-sm font-medium text-foreground">File Upload Settings</label>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Max File Size (MB)</label>
+                  <Input
+                    type="number"
+                    placeholder="10"
+                    value={Math.round((questionData.fileUploadConfig?.maxFileSize || 10485760) / (1024 * 1024))}
+                    onChange={(e) => updateFileUploadConfig('maxFileSize', parseInt(e.target.value) * 1024 * 1024)}
+                    data-testid="input-file-max-size"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Max Files</label>
+                  <Input
+                    type="number"
+                    placeholder="5"
+                    value={questionData.fileUploadConfig?.maxFiles || 5}
+                    onChange={(e) => updateFileUploadConfig('maxFiles', parseInt(e.target.value))}
+                    data-testid="input-file-max-count"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-muted-foreground mb-2">Accepted File Types (comma-separated)</label>
+                <Input
+                  placeholder="image/*, .pdf, .doc, .docx, .txt"
+                  value={(questionData.fileUploadConfig?.acceptedTypes || []).join(', ')}
+                  onChange={(e) => updateFileUploadConfig('acceptedTypes', e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
+                  data-testid="input-file-accepted-types"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Examples: image/*, .pdf, .doc, .docx, application/pdf
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-4">
+                <label className="flex items-center space-x-2">
+                  <Checkbox
+                    checked={questionData.fileUploadConfig?.allowMultiple || true}
+                    onCheckedChange={(checked) => updateFileUploadConfig('allowMultiple', !!checked)}
+                    data-testid="checkbox-file-allow-multiple"
+                  />
+                  <span className="text-sm text-foreground">Allow Multiple Files</span>
                 </label>
               </div>
             </div>
