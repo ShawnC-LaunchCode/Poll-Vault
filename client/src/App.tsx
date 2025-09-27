@@ -11,6 +11,7 @@ import SurveyBuilder from "@/pages/SurveyBuilder";
 import SurveyPlayer from "@/pages/SurveyPlayer";
 import SurveysList from "@/pages/SurveysList";
 import Responses from "@/pages/Responses";
+import ResponseDetails from "@/pages/ResponseDetails";
 import Recipients from "@/pages/Recipients";
 
 function Router() {
@@ -33,6 +34,7 @@ function Router() {
           <Route path="/surveys/:id/edit" component={SurveyBuilder} />
           <Route path="/surveys/:id/responses" component={Responses} />
           <Route path="/surveys/:id/recipients" component={Recipients} />
+          <Route path="/responses/:id" component={ResponseDetails} />
           <Route path="/responses" component={Responses} />
           <Route path="/recipients" component={Recipients} />
           <Route path="/analytics" component={Dashboard} />

@@ -345,10 +345,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
       
-      const answers = await storage.getAnswersByResponse(req.params.id);
+      const answersWithQuestions = await storage.getAnswersWithQuestionsByResponse(req.params.id);
       const recipient = await storage.getRecipient(response.recipientId);
       
-      res.json({ response, answers, recipient });
+      res.json({ response, answers: answersWithQuestions, recipient });
     } catch (error) {
       console.error("Error fetching response:", error);
       res.status(500).json({ message: "Failed to fetch response" });

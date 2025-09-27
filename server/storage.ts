@@ -69,6 +69,7 @@ export interface IStorage {
   // Answer operations
   createAnswer(answer: InsertAnswer): Promise<Answer>;
   getAnswersByResponse(responseId: string): Promise<Answer[]>;
+  getAnswersWithQuestionsByResponse(responseId: string): Promise<(Answer & { question: Question })[]>;
   updateAnswer(id: string, updates: Partial<InsertAnswer>): Promise<Answer>;
   
   // Analytics operations
@@ -282,6 +283,43 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(answers)
       .where(eq(answers.responseId, responseId));
+  }
+
+  async getAnswersWithQuestionsByResponse(responseId: string): Promise<(Answer & { question: Question })[]> {
+    const result = await db
+      .select({
+        id: answers.id,
+        responseId: answers.responseId,
+        questionId: answers.questionId,
+        loopIndex: answers.loopIndex,
+        value: answers.value,
+        createdAt: answers.createdAt,
+        question: {
+          id: questions.id,
+          pageId: questions.pageId,
+          type: questions.type,
+          title: questions.title,
+          description: questions.description,
+          required: questions.required,
+          options: questions.options,
+          order: questions.order,
+          createdAt: questions.createdAt,
+        }
+      })
+      .from(answers)
+      .innerJoin(questions, eq(answers.questionId, questions.id))
+      .where(eq(answers.responseId, responseId))
+      .orderBy(questions.order);
+    
+    return result.map(row => ({
+      id: row.id,
+      responseId: row.responseId,
+      questionId: row.questionId,
+      loopIndex: row.loopIndex,
+      value: row.value,
+      createdAt: row.createdAt,
+      question: row.question
+    }));
   }
 
   async updateAnswer(id: string, updates: Partial<InsertAnswer>): Promise<Answer> {

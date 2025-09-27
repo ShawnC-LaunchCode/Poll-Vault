@@ -1,4 +1,4 @@
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 
 export default function Responses() {
   const { id } = useParams();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
 
@@ -41,6 +42,10 @@ export default function Responses() {
     enabled: !!id,
     retry: false,
   });
+
+  const handleViewResponse = (responseId: string) => {
+    setLocation(`/responses/${responseId}`);
+  };
 
   if (authLoading || !isAuthenticated) {
     return null;
@@ -166,7 +171,12 @@ export default function Responses() {
                         >
                           {response.completed ? "Completed" : "In Progress"}
                         </Badge>
-                        <Button variant="ghost" size="sm" data-testid={`button-view-response-${response.id}`}>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleViewResponse(response.id)}
+                          data-testid={`button-view-response-${response.id}`}
+                        >
                           <i className="fas fa-eye mr-2"></i>
                           View
                         </Button>
