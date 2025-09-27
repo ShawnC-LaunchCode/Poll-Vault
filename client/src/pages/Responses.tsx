@@ -2,19 +2,22 @@ import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { Survey, Response } from "@shared/schema";
 import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
+import ExportModal from "@/components/survey/ExportModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export default function Responses() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -60,10 +63,33 @@ export default function Responses() {
           title={survey ? `Responses - ${survey.title}` : "Survey Responses"}
           description="View and analyze survey responses"
           actions={
-            <Button data-testid="button-export-responses">
-              <i className="fas fa-download mr-2"></i>
-              Export
-            </Button>
+            <div className="flex gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button data-testid="button-export-responses">
+                    <i className="fas fa-download mr-2"></i>
+                    Export
+                    <i className="fas fa-chevron-down ml-2"></i>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem 
+                    onClick={() => setIsExportModalOpen(true)}
+                    data-testid="menu-item-export-data"
+                  >
+                    <i className="fas fa-file-export mr-2"></i>
+                    Export Data
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setLocation(`/surveys/${id}/analytics`)}
+                    data-testid="menu-item-view-analytics"
+                  >
+                    <i className="fas fa-chart-bar mr-2"></i>
+                    View Analytics
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           }
         />
         
@@ -197,6 +223,16 @@ export default function Responses() {
           </Card>
         </div>
       </main>
+      
+      {/* Export Modal */}
+      {survey && (
+        <ExportModal
+          surveyId={survey.id}
+          surveyTitle={survey.title}
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

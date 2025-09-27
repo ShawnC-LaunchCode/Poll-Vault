@@ -122,7 +122,7 @@ export default function SurveyPlayer() {
     mutationFn: async (responseData: any) => {
       return await apiRequest("POST", `/api/survey/${token}/response`, responseData);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       setIsSubmitted(true);
       
       // Track survey completion event

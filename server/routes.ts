@@ -6,8 +6,10 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertSurveySchema, insertSurveyPageSchema, insertQuestionSchema, insertLoopGroupSubquestionSchema, insertConditionalRuleSchema, insertRecipientSchema, insertResponseSchema, insertAnswerSchema, insertAnalyticsEventSchema } from "@shared/schema";
 import { sendNotificationEmail } from "./services/emailService";
 import { upload, isFileTypeAccepted, deleteFile, getFilePath, fileExists } from "./services/fileService";
+import { exportService, type ExportOptions } from "./services/exportService";
 import path from "path";
 import fs from "fs";
+import { z } from "zod";
 
 // Helper function to get expected MIME type from file extension
 function getMimeTypeFromExtension(ext: string): string | null {
@@ -1262,6 +1264,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting file:", error);
       res.status(500).json({ message: "Failed to delete file" });
+    }
+  });
+
+  // Export validation schema
+  const exportOptionsSchema = z.object({
+    format: z.enum(['csv', 'pdf']),
+    includeIncomplete: z.boolean().optional().default(false),
+    dateFrom: z.string().optional().transform(val => val ? new Date(val) : undefined),
+    dateTo: z.string().optional().transform(val => val ? new Date(val) : undefined),
+    questionIds: z.array(z.string()).optional()
+  });
+
+  // Export routes
+  app.post('/api/surveys/:surveyId/export', isAuthenticated, async (req: any, res) => {
+    try {
+      const surveyId = req.params.surveyId;
+      const userId = req.user.claims.sub;
+
+      // Verify survey ownership
+      const survey = await storage.getSurvey(surveyId);
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
+      }
+
+      if (survey.creatorId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Validate export options
+      const options = exportOptionsSchema.parse(req.body);
+
+      // Generate export
+      const exportedFile = await exportService.exportSurveyData(surveyId, options);
+
+      res.json({
+        success: true,
+        filename: exportedFile.filename,
+        downloadUrl: `/api/exports/download/${exportedFile.filename}`,
+        size: exportedFile.size,
+        mimeType: exportedFile.mimeType
+      });
+    } catch (error) {
+      console.error("Error exporting survey data:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to export survey data",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Export download route
+  app.get('/api/exports/download/:filename', isAuthenticated, async (req: any, res) => {
+    try {
+      const filename = req.params.filename;
+      const filePath = exportService.getExportPath(filename);
+
+      // Check if file exists
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "Export file not found" });
+      }
+
+      // Security check: ensure filename doesn't contain path traversal
+      if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+        return res.status(400).json({ message: "Invalid filename" });
+      }
+
+      // Determine content type
+      const ext = path.extname(filename).toLowerCase();
+      const mimeType = ext === '.csv' ? 'text/csv' : 
+                     ext === '.pdf' ? 'application/pdf' : 
+                     'application/octet-stream';
+
+      // Set headers for download
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+      // Stream file
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+
+      fileStream.on('error', (error) => {
+        console.error('Error streaming export file:', error);
+        if (!res.headersSent) {
+          res.status(500).json({ message: 'Error downloading file' });
+        }
+      });
+    } catch (error) {
+      console.error("Error downloading export:", error);
+      res.status(500).json({ message: "Failed to download export" });
+    }
+  });
+
+  // Export cleanup route (admin/maintenance)
+  app.delete('/api/exports/cleanup', isAuthenticated, async (req: any, res) => {
+    try {
+      await exportService.cleanupOldExports(24); // Clean up files older than 24 hours
+      res.json({ message: "Export cleanup completed" });
+    } catch (error) {
+      console.error("Error cleaning up exports:", error);
+      res.status(500).json({ message: "Failed to clean up exports" });
     }
   });
 
