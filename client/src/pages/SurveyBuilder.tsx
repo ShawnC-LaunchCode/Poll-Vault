@@ -47,6 +47,7 @@ export default function SurveyBuilder() {
   
   const [selectedPage, setSelectedPage] = useState<string | null>(null);
   const [selectedQuestion, setSelectedQuestion] = useState<string | null>(null);
+  const [currentSurveyId, setCurrentSurveyId] = useState<string | null>(id || null);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -118,6 +119,12 @@ export default function SurveyBuilder() {
     onSuccess: async (response) => {
       const responseJson = await response.json();
       const surveyId = id || responseJson.id;
+      
+      // Store the survey ID for new surveys
+      if (!id) {
+        setCurrentSurveyId(surveyId);
+      }
+      
       queryClient.invalidateQueries({ queryKey: ["/api/surveys"] });
       
       if (!id) {
@@ -152,12 +159,10 @@ export default function SurveyBuilder() {
   // Create page mutation
   const pageMutation = useMutation({
     mutationFn: async (title: string) => {
-      let surveyId = id;
-      if (!surveyId && surveyMutation.data) {
-        const responseJson = await surveyMutation.data.json();
-        surveyId = responseJson.id;
+      const surveyId = id || currentSurveyId;
+      if (!surveyId) {
+        throw new Error("Survey ID is required");
       }
-      if (!surveyId) throw new Error("Survey ID is required");
       
       const pageCount = pages ? pages.length : 0;
       return await apiRequest("POST", `/api/surveys/${surveyId}/pages`, {
@@ -166,7 +171,8 @@ export default function SurveyBuilder() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/surveys", id, "pages"] });
+      const surveyIdForCache = id || currentSurveyId;
+      queryClient.invalidateQueries({ queryKey: ["/api/surveys", surveyIdForCache, "pages"] });
       toast({
         title: "Success",
         description: "Page created successfully",
@@ -438,7 +444,7 @@ export default function SurveyBuilder() {
                     <Button 
                       size="sm" 
                       onClick={handleAddPage}
-                      disabled={!id && !surveyMutation.data}
+                      disabled={!id && !currentSurveyId}
                       data-testid="button-add-page"
                     >
                       <i className="fas fa-plus mr-1"></i>Add Page
@@ -498,7 +504,7 @@ export default function SurveyBuilder() {
                       <Button 
                         size="sm" 
                         onClick={handleAddPage}
-                        disabled={!id && !surveyMutation.data}
+                        disabled={!id && !currentSurveyId}
                         data-testid="button-add-first-page"
                       >
                         Add First Page
