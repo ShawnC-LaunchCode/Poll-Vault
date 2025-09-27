@@ -209,9 +209,10 @@ export default function Recipients() {
 
   const sendInvitationsMutation = useMutation({
     mutationFn: async ({ surveyId, recipientIds }: { surveyId: string; recipientIds: string[] }) => {
-      return await apiRequest("POST", `/api/surveys/${surveyId}/send-invitations`, {
+      const response = await apiRequest("POST", `/api/surveys/${surveyId}/send-invitations`, {
         recipientIds
       });
+      return await response.json();
     },
     onSuccess: (data: any) => {
       const surveyId = selectedSurveyId || id;

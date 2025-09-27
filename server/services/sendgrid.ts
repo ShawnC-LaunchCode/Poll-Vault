@@ -11,11 +11,12 @@ interface EmailParams {
   html?: string;
 }
 
-export async function sendEmail(params: EmailParams): Promise<boolean> {
+export async function sendEmail(params: EmailParams): Promise<{ success: boolean; error?: string }> {
   try {
     if (!process.env.SENDGRID_API_KEY) {
-      console.error('SENDGRID_API_KEY environment variable is not set');
-      return false;
+      const errorMsg = 'SENDGRID_API_KEY environment variable is not set';
+      console.error(errorMsg);
+      return { success: false, error: errorMsg };
     }
 
     mailService.setApiKey(process.env.SENDGRID_API_KEY);
@@ -29,10 +30,23 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
     });
     
     console.log(`Email sent successfully to ${params.to}`);
-    return true;
-  } catch (error) {
+    return { success: true };
+  } catch (error: any) {
     console.error('SendGrid email error:', error);
-    return false;
+    
+    // Extract meaningful error message from SendGrid response
+    let errorMessage = 'Failed to send email';
+    if (error.response?.body?.errors) {
+      errorMessage = error.response.body.errors.map((e: any) => e.message).join(', ');
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    if (error.code === 403) {
+      errorMessage = 'SendGrid authentication failed. Please check API key permissions and sender verification.';
+    }
+    
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -44,7 +58,7 @@ export interface SurveyInvitationParams {
   creatorName?: string;
 }
 
-export async function sendSurveyInvitation(params: SurveyInvitationParams, fromEmail: string): Promise<boolean> {
+export async function sendSurveyInvitation(params: SurveyInvitationParams, fromEmail?: string): Promise<{ success: boolean; error?: string }> {
   const { recipientName, recipientEmail, surveyTitle, surveyUrl, creatorName } = params;
   
   const subject = `You're invited to participate in: ${surveyTitle}`;
@@ -108,9 +122,12 @@ Sent from Poll Vault
     </html>
   `;
 
+  // Use provided fromEmail or fallback to environment variable or default
+  const senderEmail = fromEmail || process.env.SENDGRID_FROM_EMAIL || 'noreply@pollvault.com';
+  
   return await sendEmail({
     to: recipientEmail,
-    from: fromEmail,
+    from: senderEmail,
     subject,
     text: textContent,
     html: htmlContent,

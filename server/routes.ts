@@ -612,10 +612,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const recipient of recipientsToInvite) {
         try {
           // Generate survey URL with recipient token
-          const surveyUrl = `${process.env.CLIENT_URL || 'http://localhost:5000'}/survey/${survey.id}?token=${recipient.token}`;
+          const surveyUrl = `${process.env.CLIENT_URL || 'http://localhost:5000'}/survey/${recipient.token}`;
           
           // Send invitation email
-          const emailSent = await sendSurveyInvitation({
+          const emailResult = await sendSurveyInvitation({
             recipientName: recipient.name,
             recipientEmail: recipient.email,
             surveyTitle: survey.title,
@@ -623,7 +623,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             creatorName: creatorName
           }, fromEmail);
 
-          if (emailSent) {
+          if (emailResult.success) {
             // Update recipient sentAt timestamp
             await storage.updateRecipient(recipient.id, { sentAt: new Date() });
             successCount++;
@@ -639,32 +639,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
               recipientId: recipient.id,
               email: recipient.email,
               status: 'failed',
-              message: 'Failed to send invitation'
+              message: emailResult.error || 'Failed to send invitation'
             });
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error(`Error sending invitation to ${recipient.email}:`, error);
           errorCount++;
           results.push({
             recipientId: recipient.id,
             email: recipient.email,
             status: 'failed',
-            message: 'Error sending invitation'
+            message: error.message || 'Error sending invitation'
           });
         }
       }
 
-      // Return comprehensive response
-      res.json({
-        success: errorCount === 0,
-        message: `${successCount} invitation(s) sent successfully${errorCount > 0 ? `, ${errorCount} failed` : ''}`,
-        results: results,
-        stats: {
-          total: recipientsToInvite.length,
-          sent: successCount,
-          failed: errorCount
-        }
-      });
+      // Return comprehensive response with appropriate status code
+      const allFailed = errorCount > 0 && successCount === 0;
+      const partialFailure = errorCount > 0 && successCount > 0;
+      
+      if (allFailed) {
+        // All invitations failed - return 400 error
+        return res.status(400).json({
+          success: false,
+          message: `Failed to send ${errorCount} invitation(s)`,
+          results: results,
+          stats: {
+            total: recipientsToInvite.length,
+            sent: successCount,
+            failed: errorCount
+          }
+        });
+      } else if (partialFailure) {
+        // Some failed, some succeeded - return 207 Multi-Status
+        return res.status(207).json({
+          success: false,
+          message: `${successCount} invitation(s) sent successfully, ${errorCount} failed`,
+          results: results,
+          stats: {
+            total: recipientsToInvite.length,
+            sent: successCount,
+            failed: errorCount
+          }
+        });
+      } else {
+        // All succeeded - return 200
+        return res.json({
+          success: true,
+          message: `${successCount} invitation(s) sent successfully`,
+          results: results,
+          stats: {
+            total: recipientsToInvite.length,
+            sent: successCount,
+            failed: errorCount
+          }
+        });
+      }
 
     } catch (error) {
       console.error("Error sending survey invitations:", error);
