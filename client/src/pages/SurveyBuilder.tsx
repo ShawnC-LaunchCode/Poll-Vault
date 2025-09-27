@@ -95,7 +95,7 @@ export default function SurveyBuilder() {
       setAnonymousSettings({
         enabled: survey.allowAnonymous || false,
         accessType: survey.anonymousAccessType || "unlimited",
-        publicLink: survey.publicLink
+        publicLink: survey.publicLink || undefined
       });
     }
   }, [survey]);
