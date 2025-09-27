@@ -1,0 +1,178 @@
+You are building a survey platform that will run as a full-stack app inside Replit.
+
+Frontend: React (Vite + TailwindCSS)
+
+Backend: Node.js + Express
+
+Database: PostgreSQL (with SQL migrations, not ORM)
+
+Auth: JWT
+
+Single Replit project with both backend and frontend.
+
+Provide setup scripts so npm run dev runs both.
+
+Core Use Case
+
+Creators design and send surveys. Respondents complete them via a secure link. Creators view results and receive notifications.
+
+User Roles
+
+Admin: Manages creators and surveys.
+
+Creator: Creates/manages surveys, views responses.
+
+Respondent: Completes surveys (no login, via tokenized link).
+
+MVP Features
+
+Authentication
+
+JWT-based auth for Admins + Creators.
+
+Respondents use tokenized links only.
+
+Creator Dashboard
+
+Create/manage surveys.
+
+See drafts, open, closed.
+
+Survey Builder
+
+Add/edit/delete questions, grouped into pages.
+
+Question types: short text, long text, multiple choice, radio, yes/no, date/time, file upload, looping group (repeatable sub-questions).
+
+Mark questions as required.
+
+Add conditional logic (if Qx == value → show Qy or page Z).
+
+Looping Group
+
+Special question type containing sub-questions.
+
+Respondent can “Add another.”
+
+Responses stored as arrays of objects.
+
+Survey Sending
+
+Add recipients (name + email).
+
+Generate tokenized links.
+
+Option to email links or copy for manual sharing.
+
+Respondent Flow
+
+Linear, one page at a time.
+
+Progress bar.
+
+Mobile responsive.
+
+Must complete in one sitting (no save/return).
+
+Notifications
+
+Email creator when a response is submitted (include respondent name + link to view results).
+
+Responses & Analytics
+
+Store securely in DB.
+
+Creators view individual responses.
+
+Track completion rates, time per page, loop group repetitions.
+
+Database Schema
+
+Use UUIDs as primary keys. Provide SQL migration files in /migrations.
+
+(Same schema we outlined earlier with users, surveys, survey_pages, questions, loop_group_subquestions, conditional_rules, recipients, responses, answers, files, analytics_events.)
+
+API Endpoints
+
+Auth: login, register
+
+Surveys: CRUD
+
+Pages & Questions: CRUD
+
+Recipients & Sending: add recipients, generate/send links
+
+Respondent flow: get by token, submit responses
+
+Responses: list + detail
+
+Analytics: fetch per survey
+
+Frontend Components
+
+Creator UI: Dashboard, SurveyBuilder, LoopGroupEditor, ConditionalLogicEditor, RecipientManager, ResponsesViewer, AnalyticsView.
+
+Respondent UI: SurveyPlayer (progress bar), QuestionRenderer, SubmissionComplete.
+
+Development Priorities
+
+Phase 1 (MVP must-haves)
+
+Auth (admin + creator)
+
+Creator dashboard
+
+Survey builder (basic types only)
+
+Recipient manager + token links
+
+Respondent flow (progress bar, responses stored)
+
+Email notification on completion
+
+Phase 2 (extensions)
+
+Looping groups
+
+Conditional logic
+
+File uploads
+
+Basic analytics
+
+Phase 3 (later)
+
+Exporting
+
+AI analysis
+
+Public anonymous links
+
+Advanced data visualization
+
+Setup in Replit
+
+Single project with /backend, /frontend, /migrations.
+
+Scripts:
+
+npm run dev → starts backend + frontend concurrently.
+
+npm run migrate → runs SQL migrations.
+
+Provide seed data: 1 admin, 1 creator, 1 sample survey (with loop group), 2 recipients, 3 responses.
+
+Task:
+Generate the scaffold for this project:
+
+File/folder structure.
+
+SQL migrations.
+
+Express routes.
+
+React components + routing.
+
+Seed data.
+
+Setup instructions for running inside Replit.
