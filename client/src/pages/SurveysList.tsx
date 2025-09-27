@@ -1,4 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { isUnauthorizedError } from "@/lib/authUtils";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect } from "react";
@@ -9,10 +13,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
+import { Plus, Edit, BarChart, Users, Trash2, FileText } from "lucide-react";
 
 export default function SurveysList() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
+  const queryClient = useQueryClient();
+  const [deletingSurveyId, setDeletingSurveyId] = useState<string | null>(null);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -33,6 +40,45 @@ export default function SurveysList() {
     queryKey: ["/api/surveys"],
     retry: false,
   });
+
+  // Delete survey mutation
+  const deleteSurveyMutation = useMutation({
+    mutationFn: async (surveyId: string) => {
+      return await apiRequest("DELETE", `/api/surveys/${surveyId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/surveys"] });
+      toast({
+        title: "Success",
+        description: "Survey deleted successfully",
+      });
+      setDeletingSurveyId(null);
+    },
+    onError: (error: any) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete survey",
+        variant: "destructive",
+      });
+      setDeletingSurveyId(null);
+    },
+  });
+
+  const handleDeleteSurvey = (surveyId: string) => {
+    setDeletingSurveyId(surveyId);
+    deleteSurveyMutation.mutate(surveyId);
+  };
 
   if (isLoading || !isAuthenticated) {
     return null;
@@ -63,8 +109,8 @@ export default function SurveysList() {
           actions={
             <Link href="/surveys/new">
               <Button data-testid="button-create-survey">
-                <i className="fas fa-plus mr-2"></i>
-                Create Survey
+                <Plus className="w-4 h-4 mr-2" />
+                Create New Survey
               </Button>
             </Link>
           }
@@ -114,22 +160,57 @@ export default function SurveysList() {
                       <div className="flex gap-2 pt-2">
                         <Link href={`/surveys/${survey.id}/edit`}>
                           <Button variant="outline" size="sm" data-testid={`button-edit-survey-${survey.id}`}>
-                            <i className="fas fa-edit mr-1"></i>
+                            <Edit className="w-4 h-4 mr-1" />
                             Edit
                           </Button>
                         </Link>
                         <Link href={`/surveys/${survey.id}/responses`}>
                           <Button variant="outline" size="sm" data-testid={`button-view-responses-${survey.id}`}>
-                            <i className="fas fa-chart-bar mr-1"></i>
+                            <BarChart className="w-4 h-4 mr-1" />
                             Responses
                           </Button>
                         </Link>
                         <Link href={`/surveys/${survey.id}/recipients`}>
                           <Button variant="outline" size="sm" data-testid={`button-manage-recipients-${survey.id}`}>
-                            <i className="fas fa-users mr-1"></i>
+                            <Users className="w-4 h-4 mr-1" />
                             Recipients
                           </Button>
                         </Link>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="text-destructive hover:text-destructive"
+                              data-testid={`button-delete-survey-${survey.id}`}
+                            >
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Delete
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Survey</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete "{survey.title}"? This action cannot be undone.
+                                All responses and recipient data will be permanently deleted.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel data-testid={`button-cancel-delete-${survey.id}`}>
+                                Cancel
+                              </AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteSurvey(survey.id)}
+                                disabled={deletingSurveyId === survey.id}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                data-testid={`button-confirm-delete-${survey.id}`}
+                              >
+                                {deletingSurveyId === survey.id ? "Deleting..." : "Delete Survey"}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </div>
                   </CardContent>
@@ -141,7 +222,7 @@ export default function SurveysList() {
                 <Card className="border-dashed">
                   <CardContent className="flex flex-col items-center justify-center py-12">
                     <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-                      <i className="fas fa-poll text-muted-foreground text-2xl"></i>
+                      <FileText className="w-8 h-8 text-muted-foreground" />
                     </div>
                     <h3 className="text-lg font-semibold text-foreground mb-2" data-testid="text-no-surveys">
                       No surveys yet
@@ -151,7 +232,7 @@ export default function SurveysList() {
                     </p>
                     <Link href="/surveys/new">
                       <Button data-testid="button-create-first-survey">
-                        <i className="fas fa-plus mr-2"></i>
+                        <Plus className="w-4 h-4 mr-2" />
                         Create Your First Survey
                       </Button>
                     </Link>
