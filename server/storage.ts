@@ -1646,17 +1646,57 @@ export class DatabaseStorage implements IStorage {
       console.log('Survey exists, proceeding with anonymous access enablement:', {
         id: existingSurvey.id,
         title: existingSurvey.title,
-        currentStatus: existingSurvey.status
+        currentStatus: existingSurvey.status,
+        hasExistingPublicLink: !!existingSurvey.publicLink,
+        allowAnonymous: existingSurvey.allowAnonymous
       });
 
-      // Auto-publish draft surveys when enabling anonymous access
+      // Check if anonymous access is already enabled with a public link (idempotent behavior)
+      if (existingSurvey.allowAnonymous && existingSurvey.publicLink) {
+        console.log('Anonymous access already enabled, updating configuration only:', {
+          existingPublicLink: existingSurvey.publicLink,
+          currentAccessType: existingSurvey.anonymousAccessType,
+          newAccessType: config.accessType
+        });
+        
+        // Update only the configuration without regenerating the public link
+        const [updatedSurvey] = await tx
+          .update(surveys)
+          .set({
+            anonymousAccessType: config.accessType as any,
+            anonymousConfig: config.anonymousConfig ? JSON.stringify(config.anonymousConfig) : null,
+            updatedAt: new Date()
+          })
+          .where(eq(surveys.id, surveyId))
+          .returning();
+        
+        if (!updatedSurvey) {
+          console.error('No survey returned after configuration update');
+          throw new Error('Survey configuration update failed');
+        }
+        
+        console.log('Anonymous access configuration updated (idempotent):', {
+          id: updatedSurvey.id,
+          publicLink: updatedSurvey.publicLink, // Unchanged
+          anonymousAccessType: updatedSurvey.anonymousAccessType,
+          status: updatedSurvey.status
+        });
+        
+        return updatedSurvey;
+      }
+
+      // Auto-publish draft surveys when enabling anonymous access (only from draft → open)
       const shouldPublish = existingSurvey.status === 'draft';
       if (shouldPublish) {
         console.log('Auto-publishing draft survey for anonymous access');
       }
       
-      const publicLink = randomUUID();
-      console.log('Generated public link:', publicLink);
+      // Generate new public link only if one doesn't exist
+      const publicLink = existingSurvey.publicLink || randomUUID();
+      console.log('Using public link:', { 
+        isNew: !existingSurvey.publicLink,
+        publicLink: publicLink
+      });
       
       try {
         const [updatedSurvey] = await tx
@@ -1665,7 +1705,7 @@ export class DatabaseStorage implements IStorage {
             allowAnonymous: true,
             anonymousAccessType: config.accessType as any,
             publicLink,
-            status: shouldPublish ? 'open' : existingSurvey.status, // Auto-publish drafts
+            status: shouldPublish ? 'open' : existingSurvey.status, // Auto-publish drafts only
             anonymousConfig: config.anonymousConfig ? JSON.stringify(config.anonymousConfig) : null,
             updatedAt: new Date()
           })
@@ -1683,7 +1723,8 @@ export class DatabaseStorage implements IStorage {
           allowAnonymous: updatedSurvey.allowAnonymous,
           anonymousAccessType: updatedSurvey.anonymousAccessType,
           status: updatedSurvey.status,
-          autoPublished: shouldPublish
+          autoPublished: shouldPublish,
+          wasIdempotent: !!existingSurvey.publicLink
         });
         
         // Verify the survey can be found by public link within the transaction

@@ -94,7 +94,10 @@ export const surveys = pgTable("surveys", {
   anonymousConfig: jsonb("anonymous_config"), // Additional anonymous survey settings
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  // Unique index on publicLink for database-level UUID collision prevention
+  index("surveys_public_link_unique_idx").on(table.publicLink),
+]);
 
 // Survey pages table
 export const surveyPages = pgTable("survey_pages", {
