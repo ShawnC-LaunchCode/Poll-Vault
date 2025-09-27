@@ -69,13 +69,16 @@ export default function Sidebar() {
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate" data-testid="text-user-name">
-              {user?.firstName || user?.lastName 
-                ? `${user.firstName || ""} ${user.lastName || ""}`.trim()
-                : user?.email || "User"
-              }
-            </p>
-            <p className="text-xs text-muted-foreground truncate" data-testid="text-user-email">
+            <div className="flex items-center space-x-2">
+              <i className="fas fa-user-circle text-primary text-sm"></i>
+              <p className="text-sm font-medium text-foreground truncate" data-testid="text-user-name">
+                {user?.firstName || user?.lastName 
+                  ? `${user.firstName || ""} ${user.lastName || ""}`.trim()
+                  : user?.email || "User"
+                }
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground truncate ml-6" data-testid="text-user-email">
               {user?.email || ""}
             </p>
           </div>
@@ -84,6 +87,7 @@ export default function Sidebar() {
             size="sm" 
             onClick={() => window.location.href = '/api/logout'}
             data-testid="button-logout"
+            title="Logout"
           >
             <i className="fas fa-sign-out-alt"></i>
           </Button>
