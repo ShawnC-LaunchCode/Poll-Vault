@@ -7,6 +7,8 @@ import { useEffect } from "react";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import type { Survey, Recipient } from "@shared/schema";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Link } from "wouter";
 import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
@@ -22,6 +24,7 @@ export default function Recipients() {
   const queryClient = useQueryClient();
   
   const [newRecipient, setNewRecipient] = useState({ name: "", email: "" });
+  const [selectedSurveyId, setSelectedSurveyId] = useState<string>(id || "");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Redirect to home if not authenticated
@@ -45,19 +48,29 @@ export default function Recipients() {
     retry: false,
   });
 
+  // Query all surveys when no specific survey ID
+  const { data: allSurveys } = useQuery<Survey[]>({
+    queryKey: ["/api/surveys"],
+    enabled: !id,
+    retry: false,
+  });
+
   const { data: recipients, isLoading: recipientsLoading } = useQuery<Recipient[]>({
-    queryKey: ["/api/surveys", id, "recipients"],
-    enabled: !!id,
+    queryKey: ["/api/surveys", selectedSurveyId || id, "recipients"],
+    enabled: !!(selectedSurveyId || id),
     retry: false,
   });
 
   // Add recipient mutation
   const addRecipientMutation = useMutation({
     mutationFn: async (recipient: { name: string; email: string }) => {
-      return await apiRequest("POST", `/api/surveys/${id}/recipients`, recipient);
+      const surveyId = selectedSurveyId || id;
+      if (!surveyId) throw new Error("Please select a survey first");
+      return await apiRequest("POST", `/api/surveys/${surveyId}/recipients`, recipient);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/surveys", id, "recipients"] });
+      const surveyId = selectedSurveyId || id;
+      queryClient.invalidateQueries({ queryKey: ["/api/surveys", surveyId, "recipients"] });
       setNewRecipient({ name: "", email: "" });
       setIsDialogOpen(false);
       toast({
@@ -90,6 +103,14 @@ export default function Recipients() {
   }
 
   const handleAddRecipient = () => {
+    if (!selectedSurveyId && !id) {
+      toast({
+        title: "Error",
+        description: "Please select a survey first",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!newRecipient.name || !newRecipient.email) {
       toast({
         title: "Error",
@@ -101,6 +122,9 @@ export default function Recipients() {
     
     addRecipientMutation.mutate(newRecipient);
   };
+
+  const currentSurvey = id ? survey : allSurveys?.find(s => s.id === selectedSurveyId);
+  const showSurveySelector = !id && allSurveys && allSurveys.length > 0;
 
   const getSurveyUrl = (token: string) => {
     const domain = import.meta.env.VITE_REPLIT_DOMAINS?.split(',')[0] || window.location.host;
@@ -122,7 +146,7 @@ export default function Recipients() {
       
       <main className="flex-1 flex flex-col overflow-hidden">
         <Header 
-          title={survey ? `Recipients - ${survey.title}` : "Survey Recipients"}
+          title={currentSurvey ? `Recipients - ${currentSurvey.title}` : "Survey Recipients"}
           description="Manage survey recipients and distribution"
           actions={
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -179,8 +203,41 @@ export default function Recipients() {
         />
         
         <div className="flex-1 overflow-auto p-6 space-y-6">
+          {/* Survey Selector */}
+          {showSurveySelector && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Select Survey</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <Select value={selectedSurveyId} onValueChange={setSelectedSurveyId}>
+                    <SelectTrigger data-testid="select-survey">
+                      <SelectValue placeholder="Choose a survey to manage recipients" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allSurveys?.map((survey) => (
+                        <SelectItem key={survey.id} value={survey.id}>
+                          {survey.title} ({survey.status})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {!selectedSurveyId && (
+                    <p className="text-sm text-muted-foreground">
+                      Select a survey above to manage its recipients, or{" "}
+                      <Link href="/surveys/new">
+                        <a className="text-primary hover:underline">create a new survey</a>
+                      </Link>
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Summary Stats */}
-          {survey && (
+          {currentSurvey && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <Card>
                 <CardContent className="p-6">
@@ -233,6 +290,7 @@ export default function Recipients() {
           )}
 
           {/* Recipients List */}
+          {(selectedSurveyId || id) && (
           <Card>
             <CardHeader>
               <CardTitle>Recipients</CardTitle>
@@ -302,6 +360,7 @@ export default function Recipients() {
               )}
             </CardContent>
           </Card>
+          )}
         </div>
       </main>
     </div>

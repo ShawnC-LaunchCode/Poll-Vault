@@ -83,13 +83,14 @@ export default function Sidebar() {
             </p>
           </div>
           <Button 
-            variant="ghost" 
+            variant="outline" 
             size="sm" 
             onClick={() => window.location.href = '/api/logout'}
             data-testid="button-logout"
-            title="Logout"
+            className="flex items-center space-x-2 px-3 py-1"
           >
-            <i className="fas fa-sign-out-alt"></i>
+            <i className="fas fa-sign-out-alt text-sm"></i>
+            <span className="text-xs">Logout</span>
           </Button>
         </div>
       </div>

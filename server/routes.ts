@@ -73,10 +73,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     legacyHeaders: false,
   });
 
+  // Development authentication helper (only for testing in development)
+  if (process.env.NODE_ENV === 'development') {
+    app.post('/api/auth/dev-login', async (req, res) => {
+      try {
+        // Create a test user for development
+        const testUser = {
+          id: "dev-user-123",
+          email: "dev@example.com",
+          firstName: "Dev",
+          lastName: "User",
+          profileImageUrl: null,
+        };
+        
+        // Upsert the test user
+        await storage.upsertUser(testUser);
+        
+        // Simulate authentication by setting up the session
+        const mockAuthUser = {
+          claims: {
+            sub: testUser.id,
+            email: testUser.email,
+            first_name: testUser.firstName,
+            last_name: testUser.lastName,
+            exp: Math.floor(Date.now() / 1000) + 3600, // Expires in 1 hour
+          },
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+          access_token: "dev-token",
+          refresh_token: "dev-refresh-token"
+        };
+        
+        // Set up the session
+        req.login(mockAuthUser, (err) => {
+          if (err) {
+            console.error("Dev login error:", err);
+            return res.status(500).json({ message: "Failed to create dev session" });
+          }
+          res.json({ message: "Development authentication successful", user: testUser });
+        });
+      } catch (error) {
+        console.error("Dev login error:", error);
+        res.status(500).json({ message: "Failed to authenticate in dev mode" });
+      }
+    });
+  }
+
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized - no user ID" });
+      }
       const user = await storage.getUser(userId);
       res.json(user);
     } catch (error) {
@@ -88,7 +136,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Survey routes
   app.post('/api/surveys', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized - no user ID" });
+      }
       const surveyData = insertSurveySchema.parse({ ...req.body, creatorId: userId });
       const survey = await storage.createSurvey(surveyData);
       res.json(survey);
@@ -100,7 +151,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/surveys', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized - no user ID" });
+      }
       const surveys = await storage.getSurveysByCreator(userId);
       res.json(surveys);
     } catch (error) {
