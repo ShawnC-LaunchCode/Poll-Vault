@@ -257,8 +257,36 @@ export class DatabaseStorage implements IStorage {
   
   // Survey operations
   async createSurvey(survey: InsertSurvey): Promise<Survey> {
-    const [newSurvey] = await db.insert(surveys).values(survey).returning();
-    return newSurvey;
+    console.log('Creating survey in database:', { 
+      title: survey.title, 
+      creatorId: survey.creatorId,
+      description: survey.description?.substring(0, 100) 
+    });
+    
+    return await db.transaction(async (tx) => {
+      try {
+        const [newSurvey] = await tx.insert(surveys).values(survey).returning();
+        
+        console.log('Survey created in database successfully:', { 
+          id: newSurvey.id, 
+          title: newSurvey.title,
+          status: newSurvey.status 
+        });
+        
+        // Verify the survey was actually saved within the transaction
+        const [verification] = await tx.select().from(surveys).where(eq(surveys.id, newSurvey.id));
+        if (!verification) {
+          console.error('CRITICAL: Survey not found immediately after creation within transaction!', newSurvey.id);
+          throw new Error('Survey creation failed - survey not persisted to database');
+        }
+        
+        console.log('Survey creation verified successfully within transaction');
+        return newSurvey;
+      } catch (error) {
+        console.error('Database error creating survey:', error);
+        throw error;
+      }
+    });
   }
 
   async getSurvey(id: string): Promise<Survey | undefined> {
@@ -1560,8 +1588,36 @@ export class DatabaseStorage implements IStorage {
 
   // Anonymous survey operations
   async getSurveyByPublicLink(publicLink: string): Promise<Survey | undefined> {
-    const [survey] = await db.select().from(surveys).where(eq(surveys.publicLink, publicLink));
-    return survey;
+    console.log('Looking up survey by public link in database:', publicLink);
+    
+    try {
+      const [survey] = await db.select().from(surveys).where(eq(surveys.publicLink, publicLink));
+      
+      if (survey) {
+        console.log('Found survey by public link:', {
+          id: survey.id,
+          title: survey.title,
+          publicLink: survey.publicLink,
+          allowAnonymous: survey.allowAnonymous,
+          status: survey.status
+        });
+      } else {
+        console.log('No survey found for public link:', publicLink);
+        
+        // Debug: Let's see what surveys exist with public links
+        const allSurveysWithPublicLinks = await db
+          .select({ id: surveys.id, title: surveys.title, publicLink: surveys.publicLink })
+          .from(surveys)
+          .where(sql`${surveys.publicLink} IS NOT NULL`);
+        
+        console.log('All surveys with public links:', allSurveysWithPublicLinks);
+      }
+      
+      return survey;
+    } catch (error) {
+      console.error('Database error looking up survey by public link:', error);
+      throw error;
+    }
   }
 
   async generatePublicLink(surveyId: string): Promise<string> {
@@ -1577,24 +1633,73 @@ export class DatabaseStorage implements IStorage {
   }
 
   async enableAnonymousAccess(surveyId: string, config: { accessType: string; anonymousConfig?: AnonymousSurveyConfig }): Promise<Survey> {
-    const publicLink = randomUUID();
-    const [updatedSurvey] = await db
-      .update(surveys)
-      .set({
-        allowAnonymous: true,
-        anonymousAccessType: config.accessType as any,
-        publicLink,
-        anonymousConfig: config.anonymousConfig ? JSON.stringify(config.anonymousConfig) : null,
-        updatedAt: new Date()
-      })
-      .where(eq(surveys.id, surveyId))
-      .returning();
+    console.log('Enabling anonymous access in database for survey:', surveyId);
     
-    if (!updatedSurvey) {
-      throw new Error('Survey not found');
-    }
-    
-    return updatedSurvey;
+    return await db.transaction(async (tx) => {
+      // First verify the survey exists within transaction
+      const [existingSurvey] = await tx.select().from(surveys).where(eq(surveys.id, surveyId));
+      if (!existingSurvey) {
+        console.error('Survey not found when enabling anonymous access:', surveyId);
+        throw new Error('Survey not found - cannot enable anonymous access');
+      }
+      
+      console.log('Survey exists, proceeding with anonymous access enablement:', {
+        id: existingSurvey.id,
+        title: existingSurvey.title,
+        currentStatus: existingSurvey.status
+      });
+
+      // Auto-publish draft surveys when enabling anonymous access
+      const shouldPublish = existingSurvey.status === 'draft';
+      if (shouldPublish) {
+        console.log('Auto-publishing draft survey for anonymous access');
+      }
+      
+      const publicLink = randomUUID();
+      console.log('Generated public link:', publicLink);
+      
+      try {
+        const [updatedSurvey] = await tx
+          .update(surveys)
+          .set({
+            allowAnonymous: true,
+            anonymousAccessType: config.accessType as any,
+            publicLink,
+            status: shouldPublish ? 'open' : existingSurvey.status, // Auto-publish drafts
+            anonymousConfig: config.anonymousConfig ? JSON.stringify(config.anonymousConfig) : null,
+            updatedAt: new Date()
+          })
+          .where(eq(surveys.id, surveyId))
+          .returning();
+        
+        if (!updatedSurvey) {
+          console.error('No survey returned after update operation');
+          throw new Error('Survey update failed - no result returned');
+        }
+        
+        console.log('Survey updated with anonymous access:', {
+          id: updatedSurvey.id,
+          publicLink: updatedSurvey.publicLink,
+          allowAnonymous: updatedSurvey.allowAnonymous,
+          anonymousAccessType: updatedSurvey.anonymousAccessType,
+          status: updatedSurvey.status,
+          autoPublished: shouldPublish
+        });
+        
+        // Verify the survey can be found by public link within the transaction
+        const [verification] = await tx.select().from(surveys).where(eq(surveys.publicLink, updatedSurvey.publicLink || ''));
+        if (!verification) {
+          console.error('CRITICAL: Survey not found by public link immediately after creation!', updatedSurvey.publicLink);
+          throw new Error('Anonymous access enablement failed - survey not findable by public link');
+        }
+        
+        console.log('Anonymous access enablement verified successfully within transaction');
+        return updatedSurvey;
+      } catch (error) {
+        console.error('Database error enabling anonymous access:', error);
+        throw error;
+      }
+    });
   }
 
   async disableAnonymousAccess(surveyId: string): Promise<Survey> {

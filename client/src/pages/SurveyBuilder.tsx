@@ -194,22 +194,38 @@ export default function SurveyBuilder() {
       return await apiRequest("POST", `/api/surveys/${id}/anonymous`, data);
     },
     onSuccess: async (response) => {
-      const data = await response.json();
-      setAnonymousSettings(prev => ({ 
-        ...prev, 
-        enabled: true, 
-        publicLink: data.survey.publicLink 
-      }));
-      queryClient.invalidateQueries({ queryKey: ["/api/surveys", id] });
-      toast({
-        title: "Success",
-        description: "Anonymous access enabled successfully",
-      });
+      try {
+        const data = await response.json();
+        console.log('Anonymous access enabled response:', data);
+        
+        if (!data.survey || !data.survey.publicLink) {
+          throw new Error('Invalid response: missing public link');
+        }
+        
+        setAnonymousSettings(prev => ({ 
+          ...prev, 
+          enabled: true, 
+          publicLink: data.survey.publicLink 
+        }));
+        queryClient.invalidateQueries({ queryKey: ["/api/surveys", id] });
+        toast({
+          title: "Success",
+          description: "Anonymous access enabled successfully",
+        });
+      } catch (error) {
+        console.error('Error processing anonymous access response:', error);
+        toast({
+          title: "Error",
+          description: "Failed to process anonymous access response",
+          variant: "destructive",
+        });
+      }
     },
     onError: (error) => {
+      console.error('Anonymous access mutation error:', error);
       toast({
         title: "Error",
-        description: error.message,
+        description: `Failed to enable anonymous access: ${error.message}`,
         variant: "destructive",
       });
     },

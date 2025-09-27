@@ -138,15 +138,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/surveys', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
+      console.log('Creating survey for user:', userId);
+      
       if (!userId) {
+        console.error('Survey creation failed: No user ID');
         return res.status(401).json({ message: "Unauthorized - no user ID" });
       }
+      
       const surveyData = insertSurveySchema.parse({ ...req.body, creatorId: userId });
+      console.log('Parsed survey data:', { 
+        title: surveyData.title, 
+        description: surveyData.description?.substring(0, 100),
+        creatorId: surveyData.creatorId 
+      });
+      
       const survey = await storage.createSurvey(surveyData);
+      console.log('Survey created successfully:', { id: survey.id, title: survey.title });
+      
       res.json(survey);
     } catch (error) {
       console.error("Error creating survey:", error);
-      res.status(500).json({ message: "Failed to create survey" });
+      if (error instanceof Error) {
+        console.error('Error stack:', error.stack);
+        // Return more detailed error information
+        res.status(500).json({ 
+          message: "Failed to create survey", 
+          error: process.env.NODE_ENV === 'development' ? error.message : undefined 
+        });
+      } else {
+        res.status(500).json({ message: "Failed to create survey" });
+      }
     }
   });
 
@@ -1071,20 +1092,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Anonymous survey configuration routes
   app.post('/api/surveys/:id/anonymous', isAuthenticated, async (req: any, res) => {
     try {
-      const survey = await storage.getSurvey(req.params.id);
+      const surveyId = req.params.id;
+      const userId = req.user.claims.sub;
+      
+      console.log('Enabling anonymous access for survey:', surveyId, 'by user:', userId);
+      
+      const survey = await storage.getSurvey(surveyId);
       if (!survey) {
+        console.error('Survey not found when enabling anonymous access:', surveyId);
         return res.status(404).json({ message: "Survey not found" });
       }
       
-      if (survey.creatorId !== req.user.claims.sub) {
+      console.log('Found survey for anonymous access:', { 
+        id: survey.id, 
+        title: survey.title, 
+        creatorId: survey.creatorId 
+      });
+      
+      if (survey.creatorId !== userId) {
+        console.error('Access denied for anonymous access:', { surveyCreator: survey.creatorId, requestUser: userId });
         return res.status(403).json({ message: "Access denied" });
       }
       
       const { accessType, anonymousConfig } = req.body;
+      console.log('Anonymous access config:', { accessType, anonymousConfig });
       
-      const updatedSurvey = await storage.enableAnonymousAccess(req.params.id, {
+      const updatedSurvey = await storage.enableAnonymousAccess(surveyId, {
         accessType,
         anonymousConfig
+      });
+      
+      console.log('Anonymous access enabled successfully:', {
+        id: updatedSurvey.id,
+        publicLink: updatedSurvey.publicLink,
+        allowAnonymous: updatedSurvey.allowAnonymous
       });
       
       res.json({
@@ -1093,7 +1134,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error enabling anonymous access:", error);
-      res.status(500).json({ message: "Failed to enable anonymous access" });
+      if (error instanceof Error) {
+        console.error('Error stack:', error.stack);
+        res.status(500).json({ 
+          message: "Failed to enable anonymous access",
+          error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+      } else {
+        res.status(500).json({ message: "Failed to enable anonymous access" });
+      }
     }
   });
 
@@ -1119,16 +1168,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Anonymous survey access routes (no authentication required)
   app.get('/api/anonymous-survey/:publicLink', async (req, res) => {
     try {
-      const survey = await storage.getSurveyByPublicLink(req.params.publicLink);
+      const publicLink = req.params.publicLink;
+      console.log('Looking up anonymous survey by public link:', publicLink);
+      
+      const survey = await storage.getSurveyByPublicLink(publicLink);
       if (!survey) {
+        console.error('Survey not found for public link:', publicLink);
         return res.status(404).json({ message: "Survey not found" });
       }
       
-      if (!survey.allowAnonymous || survey.status !== 'open') {
-        return res.status(404).json({ message: "Survey not available for anonymous access" });
+      console.log('Found survey for public link:', {
+        id: survey.id,
+        title: survey.title,
+        allowAnonymous: survey.allowAnonymous,
+        status: survey.status,
+        publicLink: survey.publicLink
+      });
+      
+      if (!survey.allowAnonymous) {
+        console.error('Survey does not allow anonymous access:', {
+          allowAnonymous: survey.allowAnonymous,
+          status: survey.status
+        });
+        return res.status(404).json({ message: "Survey does not allow anonymous access" });
+      }
+      
+      if (survey.status !== 'open') {
+        console.error('Survey not open for responses:', {
+          allowAnonymous: survey.allowAnonymous,
+          status: survey.status
+        });
+        return res.status(404).json({ message: "Survey is not currently open for responses" });
       }
       
       const pages = await storage.getSurveyPages(survey.id);
+      console.log('Retrieved survey pages:', pages.length);
       
       // Get questions for each page, including subquestions for loop groups
       for (const page of pages) {
@@ -1145,9 +1219,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         anonymous: true
       };
       
+      console.log('Returning anonymous survey data successfully');
       res.json(surveyData);
     } catch (error) {
       console.error("Error fetching anonymous survey:", error);
+      if (error instanceof Error) {
+        console.error('Error stack:', error.stack);
+      }
       res.status(500).json({ message: "Failed to fetch survey" });
     }
   });
