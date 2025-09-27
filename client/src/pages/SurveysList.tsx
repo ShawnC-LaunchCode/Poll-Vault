@@ -118,7 +118,7 @@ export default function SurveysList() {
         
         <div className="flex-1 overflow-auto p-6 space-y-6">
           {/* Surveys Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
             {surveysLoading ? (
               // Loading State
               Array.from({ length: 6 }).map((_, i) => (
@@ -135,7 +135,7 @@ export default function SurveysList() {
               ))
             ) : surveys && surveys.length > 0 ? (
               surveys.map((survey) => (
-                <Card key={survey.id} className="hover:shadow-md transition-shadow">
+                <Card key={survey.id} className="hover:shadow-md transition-shadow min-h-[220px]">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <CardTitle className="text-lg font-semibold text-foreground line-clamp-2" data-testid={`text-survey-title-${survey.id}`}>
@@ -157,7 +157,7 @@ export default function SurveysList() {
                         <span>Responses: 0</span>
                       </div>
                       
-                      <div className="flex gap-2 pt-2">
+                      <div className="flex flex-wrap gap-2 pt-2">
                         <Link href={`/surveys/${survey.id}/edit`}>
                           <Button variant="outline" size="sm" data-testid={`button-edit-survey-${survey.id}`}>
                             <Edit className="w-4 h-4 mr-1" />
