@@ -266,29 +266,27 @@ export default function Dashboard() {
                     ) : surveys && surveys.length > 0 ? (
                       <div className="space-y-3">
                         {surveys.slice(0, 4).map((survey) => (
-                          <div key={survey.id} className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-accent/50 transition-colors">
-                            <div className="flex items-center space-x-3">
-                              <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-                                <FileText className="h-4 w-4 text-primary" />
+                          <Link key={survey.id} href={`/surveys/${survey.id}/edit`}>
+                            <div className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer" data-testid={`card-recent-survey-${survey.id}`}>
+                              <div className="flex items-center space-x-3">
+                                <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                                  <FileText className="h-4 w-4 text-primary" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h4 className="font-medium text-foreground line-clamp-1" data-testid={`text-recent-survey-title-${survey.id}`}>
+                                    {survey.title}
+                                  </h4>
+                                  <p className="text-xs text-muted-foreground">
+                                    {survey.updatedAt ? new Date(survey.updatedAt).toLocaleDateString() : 'N/A'}
+                                  </p>
+                                </div>
                               </div>
-                              <div className="min-w-0 flex-1">
-                                <h4 className="font-medium text-foreground line-clamp-1" data-testid={`text-recent-survey-title-${survey.id}`}>
-                                  {survey.title}
-                                </h4>
-                                <p className="text-xs text-muted-foreground">
-                                  {survey.updatedAt ? new Date(survey.updatedAt).toLocaleDateString() : 'N/A'}
-                                </p>
+                              <div className="flex items-center space-x-2">
+                                {getStatusBadge(survey.status)}
+                                <ExternalLink className="h-4 w-4 text-muted-foreground" />
                               </div>
                             </div>
-                            <div className="flex items-center space-x-2">
-                              {getStatusBadge(survey.status)}
-                              <Link href={`/surveys/${survey.id}`}>
-                                <Button variant="ghost" size="sm" data-testid={`button-recent-survey-${survey.id}`}>
-                                  <ExternalLink className="h-3 w-3" />
-                                </Button>
-                              </Link>
-                            </div>
-                          </div>
+                          </Link>
                         ))}
                       </div>
                     ) : (
