@@ -49,6 +49,10 @@ export default function Recipients() {
   const [globalSearchTerm, setGlobalSearchTerm] = useState("");
   const [globalFilterTag, setGlobalFilterTag] = useState("");
   
+  // Survey recipients selection state for sending invitations
+  const [selectedSurveyRecipients, setSelectedSurveyRecipients] = useState<string[]>([]);
+  const [isSendInvitationsDialogOpen, setIsSendInvitationsDialogOpen] = useState(false);
+  
   // Active tab - default to global recipients unless we have a specific survey ID
   const [activeTab, setActiveTab] = useState<string>(id ? "survey" : "global");
 
@@ -198,6 +202,38 @@ export default function Recipients() {
       toast({
         title: "Success",
         description: `Successfully added ${(data as any).addedCount || selectedFromGlobal.length} recipients to survey`,
+      });
+    },
+    onError: handleMutationError,
+  });
+
+  const sendInvitationsMutation = useMutation({
+    mutationFn: async ({ surveyId, recipientIds }: { surveyId: string; recipientIds: string[] }) => {
+      return await apiRequest("POST", `/api/surveys/${surveyId}/send-invitations`, {
+        recipientIds
+      });
+    },
+    onSuccess: (data: any) => {
+      const surveyId = selectedSurveyId || id;
+      queryClient.invalidateQueries({ queryKey: ["/api/surveys", surveyId, "recipients"] });
+      setSelectedSurveyRecipients([]);
+      setIsSendInvitationsDialogOpen(false);
+      
+      const { sent, failed, total } = data.stats || { sent: 0, failed: 0, total: 0 };
+      let title = "Invitations Sent";
+      let description = `${sent} invitation(s) sent successfully`;
+      let variant: "default" | "destructive" = "default";
+      
+      if (failed > 0) {
+        title = "Invitations Partially Sent";
+        description = `${sent} sent, ${failed} failed out of ${total} total`;
+        variant = "destructive";
+      }
+      
+      toast({
+        title,
+        description,
+        variant,
       });
     },
     onError: handleMutationError,
@@ -462,6 +498,51 @@ export default function Recipients() {
         title: "Copied",
         description: "Link copied to clipboard",
       });
+    });
+  };
+
+  // Survey recipients selection handlers
+  const toggleSurveyRecipientSelection = (recipientId: string) => {
+    setSelectedSurveyRecipients(prev =>
+      prev.includes(recipientId)
+        ? prev.filter(id => id !== recipientId)
+        : [...prev, recipientId]
+    );
+  };
+
+  const toggleAllSurveyRecipients = () => {
+    if (!recipients) return;
+    
+    if (selectedSurveyRecipients.length === recipients.length) {
+      setSelectedSurveyRecipients([]);
+    } else {
+      setSelectedSurveyRecipients(recipients.map(r => r.id));
+    }
+  };
+
+  const handleSendInvitations = () => {
+    const surveyId = selectedSurveyId || id;
+    if (!surveyId) {
+      toast({
+        title: "Error",
+        description: "Survey not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectedSurveyRecipients.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please select recipients to send invitations to",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    sendInvitationsMutation.mutate({
+      surveyId,
+      recipientIds: selectedSurveyRecipients
     });
   };
 
@@ -1152,7 +1233,50 @@ export default function Recipients() {
               {(selectedSurveyId || id) && (
                 <Card>
                   <CardHeader>
-                    <CardTitle>Survey Recipients</CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Survey Recipients</CardTitle>
+                      {recipients && recipients.length > 0 && (
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              checked={selectedSurveyRecipients.length === recipients.length}
+                              onCheckedChange={toggleAllSurveyRecipients}
+                              data-testid="checkbox-select-all-survey-recipients"
+                            />
+                            <span className="text-sm text-muted-foreground">Select All</span>
+                          </div>
+                          {selectedSurveyRecipients.length > 0 && (
+                            <AlertDialog open={isSendInvitationsDialogOpen} onOpenChange={setIsSendInvitationsDialogOpen}>
+                              <AlertDialogTrigger asChild>
+                                <Button data-testid="button-send-invitations">
+                                  <Mail className="w-4 h-4 mr-2" />
+                                  Send Invitations ({selectedSurveyRecipients.length})
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Send Survey Invitations</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to send invitations to {selectedSurveyRecipients.length} selected recipient(s)? 
+                                    This will send personalized email invitations with unique survey links.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={handleSendInvitations} 
+                                    disabled={sendInvitationsMutation.isPending}
+                                    data-testid="button-confirm-send-invitations"
+                                  >
+                                    {sendInvitationsMutation.isPending ? "Sending..." : "Send Invitations"}
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent>
                     {recipientsLoading ? (
@@ -1175,6 +1299,11 @@ export default function Recipients() {
                         {recipients.map((recipient) => (
                           <div key={recipient.id} className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent/50 transition-colors">
                             <div className="flex items-center space-x-4">
+                              <Checkbox
+                                checked={selectedSurveyRecipients.includes(recipient.id)}
+                                onCheckedChange={() => toggleSurveyRecipientSelection(recipient.id)}
+                                data-testid={`checkbox-survey-recipient-${recipient.id}`}
+                              />
                               <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
                                 <Users className="text-primary w-5 h-5" />
                               </div>
@@ -1185,10 +1314,15 @@ export default function Recipients() {
                                 <p className="text-sm text-muted-foreground" data-testid={`text-recipient-email-${recipient.id}`}>
                                   {recipient.email}
                                 </p>
+                                {recipient.sentAt && (
+                                  <p className="text-xs text-muted-foreground" data-testid={`text-recipient-sent-at-${recipient.id}`}>
+                                    Sent: {new Date(recipient.sentAt).toLocaleDateString()}
+                                  </p>
+                                )}
                               </div>
                             </div>
                             <div className="flex items-center space-x-4">
-                              <Badge variant={recipient.sentAt ? "default" : "secondary"}>
+                              <Badge variant={recipient.sentAt ? "default" : "secondary"} data-testid={`badge-recipient-status-${recipient.id}`}>
                                 {recipient.sentAt ? "Sent" : "Pending"}
                               </Badge>
                               <Button 

@@ -21,6 +21,7 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertSurveySchema, insertSurveyPageSchema, insertQuestionSchema, insertLoopGroupSubquestionSchema, insertConditionalRuleSchema, insertRecipientSchema, insertGlobalRecipientSchema, insertResponseSchema, insertAnswerSchema, insertAnalyticsEventSchema } from "@shared/schema";
 import { sendNotificationEmail } from "./services/emailService";
+import { sendSurveyInvitation } from "./services/sendgrid";
 import { upload, isFileTypeAccepted, deleteFile, getFilePath, fileExists } from "./services/fileService";
 import { exportService, type ExportOptions } from "./services/exportService";
 import path from "path";
@@ -561,6 +562,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching recipients:", error);
       res.status(500).json({ message: "Failed to fetch recipients" });
+    }
+  });
+
+  // Send survey invitations endpoint
+  app.post('/api/surveys/:surveyId/send-invitations', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized - no user ID" });
+      }
+
+      // Validate that user owns the survey
+      const survey = await storage.getSurvey(req.params.surveyId);
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
+      }
+      
+      if (survey.creatorId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Validate request body
+      const { recipientIds } = req.body;
+      if (!recipientIds || !Array.isArray(recipientIds) || recipientIds.length === 0) {
+        return res.status(400).json({ message: "Recipient IDs are required" });
+      }
+
+      // Get recipients to send invitations to
+      const allRecipients = await storage.getRecipientsBySurvey(req.params.surveyId);
+      const recipientsToInvite = allRecipients.filter(recipient => recipientIds.includes(recipient.id));
+      
+      if (recipientsToInvite.length === 0) {
+        return res.status(400).json({ message: "No valid recipients found" });
+      }
+
+      // Get user information for the email
+      const user = await storage.getUser(userId);
+      const creatorName = user ? `${user.firstName} ${user.lastName}`.trim() : undefined;
+      
+      // Use environment variable for from email or default
+      const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@pollvault.com';
+
+      // Send invitations and track results
+      const results = [];
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const recipient of recipientsToInvite) {
+        try {
+          // Generate survey URL with recipient token
+          const surveyUrl = `${process.env.CLIENT_URL || 'http://localhost:5000'}/survey/${survey.id}?token=${recipient.token}`;
+          
+          // Send invitation email
+          const emailSent = await sendSurveyInvitation({
+            recipientName: recipient.name,
+            recipientEmail: recipient.email,
+            surveyTitle: survey.title,
+            surveyUrl: surveyUrl,
+            creatorName: creatorName
+          }, fromEmail);
+
+          if (emailSent) {
+            // Update recipient sentAt timestamp
+            await storage.updateRecipient(recipient.id, { sentAt: new Date() });
+            successCount++;
+            results.push({
+              recipientId: recipient.id,
+              email: recipient.email,
+              status: 'sent',
+              message: 'Invitation sent successfully'
+            });
+          } else {
+            errorCount++;
+            results.push({
+              recipientId: recipient.id,
+              email: recipient.email,
+              status: 'failed',
+              message: 'Failed to send invitation'
+            });
+          }
+        } catch (error) {
+          console.error(`Error sending invitation to ${recipient.email}:`, error);
+          errorCount++;
+          results.push({
+            recipientId: recipient.id,
+            email: recipient.email,
+            status: 'failed',
+            message: 'Error sending invitation'
+          });
+        }
+      }
+
+      // Return comprehensive response
+      res.json({
+        success: errorCount === 0,
+        message: `${successCount} invitation(s) sent successfully${errorCount > 0 ? `, ${errorCount} failed` : ''}`,
+        results: results,
+        stats: {
+          total: recipientsToInvite.length,
+          sent: successCount,
+          failed: errorCount
+        }
+      });
+
+    } catch (error) {
+      console.error("Error sending survey invitations:", error);
+      res.status(500).json({ message: "Failed to send survey invitations" });
     }
   });
 
