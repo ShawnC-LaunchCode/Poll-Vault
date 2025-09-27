@@ -197,7 +197,7 @@ export default function Recipients() {
       setIsDialogOpen(false);
       toast({
         title: "Success",
-        description: `Successfully added ${data.addedCount} recipients to survey`,
+        description: `Successfully added ${(data as any).addedCount || selectedFromGlobal.length} recipients to survey`,
       });
     },
     onError: handleMutationError,
@@ -792,7 +792,7 @@ export default function Recipients() {
                         <Checkbox
                           id="save-to-global"
                           checked={saveToGlobal}
-                          onCheckedChange={setSaveToGlobal}
+                          onCheckedChange={(checked) => setSaveToGlobal(checked === true)}
                           data-testid="checkbox-save-to-global"
                         />
                         <label htmlFor="save-to-global" className="text-sm text-foreground cursor-pointer">
