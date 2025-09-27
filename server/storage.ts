@@ -41,6 +41,7 @@ export interface IStorage {
   
   // Survey page operations
   createSurveyPage(page: InsertSurveyPage): Promise<SurveyPage>;
+  getSurveyPage(id: string): Promise<SurveyPage | undefined>;
   getSurveyPages(surveyId: string): Promise<SurveyPage[]>;
   updateSurveyPage(id: string, updates: Partial<InsertSurveyPage>): Promise<SurveyPage>;
   deleteSurveyPage(id: string): Promise<void>;
@@ -140,6 +141,11 @@ export class DatabaseStorage implements IStorage {
   async createSurveyPage(page: InsertSurveyPage): Promise<SurveyPage> {
     const [newPage] = await db.insert(surveyPages).values(page).returning();
     return newPage;
+  }
+
+  async getSurveyPage(id: string): Promise<SurveyPage | undefined> {
+    const [page] = await db.select().from(surveyPages).where(eq(surveyPages.id, id));
+    return page;
   }
 
   async getSurveyPages(surveyId: string): Promise<SurveyPage[]> {

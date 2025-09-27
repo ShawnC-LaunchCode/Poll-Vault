@@ -138,6 +138,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Questions routes
   app.post('/api/pages/:pageId/questions', isAuthenticated, async (req: any, res) => {
     try {
+      // First, verify that the page belongs to a survey owned by the authenticated user
+      const page = await storage.getSurveyPage(req.params.pageId);
+      if (!page) {
+        return res.status(404).json({ message: "Page not found" });
+      }
+      
+      const survey = await storage.getSurvey(page.surveyId);
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
+      }
+      
+      if (survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
       const questionData = insertQuestionSchema.parse({ ...req.body, pageId: req.params.pageId });
       const question = await storage.createQuestion(questionData);
       res.json(question);
@@ -149,6 +164,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/pages/:pageId/questions', isAuthenticated, async (req: any, res) => {
     try {
+      // First, verify that the page belongs to a survey owned by the authenticated user
+      const page = await storage.getSurveyPage(req.params.pageId);
+      if (!page) {
+        return res.status(404).json({ message: "Page not found" });
+      }
+      
+      const survey = await storage.getSurvey(page.surveyId);
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
+      }
+      
+      if (survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
       const questions = await storage.getQuestionsByPage(req.params.pageId);
       res.json(questions);
     } catch (error) {

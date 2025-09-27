@@ -103,7 +103,7 @@ export default function Recipients() {
   };
 
   const getSurveyUrl = (token: string) => {
-    const domain = process.env.REPLIT_DOMAINS?.split(',')[0] || window.location.host;
+    const domain = import.meta.env.VITE_REPLIT_DOMAINS?.split(',')[0] || window.location.host;
     return `https://${domain}/survey/${token}`;
   };
 
