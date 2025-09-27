@@ -3,7 +3,8 @@ import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { Survey, SurveyPage, Recipient, Question, QuestionWithSubquestions } from "@shared/schema";
+import type { Survey, SurveyPage, Recipient, Question, QuestionWithSubquestions, ConditionalRule } from "@shared/schema";
+import { evaluatePageConditionalLogic, createEvaluationContext } from "@shared/conditionalLogic";
 
 // Extended type for survey player API response
 interface SurveyPageWithQuestions extends SurveyPage {
@@ -21,6 +22,7 @@ export default function SurveyPlayer() {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [visibleQuestions, setVisibleQuestions] = useState<Record<string, boolean>>({});
 
   // Load survey data
   const { data: surveyData, isLoading, error } = useQuery<{
@@ -31,6 +33,13 @@ export default function SurveyPlayer() {
     submittedAt?: string;
   }>({
     queryKey: ["/api/survey", token],
+    retry: false,
+  });
+
+  // Load conditional rules for the survey
+  const { data: conditionalRules = [] } = useQuery<ConditionalRule[]>({
+    queryKey: ["/api/surveys", surveyData?.survey?.id, "conditional-rules"],
+    enabled: !!surveyData?.survey?.id,
     retry: false,
   });
 
@@ -54,6 +63,32 @@ export default function SurveyPlayer() {
       });
     },
   });
+
+  // Evaluate conditional logic when answers change
+  useEffect(() => {
+    if (!conditionalRules.length || !surveyData?.pages) return;
+    
+    const currentPage = surveyData.pages[currentPageIndex];
+    if (!currentPage?.questions) return;
+
+    // Evaluate conditional rules for current page
+    const evaluationResults = evaluatePageConditionalLogic(conditionalRules, answers);
+    
+    // Update visible questions based on evaluation results
+    const newVisibility: Record<string, boolean> = {};
+    
+    // First, set all questions as visible by default
+    currentPage.questions.forEach(question => {
+      newVisibility[question.id] = true;
+    });
+    
+    // Then apply conditional logic results
+    evaluationResults.forEach(result => {
+      newVisibility[result.questionId] = result.visible;
+    });
+    
+    setVisibleQuestions(newVisibility);
+  }, [answers, conditionalRules, surveyData, currentPageIndex]);
 
   if (isLoading) {
     return (
@@ -269,7 +304,9 @@ export default function SurveyPlayer() {
                   )}
 
                   {/* Questions */}
-                  {currentPage.questions && currentPage.questions.map((question) => (
+                  {currentPage.questions && currentPage.questions
+                    .filter(question => visibleQuestions[question.id] !== false)
+                    .map((question) => (
                   <QuestionRenderer
                     key={question.id}
                     question={{

@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertSurveySchema, insertSurveyPageSchema, insertQuestionSchema, insertLoopGroupSubquestionSchema, insertRecipientSchema, insertResponseSchema, insertAnswerSchema } from "@shared/schema";
+import { insertSurveySchema, insertSurveyPageSchema, insertQuestionSchema, insertLoopGroupSubquestionSchema, insertConditionalRuleSchema, insertRecipientSchema, insertResponseSchema, insertAnswerSchema } from "@shared/schema";
 import { sendNotificationEmail } from "./services/emailService";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -310,6 +310,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting subquestion:", error);
       res.status(500).json({ message: "Failed to delete subquestion" });
+    }
+  });
+
+  // Conditional rules routes
+  app.post('/api/surveys/:surveyId/conditional-rules', isAuthenticated, async (req: any, res) => {
+    try {
+      const survey = await storage.getSurvey(req.params.surveyId);
+      if (!survey || survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const ruleData = insertConditionalRuleSchema.parse({ ...req.body, surveyId: req.params.surveyId });
+      const rule = await storage.createConditionalRule(ruleData);
+      res.json(rule);
+    } catch (error) {
+      console.error("Error creating conditional rule:", error);
+      res.status(500).json({ message: "Failed to create conditional rule" });
+    }
+  });
+
+  app.get('/api/surveys/:surveyId/conditional-rules', isAuthenticated, async (req: any, res) => {
+    try {
+      const survey = await storage.getSurvey(req.params.surveyId);
+      if (!survey || survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const rules = await storage.getConditionalRulesBySurvey(req.params.surveyId);
+      res.json(rules);
+    } catch (error) {
+      console.error("Error fetching conditional rules:", error);
+      res.status(500).json({ message: "Failed to fetch conditional rules" });
+    }
+  });
+
+  app.get('/api/questions/:questionId/conditional-rules', isAuthenticated, async (req: any, res) => {
+    try {
+      // Verify access through the question
+      const question = await storage.getQuestion(req.params.questionId);
+      if (!question) {
+        return res.status(404).json({ message: "Question not found" });
+      }
+      
+      const page = await storage.getSurveyPage(question.pageId);
+      if (!page) {
+        return res.status(404).json({ message: "Page not found" });
+      }
+      
+      const survey = await storage.getSurvey(page.surveyId);
+      if (!survey || survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const rules = await storage.getConditionalRulesByQuestion(req.params.questionId);
+      res.json(rules);
+    } catch (error) {
+      console.error("Error fetching conditional rules:", error);
+      res.status(500).json({ message: "Failed to fetch conditional rules" });
+    }
+  });
+
+  app.put('/api/conditional-rules/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const rule = await storage.getConditionalRule(req.params.id);
+      if (!rule) {
+        return res.status(404).json({ message: "Conditional rule not found" });
+      }
+      
+      // Verify access through the survey
+      const survey = await storage.getSurvey(rule.surveyId);
+      if (!survey || survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const updates = insertConditionalRuleSchema.partial().parse(req.body);
+      const updatedRule = await storage.updateConditionalRule(req.params.id, updates);
+      res.json(updatedRule);
+    } catch (error) {
+      console.error("Error updating conditional rule:", error);
+      res.status(500).json({ message: "Failed to update conditional rule" });
+    }
+  });
+
+  app.delete('/api/conditional-rules/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const rule = await storage.getConditionalRule(req.params.id);
+      if (!rule) {
+        return res.status(404).json({ message: "Conditional rule not found" });
+      }
+      
+      // Verify access through the survey
+      const survey = await storage.getSurvey(rule.surveyId);
+      if (!survey || survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      await storage.deleteConditionalRule(req.params.id);
+      res.json({ message: "Conditional rule deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting conditional rule:", error);
+      res.status(500).json({ message: "Failed to delete conditional rule" });
     }
   });
 

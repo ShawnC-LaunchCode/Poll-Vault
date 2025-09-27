@@ -43,6 +43,27 @@ export const questionTypeEnum = pgEnum('question_type', [
   'loop_group'
 ]);
 
+// Condition operator enum for conditional logic
+export const conditionOperatorEnum = pgEnum('condition_operator', [
+  'equals',
+  'not_equals',
+  'contains',
+  'not_contains',
+  'greater_than',
+  'less_than',
+  'between',
+  'is_empty',
+  'is_not_empty'
+]);
+
+// Conditional action enum
+export const conditionalActionEnum = pgEnum('conditional_action', [
+  'show',
+  'hide',
+  'require',
+  'make_optional'
+]);
+
 // Users table for Replit Auth
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -85,6 +106,7 @@ export const questions = pgTable("questions", {
   required: boolean("required").default(false),
   options: jsonb("options"), // For multiple choice, radio options
   loopConfig: jsonb("loop_config"), // For loop groups: {minIterations, maxIterations, addButtonText, removeButtonText}
+  conditionalLogic: jsonb("conditional_logic"), // For conditional visibility and requirements
   order: integer("order").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -107,10 +129,14 @@ export const conditionalRules = pgTable("conditional_rules", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   surveyId: uuid("survey_id").references(() => surveys.id, { onDelete: 'cascade' }).notNull(),
   conditionQuestionId: uuid("condition_question_id").references(() => questions.id).notNull(),
-  conditionValue: varchar("condition_value").notNull(),
+  operator: conditionOperatorEnum("operator").notNull(),
+  conditionValue: jsonb("condition_value").notNull(), // Support complex values for between, contains, etc.
   targetQuestionId: uuid("target_question_id").references(() => questions.id),
   targetPageId: uuid("target_page_id").references(() => surveyPages.id),
-  action: varchar("action").notNull(), // 'show' or 'hide'
+  action: conditionalActionEnum("action").notNull(),
+  logicalOperator: varchar("logical_operator").default("AND"), // For multiple conditions: AND, OR
+  order: integer("order").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Recipients table
@@ -248,6 +274,7 @@ export const insertSurveySchema = createInsertSchema(surveys).omit({ id: true, c
 export const insertSurveyPageSchema = createInsertSchema(surveyPages).omit({ id: true, createdAt: true });
 export const insertQuestionSchema = createInsertSchema(questions).omit({ id: true, createdAt: true });
 export const insertLoopGroupSubquestionSchema = createInsertSchema(loopGroupSubquestions).omit({ id: true, createdAt: true });
+export const insertConditionalRuleSchema = createInsertSchema(conditionalRules).omit({ id: true, createdAt: true });
 export const insertRecipientSchema = createInsertSchema(recipients).omit({ id: true, createdAt: true, token: true });
 export const insertResponseSchema = createInsertSchema(responses).omit({ id: true, createdAt: true });
 export const insertAnswerSchema = createInsertSchema(answers).omit({ id: true, createdAt: true });
@@ -263,6 +290,8 @@ export type Question = typeof questions.$inferSelect;
 export type InsertQuestion = typeof insertQuestionSchema._type;
 export type LoopGroupSubquestion = typeof loopGroupSubquestions.$inferSelect;
 export type InsertLoopGroupSubquestion = typeof insertLoopGroupSubquestionSchema._type;
+export type ConditionalRule = typeof conditionalRules.$inferSelect;
+export type InsertConditionalRule = typeof insertConditionalRuleSchema._type;
 export type Recipient = typeof recipients.$inferSelect;
 export type InsertRecipient = typeof insertRecipientSchema._type;
 export type Response = typeof responses.$inferSelect;
@@ -344,4 +373,32 @@ export interface QuestionWithSubquestions extends Question {
 export interface LoopInstanceData {
   instanceIndex: number;
   answers: Record<string, any>;
+}
+
+// Conditional logic configuration types
+export interface ConditionalLogicConfig {
+  enabled: boolean;
+  conditions: ConditionalCondition[];
+  action: 'show' | 'hide' | 'require' | 'make_optional';
+  logicalOperator?: 'AND' | 'OR'; // For multiple conditions
+}
+
+export interface ConditionalCondition {
+  questionId: string;
+  operator: 'equals' | 'not_equals' | 'contains' | 'not_contains' | 'greater_than' | 'less_than' | 'between' | 'is_empty' | 'is_not_empty';
+  value: any; // Can be string, number, array, etc.
+  secondValue?: any; // For 'between' operator
+}
+
+// Extended question type with conditional rules for frontend usage
+export interface QuestionWithConditionalLogic extends Question {
+  conditionalRules?: ConditionalRule[];
+}
+
+// Condition evaluation result
+export interface ConditionalEvaluationResult {
+  questionId: string;
+  visible: boolean;
+  required: boolean;
+  reason?: string; // For debugging
 }

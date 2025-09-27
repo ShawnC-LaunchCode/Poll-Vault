@@ -319,6 +319,7 @@ export default function SurveyBuilder() {
                 pageId={selectedPage}
                 selectedQuestion={selectedQuestion}
                 onQuestionSelect={setSelectedQuestion}
+                surveyId={id || ""}
               />
             ) : (
               <div className="flex items-center justify-center h-full">

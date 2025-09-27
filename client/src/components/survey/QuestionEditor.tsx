@@ -2,21 +2,25 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { Question, QuestionWithSubquestions, LoopGroupConfig, LoopGroupSubquestion } from "@shared/schema";
+import type { Question, QuestionWithSubquestions, LoopGroupConfig, LoopGroupSubquestion, ConditionalRule, ConditionalLogicConfig } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Trash2, Plus, Settings } from "lucide-react";
 
 interface QuestionEditorProps {
   pageId: string;
   selectedQuestion?: string | null;
   onQuestionSelect: (questionId: string | null) => void;
+  surveyId: string;
 }
 
-export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSelect }: QuestionEditorProps) {
+export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSelect, surveyId }: QuestionEditorProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -27,13 +31,15 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
     required: boolean;
     options: string[];
     loopConfig?: LoopGroupConfig;
+    conditionalLogic?: ConditionalLogicConfig;
   }>({
     type: "short_text",
     title: "",
     description: "",
     required: false,
     options: [],
-    loopConfig: undefined
+    loopConfig: undefined,
+    conditionalLogic: undefined
   });
 
   const [subquestions, setSubquestions] = useState<LoopGroupSubquestion[]>([]);
@@ -53,6 +59,10 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
   });
 
   const [isEditing, setIsEditing] = useState(false);
+  
+  // Conditional logic state
+  const [showConditionalLogic, setShowConditionalLogic] = useState(false);
+  const [conditionalRules, setConditionalRules] = useState<ConditionalRule[]>([]);
 
   // Load questions for this page
   const { data: questions, isLoading: questionsLoading } = useQuery<QuestionWithSubquestions[]>({
@@ -65,6 +75,20 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
   const { data: selectedQuestionData } = useQuery<Question>({
     queryKey: ["/api/questions", selectedQuestion],
     enabled: !!selectedQuestion,
+    retry: false,
+  });
+
+  // Load conditional rules for the survey
+  const { data: allConditionalRules } = useQuery<ConditionalRule[]>({
+    queryKey: ["/api/surveys", surveyId, "conditional-rules"],
+    enabled: !!surveyId,
+    retry: false,
+  });
+
+  // Load all questions in the survey for conditional logic dependencies
+  const { data: allQuestionsInSurvey } = useQuery<Question[]>({
+    queryKey: ["/api/surveys", surveyId, "all-questions"],
+    enabled: !!surveyId,
     retry: false,
   });
 

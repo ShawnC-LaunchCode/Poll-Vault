@@ -4,6 +4,7 @@ import {
   surveyPages,
   questions,
   loopGroupSubquestions,
+  conditionalRules,
   recipients,
   responses,
   answers,
@@ -18,6 +19,8 @@ import {
   type InsertQuestion,
   type LoopGroupSubquestion,
   type InsertLoopGroupSubquestion,
+  type ConditionalRule,
+  type InsertConditionalRule,
   type QuestionWithSubquestions,
   type Recipient,
   type InsertRecipient,
@@ -72,6 +75,15 @@ export interface IStorage {
   updateLoopGroupSubquestion(id: string, updates: Partial<InsertLoopGroupSubquestion>): Promise<LoopGroupSubquestion>;
   deleteLoopGroupSubquestion(id: string): Promise<void>;
   deleteLoopGroupSubquestionsByLoopId(loopQuestionId: string): Promise<void>;
+  
+  // Conditional rules operations
+  createConditionalRule(rule: InsertConditionalRule): Promise<ConditionalRule>;
+  getConditionalRule(id: string): Promise<ConditionalRule | undefined>;
+  getConditionalRulesBySurvey(surveyId: string): Promise<ConditionalRule[]>;
+  getConditionalRulesByQuestion(questionId: string): Promise<ConditionalRule[]>;
+  updateConditionalRule(id: string, updates: Partial<InsertConditionalRule>): Promise<ConditionalRule>;
+  deleteConditionalRule(id: string): Promise<void>;
+  deleteConditionalRulesBySurvey(surveyId: string): Promise<void>;
   
   // Recipient operations
   createRecipient(recipient: InsertRecipient): Promise<Recipient>;
@@ -285,6 +297,50 @@ export class DatabaseStorage implements IStorage {
 
   async deleteLoopGroupSubquestionsByLoopId(loopQuestionId: string): Promise<void> {
     await db.delete(loopGroupSubquestions).where(eq(loopGroupSubquestions.loopQuestionId, loopQuestionId));
+  }
+  
+  // Conditional rules operations
+  async createConditionalRule(rule: InsertConditionalRule): Promise<ConditionalRule> {
+    const [newRule] = await db.insert(conditionalRules).values(rule).returning();
+    return newRule;
+  }
+
+  async getConditionalRule(id: string): Promise<ConditionalRule | undefined> {
+    const [rule] = await db.select().from(conditionalRules).where(eq(conditionalRules.id, id));
+    return rule;
+  }
+
+  async getConditionalRulesBySurvey(surveyId: string): Promise<ConditionalRule[]> {
+    return await db
+      .select()
+      .from(conditionalRules)
+      .where(eq(conditionalRules.surveyId, surveyId))
+      .orderBy(conditionalRules.order);
+  }
+
+  async getConditionalRulesByQuestion(questionId: string): Promise<ConditionalRule[]> {
+    return await db
+      .select()
+      .from(conditionalRules)
+      .where(eq(conditionalRules.targetQuestionId, questionId))
+      .orderBy(conditionalRules.order);
+  }
+
+  async updateConditionalRule(id: string, updates: Partial<InsertConditionalRule>): Promise<ConditionalRule> {
+    const [updatedRule] = await db
+      .update(conditionalRules)
+      .set(updates)
+      .where(eq(conditionalRules.id, id))
+      .returning();
+    return updatedRule;
+  }
+
+  async deleteConditionalRule(id: string): Promise<void> {
+    await db.delete(conditionalRules).where(eq(conditionalRules.id, id));
+  }
+
+  async deleteConditionalRulesBySurvey(surveyId: string): Promise<void> {
+    await db.delete(conditionalRules).where(eq(conditionalRules.surveyId, surveyId));
   }
   
   // Recipient operations
