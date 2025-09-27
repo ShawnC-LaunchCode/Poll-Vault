@@ -542,6 +542,7 @@ export interface EngagementMetrics {
 // File metadata type
 export interface FileMetadata {
   id: string;
+  answerId: string;
   filename: string;
   originalName: string;
   mimeType: string;

@@ -1,6 +1,22 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import rateLimit from "express-rate-limit";
+
+// Extend Express Request type for authenticated requests
+declare global {
+  namespace Express {
+    interface User {
+      claims: {
+        sub: string;
+        email: string;
+        [key: string]: any;
+      };
+      access_token?: string;
+      refresh_token?: string;
+      expires_at?: number;
+    }
+  }
+}
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertSurveySchema, insertSurveyPageSchema, insertQuestionSchema, insertLoopGroupSubquestionSchema, insertConditionalRuleSchema, insertRecipientSchema, insertResponseSchema, insertAnswerSchema, insertAnalyticsEventSchema } from "@shared/schema";
@@ -589,7 +605,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if user is survey creator or the recipient
       const userId = req.user.claims.sub;
-      const recipient = await storage.getRecipient(response.recipientId);
+      const recipient = response.recipientId ? await storage.getRecipient(response.recipientId) : null;
       const isCreator = survey.creatorId === userId;
       const isRecipient = recipient && recipient.email === req.user.claims.email;
       
@@ -907,7 +923,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const answersWithQuestions = await storage.getAnswersWithQuestionsByResponse(req.params.id);
-      const recipient = await storage.getRecipient(response.recipientId);
+      const recipient = response.recipientId ? await storage.getRecipient(response.recipientId) : null;
       
       res.json({ response, answers: answersWithQuestions, recipient });
     } catch (error) {
@@ -1240,7 +1256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if user is survey creator or the recipient
       const userId = req.user.claims.sub;
-      const recipient = await storage.getRecipient(response.recipientId);
+      const recipient = response.recipientId ? await storage.getRecipient(response.recipientId) : null;
       const isCreator = survey.creatorId === userId;
       const isRecipient = recipient && recipient.email === req.user.claims.email;
       
@@ -1314,7 +1330,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           uploadedFiles.push(fileMetadata);
         } catch (error) {
           console.error('Error processing file:', error);
-          errors.push(`Error processing ${file.originalname}: ${error.message}`);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          errors.push(`Error processing ${file.originalname}: ${errorMessage}`);
         }
       }
 
@@ -1357,7 +1374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if user is survey creator or the recipient
       const userId = req.user.claims.sub;
-      const recipient = await storage.getRecipient(response.recipientId);
+      const recipient = response.recipientId ? await storage.getRecipient(response.recipientId) : null;
       const isCreator = survey.creatorId === userId;
       const isRecipient = recipient && recipient.email === req.user.claims.email;
       
@@ -1408,7 +1425,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if user is survey creator or the recipient
       const userId = req.user.claims.sub;
-      const recipient = await storage.getRecipient(response.recipientId);
+      const recipient = response.recipientId ? await storage.getRecipient(response.recipientId) : null;
       const isCreator = survey.creatorId === userId;
       const isRecipient = recipient && recipient.email === req.user.claims.email;
       
@@ -1452,7 +1469,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if user is survey creator or the recipient
       const userId = req.user.claims.sub;
-      const recipient = await storage.getRecipient(response.recipientId);
+      const recipient = response.recipientId ? await storage.getRecipient(response.recipientId) : null;
       const isCreator = survey.creatorId === userId;
       const isRecipient = recipient && recipient.email === req.user.claims.email;
       

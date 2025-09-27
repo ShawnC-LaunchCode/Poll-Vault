@@ -112,6 +112,7 @@ export interface IStorage {
   
   // Answer operations
   createAnswer(answer: InsertAnswer): Promise<Answer>;
+  getAnswer(id: string): Promise<Answer | undefined>;
   getAnswersByResponse(responseId: string): Promise<Answer[]>;
   getAnswersWithQuestionsByResponse(responseId: string): Promise<(Answer & { question: Question })[]>;
   updateAnswer(id: string, updates: Partial<InsertAnswer>): Promise<Answer>;
@@ -472,6 +473,14 @@ export class DatabaseStorage implements IStorage {
   async createAnswer(answer: InsertAnswer): Promise<Answer> {
     const [newAnswer] = await db.insert(answers).values(answer).returning();
     return newAnswer;
+  }
+
+  async getAnswer(id: string): Promise<Answer | undefined> {
+    const [answer] = await db
+      .select()
+      .from(answers)
+      .where(eq(answers.id, id));
+    return answer;
   }
 
   async getAnswersByResponse(responseId: string): Promise<Answer[]> {
@@ -1306,6 +1315,7 @@ export class DatabaseStorage implements IStorage {
     const [newFile] = await db.insert(files).values(fileData).returning();
     return {
       id: newFile.id,
+      answerId: newFile.answerId,
       filename: newFile.filename,
       originalName: newFile.originalName,
       mimeType: newFile.mimeType,
@@ -1320,6 +1330,7 @@ export class DatabaseStorage implements IStorage {
     
     return {
       id: file.id,
+      answerId: file.answerId,
       filename: file.filename,
       originalName: file.originalName,
       mimeType: file.mimeType,
@@ -1332,6 +1343,7 @@ export class DatabaseStorage implements IStorage {
     const fileList = await db.select().from(files).where(eq(files.answerId, answerId));
     return fileList.map(file => ({
       id: file.id,
+      answerId: file.answerId,
       filename: file.filename,
       originalName: file.originalName,
       mimeType: file.mimeType,
