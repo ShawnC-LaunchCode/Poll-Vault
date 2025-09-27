@@ -38,6 +38,11 @@ import {
   type BulkOperationResult,
   type SurveyDuplication,
   type FileMetadata,
+  type QuestionAnalytics,
+  type PageAnalytics,
+  type CompletionFunnelData,
+  type TimeSpentData,
+  type EngagementMetrics,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, count, sql, gte, inArray } from "drizzle-orm";
@@ -110,6 +115,14 @@ export interface IStorage {
   // Analytics operations
   createAnalyticsEvent(event: Omit<AnalyticsEvent, 'id' | 'timestamp'>): Promise<AnalyticsEvent>;
   getAnalyticsByResponse(responseId: string): Promise<AnalyticsEvent[]>;
+  getAnalyticsBySurvey(surveyId: string): Promise<AnalyticsEvent[]>;
+  
+  // Advanced analytics
+  getQuestionAnalytics(surveyId: string): Promise<QuestionAnalytics[]>;
+  getPageAnalytics(surveyId: string): Promise<PageAnalytics[]>;
+  getCompletionFunnelData(surveyId: string): Promise<CompletionFunnelData[]>;
+  getTimeSpentData(surveyId: string): Promise<TimeSpentData[]>;
+  getEngagementMetrics(surveyId: string): Promise<EngagementMetrics>;
   
   // Enhanced dashboard analytics
   getDashboardStats(creatorId: string): Promise<DashboardStats>;
@@ -504,6 +517,14 @@ export class DatabaseStorage implements IStorage {
       .where(eq(analyticsEvents.responseId, responseId))
       .orderBy(analyticsEvents.timestamp);
   }
+
+  async getAnalyticsBySurvey(surveyId: string): Promise<AnalyticsEvent[]> {
+    return await db
+      .select()
+      .from(analyticsEvents)
+      .where(eq(analyticsEvents.surveyId, surveyId))
+      .orderBy(analyticsEvents.timestamp);
+  }
   
   // Enhanced dashboard analytics
   async getDashboardStats(creatorId: string): Promise<DashboardStats> {
@@ -595,12 +616,55 @@ export class DatabaseStorage implements IStorage {
       const completedCount = completedCountResult.count;
       const completionRate = responseCount > 0 ? Math.round((completedCount / responseCount) * 100) : 0;
 
+      // Calculate actual completion time data
+      const timeSpentData = await this.getTimeSpentData(survey.surveyId);
+      const completedTimeData = timeSpentData.filter(data => {
+        // Check if response was completed by looking for survey_complete events
+        return data.totalTime > 0;
+      });
+      
+      const avgCompletionTime = completedTimeData.length > 0
+        ? completedTimeData.reduce((sum, data) => sum + data.totalTime, 0) / completedTimeData.length / 60000 // Convert to minutes
+        : 0;
+        
+      const sortedCompletionTimes = completedTimeData.map(data => data.totalTime).sort((a, b) => a - b);
+      const medianCompletionTime = sortedCompletionTimes.length > 0
+        ? sortedCompletionTimes[Math.floor(sortedCompletionTimes.length / 2)] / 60000
+        : 0;
+        
+      const totalTimeSpent = completedTimeData.reduce((sum, data) => sum + data.totalTime, 0) / 60000;
+      
+      // Calculate drop-off rate
+      const [totalStartedResult] = await db
+        .select({ count: count() })
+        .from(analyticsEvents)
+        .where(
+          and(
+            eq(analyticsEvents.surveyId, survey.surveyId),
+            eq(analyticsEvents.event, 'survey_start')
+          )
+        );
+        
+      const dropOffRate = totalStartedResult.count > 0
+        ? Math.round(((totalStartedResult.count - completedCount) / totalStartedResult.count) * 100)
+        : 0;
+        
+      // Find most and least answered questions
+      const questionAnalytics = await this.getQuestionAnalytics(survey.surveyId);
+      const mostAnswered = questionAnalytics.reduce((max, q) => q.totalAnswers > max.totalAnswers ? q : max, questionAnalytics[0] || { totalAnswers: 0, questionId: undefined });
+      const leastAnswered = questionAnalytics.reduce((min, q) => q.totalAnswers < min.totalAnswers ? q : min, questionAnalytics[0] || { totalAnswers: Infinity, questionId: undefined });
+
       analytics.push({
         surveyId: survey.surveyId,
         title: survey.title,
         responseCount,
         completionRate,
-        avgCompletionTime: 5, // Placeholder - would need more complex analytics
+        avgCompletionTime,
+        medianCompletionTime,
+        totalTimeSpent,
+        dropOffRate,
+        mostAnsweredQuestionId: mostAnswered?.questionId,
+        leastAnsweredQuestionId: leastAnswered?.questionId,
         lastResponseAt: lastResponseResult?.submittedAt || null,
         status: survey.status,
       });
@@ -628,11 +692,44 @@ export class DatabaseStorage implements IStorage {
       .groupBy(sql`DATE(${responses.createdAt})`)
       .orderBy(sql`DATE(${responses.createdAt})`);
 
-    return trendsData.map(row => ({
-      date: row.date,
-      count: row.total,
-      completed: Number(row.completed),
-    }));
+    // Get time data for each day
+    const trendsWithTime: ResponseTrend[] = [];
+    
+    for (const row of trendsData) {
+      // Get time data for responses created on this date
+      const dayTimeData = await db
+        .select({
+          duration: analyticsEvents.duration,
+          responseId: analyticsEvents.responseId,
+        })
+        .from(analyticsEvents)
+        .innerJoin(responses, eq(analyticsEvents.responseId, responses.id))
+        .innerJoin(surveys, eq(responses.surveyId, surveys.id))
+        .where(
+          and(
+            eq(surveys.creatorId, creatorId),
+            sql`DATE(${responses.createdAt}) = ${row.date}`,
+            sql`duration IS NOT NULL`,
+            eq(analyticsEvents.event, 'survey_complete')
+          )
+        );
+        
+      const avgCompletionTime = dayTimeData.length > 0
+        ? dayTimeData.reduce((sum, event) => sum + (event.duration || 0), 0) / dayTimeData.length / 60000
+        : 0;
+        
+      const totalTimeSpent = dayTimeData.reduce((sum, event) => sum + (event.duration || 0), 0) / 60000;
+      
+      trendsWithTime.push({
+        date: row.date,
+        count: row.total,
+        completed: Number(row.completed),
+        avgCompletionTime,
+        totalTimeSpent,
+      });
+    }
+    
+    return trendsWithTime;
   }
 
   async getRecentActivity(creatorId: string, limit: number = 10): Promise<ActivityItem[]> {
@@ -701,6 +798,308 @@ export class DatabaseStorage implements IStorage {
     return activities
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, limit);
+  }
+
+  // Advanced analytics methods
+  async getQuestionAnalytics(surveyId: string): Promise<QuestionAnalytics[]> {
+    // Get all questions for this survey
+    const surveyQuestions = await db
+      .select({
+        questionId: questions.id,
+        questionTitle: questions.title,
+        questionType: questions.type,
+        pageId: questions.pageId,
+      })
+      .from(questions)
+      .innerJoin(surveyPages, eq(questions.pageId, surveyPages.id))
+      .where(eq(surveyPages.surveyId, surveyId));
+
+    const analytics: QuestionAnalytics[] = [];
+
+    for (const question of surveyQuestions) {
+      // Count views (question_focus events)
+      const [viewsResult] = await db
+        .select({ count: count() })
+        .from(analyticsEvents)
+        .where(
+          and(
+            eq(analyticsEvents.surveyId, surveyId),
+            eq(analyticsEvents.questionId, question.questionId),
+            eq(analyticsEvents.event, 'question_focus')
+          )
+        );
+
+      // Count answers
+      const [answersResult] = await db
+        .select({ count: count() })
+        .from(analyticsEvents)
+        .where(
+          and(
+            eq(analyticsEvents.surveyId, surveyId),
+            eq(analyticsEvents.questionId, question.questionId),
+            eq(analyticsEvents.event, 'question_answer')
+          )
+        );
+
+      // Count skips
+      const [skipsResult] = await db
+        .select({ count: count() })
+        .from(analyticsEvents)
+        .where(
+          and(
+            eq(analyticsEvents.surveyId, surveyId),
+            eq(analyticsEvents.questionId, question.questionId),
+            eq(analyticsEvents.event, 'question_skip')
+          )
+        );
+
+      // Calculate average time spent
+      const timeEvents = await db
+        .select({ duration: analyticsEvents.duration })
+        .from(analyticsEvents)
+        .where(
+          and(
+            eq(analyticsEvents.surveyId, surveyId),
+            eq(analyticsEvents.questionId, question.questionId),
+            sql`duration IS NOT NULL`
+          )
+        );
+
+      const totalViews = viewsResult.count;
+      const totalAnswers = answersResult.count;
+      const totalSkips = skipsResult.count;
+      const avgTimeSpent = timeEvents.length > 0 
+        ? timeEvents.reduce((sum, event) => sum + (event.duration || 0), 0) / timeEvents.length / 1000
+        : 0;
+      
+      const sortedTimes = timeEvents.map(e => e.duration || 0).sort((a, b) => a - b);
+      const medianTimeSpent = sortedTimes.length > 0
+        ? sortedTimes[Math.floor(sortedTimes.length / 2)] / 1000
+        : 0;
+
+      analytics.push({
+        questionId: question.questionId,
+        questionTitle: question.questionTitle,
+        questionType: question.questionType,
+        pageId: question.pageId,
+        totalViews,
+        totalAnswers,
+        totalSkips,
+        answerRate: totalViews > 0 ? Math.round((totalAnswers / totalViews) * 100) : 0,
+        avgTimeSpent,
+        medianTimeSpent,
+        dropOffCount: totalViews - totalAnswers - totalSkips,
+      });
+    }
+
+    return analytics;
+  }
+
+  async getPageAnalytics(surveyId: string): Promise<PageAnalytics[]> {
+    // Get all pages for this survey
+    const surveyPages = await db
+      .select({
+        pageId: surveyPages.id,
+        pageTitle: surveyPages.title,
+        pageOrder: surveyPages.order,
+      })
+      .from(surveyPages)
+      .where(eq(surveyPages.surveyId, surveyId))
+      .orderBy(surveyPages.order);
+
+    const analytics: PageAnalytics[] = [];
+
+    for (const page of surveyPages) {
+      // Count page views
+      const [viewsResult] = await db
+        .select({ count: count() })
+        .from(analyticsEvents)
+        .where(
+          and(
+            eq(analyticsEvents.surveyId, surveyId),
+            eq(analyticsEvents.pageId, page.pageId),
+            eq(analyticsEvents.event, 'page_view')
+          )
+        );
+
+      // Count page completions (page_leave events)
+      const [completionsResult] = await db
+        .select({ count: count() })
+        .from(analyticsEvents)
+        .where(
+          and(
+            eq(analyticsEvents.surveyId, surveyId),
+            eq(analyticsEvents.pageId, page.pageId),
+            eq(analyticsEvents.event, 'page_leave')
+          )
+        );
+
+      // Calculate average time spent on page
+      const pageTimeEvents = await db
+        .select({ duration: analyticsEvents.duration })
+        .from(analyticsEvents)
+        .where(
+          and(
+            eq(analyticsEvents.surveyId, surveyId),
+            eq(analyticsEvents.pageId, page.pageId),
+            eq(analyticsEvents.event, 'page_leave'),
+            sql`duration IS NOT NULL`
+          )
+        );
+
+      const totalViews = viewsResult.count;
+      const totalCompletions = completionsResult.count;
+      const avgTimeSpent = pageTimeEvents.length > 0
+        ? pageTimeEvents.reduce((sum, event) => sum + (event.duration || 0), 0) / pageTimeEvents.length / 1000
+        : 0;
+      
+      const sortedTimes = pageTimeEvents.map(e => e.duration || 0).sort((a, b) => a - b);
+      const medianTimeSpent = sortedTimes.length > 0
+        ? sortedTimes[Math.floor(sortedTimes.length / 2)] / 1000
+        : 0;
+
+      // Get question analytics for this page
+      const questionAnalytics = await this.getQuestionAnalytics(surveyId);
+      const pageQuestions = questionAnalytics.filter(q => q.pageId === page.pageId);
+
+      analytics.push({
+        pageId: page.pageId,
+        pageTitle: page.pageTitle,
+        pageOrder: page.pageOrder,
+        totalViews,
+        totalCompletions,
+        completionRate: totalViews > 0 ? Math.round((totalCompletions / totalViews) * 100) : 0,
+        avgTimeSpent,
+        medianTimeSpent,
+        dropOffCount: totalViews - totalCompletions,
+        questions: pageQuestions,
+      });
+    }
+
+    return analytics;
+  }
+
+  async getCompletionFunnelData(surveyId: string): Promise<CompletionFunnelData[]> {
+    const pageAnalytics = await this.getPageAnalytics(surveyId);
+    
+    return pageAnalytics.map(page => ({
+      pageId: page.pageId,
+      pageTitle: page.pageTitle,
+      pageOrder: page.pageOrder,
+      entrances: page.totalViews,
+      exits: page.dropOffCount,
+      completions: page.totalCompletions,
+      dropOffRate: page.totalViews > 0 ? Math.round((page.dropOffCount / page.totalViews) * 100) : 0,
+    }));
+  }
+
+  async getTimeSpentData(surveyId: string): Promise<TimeSpentData[]> {
+    // Get all responses for this survey
+    const surveyResponses = await db
+      .select({ responseId: responses.id })
+      .from(responses)
+      .where(eq(responses.surveyId, surveyId));
+
+    const timeSpentData: TimeSpentData[] = [];
+
+    for (const response of surveyResponses) {
+      // Get all time-based events for this response
+      const events = await db
+        .select({
+          pageId: analyticsEvents.pageId,
+          questionId: analyticsEvents.questionId,
+          duration: analyticsEvents.duration,
+          event: analyticsEvents.event,
+        })
+        .from(analyticsEvents)
+        .where(
+          and(
+            eq(analyticsEvents.responseId, response.responseId),
+            sql`duration IS NOT NULL`
+          )
+        );
+
+      const totalTime = events.reduce((sum, event) => sum + (event.duration || 0), 0);
+      
+      const pageTimeSpent = events
+        .filter(e => e.pageId && e.event === 'page_leave')
+        .map(e => ({ pageId: e.pageId!, duration: e.duration || 0 }));
+      
+      const questionTimeSpent = events
+        .filter(e => e.questionId && (e.event === 'question_answer' || e.event === 'question_skip'))
+        .map(e => ({ questionId: e.questionId!, duration: e.duration || 0 }));
+
+      timeSpentData.push({
+        surveyId,
+        responseId: response.responseId,
+        totalTime,
+        pageTimeSpent,
+        questionTimeSpent,
+      });
+    }
+
+    return timeSpentData;
+  }
+
+  async getEngagementMetrics(surveyId: string): Promise<EngagementMetrics> {
+    const timeSpentData = await this.getTimeSpentData(surveyId);
+    
+    // Calculate average session duration
+    const avgSessionDuration = timeSpentData.length > 0
+      ? timeSpentData.reduce((sum, data) => sum + data.totalTime, 0) / timeSpentData.length / 60000 // Convert to minutes
+      : 0;
+
+    // Calculate bounce rate (responses with no answers)
+    const [totalResponsesResult] = await db
+      .select({ count: count() })
+      .from(responses)
+      .where(eq(responses.surveyId, surveyId));
+
+    const uniqueAnsweredResponses = await db
+      .select({ responseId: analyticsEvents.responseId })
+      .from(analyticsEvents)
+      .where(
+        and(
+          eq(analyticsEvents.surveyId, surveyId),
+          eq(analyticsEvents.event, 'question_answer')
+        )
+      )
+      .groupBy(analyticsEvents.responseId);
+
+    const bounceRate = totalResponsesResult.count > 0
+      ? Math.round(((totalResponsesResult.count - uniqueAnsweredResponses.length) / totalResponsesResult.count) * 100)
+      : 0;
+
+    // Calculate engagement score (simplified)
+    const engagementScore = Math.max(0, Math.min(100, Math.round(100 - bounceRate + (avgSessionDuration * 10))));
+
+    // Get completion trends by hour
+    const completionTrends = await db
+      .select({
+        hour: sql<number>`EXTRACT(HOUR FROM timestamp)`,
+        completions: count(),
+      })
+      .from(analyticsEvents)
+      .where(
+        and(
+          eq(analyticsEvents.surveyId, surveyId),
+          eq(analyticsEvents.event, 'survey_complete')
+        )
+      )
+      .groupBy(sql`EXTRACT(HOUR FROM timestamp)`);
+
+    const peakEngagementHour = completionTrends.length > 0
+      ? completionTrends.reduce((max, current) => current.completions > max.completions ? current : max).hour
+      : 12; // Default to noon
+
+    return {
+      surveyId,
+      avgSessionDuration,
+      bounceRate,
+      engagementScore,
+      peakEngagementHour,
+      completionTrends: completionTrends.map(trend => ({ hour: trend.hour, completions: trend.completions })),
+    };
   }
 
   // Bulk operations

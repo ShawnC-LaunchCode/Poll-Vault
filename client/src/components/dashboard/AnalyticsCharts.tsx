@@ -3,11 +3,15 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, BarChart3 } from "lucide-react";
 import type { ResponseTrend, SurveyAnalytics } from "@shared/schema";
+import { Link } from "wouter";
+import { Button } from "@/components/ui/button";
+import { ExternalLink } from "lucide-react";
 
 interface AnalyticsChartsProps {
   responsesTrend: ResponseTrend[];
   surveyAnalytics: SurveyAnalytics[];
   isLoading?: boolean;
+  showDetailedLinks?: boolean;
 }
 
 export function AnalyticsCharts({ responsesTrend, surveyAnalytics, isLoading }: AnalyticsChartsProps) {

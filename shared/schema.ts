@@ -13,6 +13,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
 
 // Session storage table for Replit Auth
 export const sessions = pgTable(
@@ -186,10 +187,25 @@ export const files = pgTable("files", {
 export const analyticsEvents = pgTable("analytics_events", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   responseId: uuid("response_id").references(() => responses.id, { onDelete: 'cascade' }).notNull(),
-  event: varchar("event").notNull(), // 'page_view', 'question_answer', 'survey_complete'
-  data: jsonb("data"), // Event-specific data
+  surveyId: uuid("survey_id").references(() => surveys.id, { onDelete: 'cascade' }).notNull(),
+  pageId: uuid("page_id").references(() => surveyPages.id, { onDelete: 'cascade' }),
+  questionId: uuid("question_id").references(() => questions.id, { onDelete: 'cascade' }),
+  event: varchar("event").notNull(), // 'page_view', 'page_leave', 'question_focus', 'question_answer', 'question_skip', 'survey_start', 'survey_complete', 'survey_abandon'
+  data: jsonb("data"), // Event-specific data including time tracking
+  duration: integer("duration"), // Time spent in milliseconds
   timestamp: timestamp("timestamp").defaultNow(),
-});
+}, (table) => [
+  // Performance indices for analytics queries
+  index("analytics_survey_event_idx").on(table.surveyId, table.event),
+  index("analytics_response_event_idx").on(table.responseId, table.event),
+  index("analytics_question_event_idx").on(table.questionId, table.event),
+  index("analytics_page_event_idx").on(table.pageId, table.event),
+  index("analytics_timestamp_idx").on(table.timestamp),
+  index("analytics_duration_idx").on(table.duration),
+  // Composite indices for common query patterns
+  index("analytics_survey_question_event_idx").on(table.surveyId, table.questionId, table.event),
+  index("analytics_survey_page_event_idx").on(table.surveyId, table.pageId, table.event),
+]);
 
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
@@ -279,6 +295,20 @@ export const insertRecipientSchema = createInsertSchema(recipients).omit({ id: t
 export const insertResponseSchema = createInsertSchema(responses).omit({ id: true, createdAt: true });
 export const insertAnswerSchema = createInsertSchema(answers).omit({ id: true, createdAt: true });
 
+// Analytics event validation schema with strict validation
+export const insertAnalyticsEventSchema = createInsertSchema(analyticsEvents).omit({ 
+  id: true, 
+  timestamp: true 
+}).extend({
+  event: z.enum(['page_view', 'page_leave', 'question_focus', 'question_blur', 'question_answer', 'question_skip', 'survey_start', 'survey_complete', 'survey_abandon']),
+  responseId: z.string().uuid("Invalid response ID format"),
+  surveyId: z.string().uuid("Invalid survey ID format"),
+  pageId: z.string().uuid("Invalid page ID format").optional().nullable(),
+  questionId: z.string().uuid("Invalid question ID format").optional(),
+  duration: z.number().int().min(0, "Duration must be non-negative").optional(),
+  data: z.record(z.any()).optional()
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -328,6 +358,11 @@ export interface SurveyAnalytics {
   responseCount: number;
   completionRate: number;
   avgCompletionTime: number; // in minutes
+  medianCompletionTime: number; // in minutes
+  totalTimeSpent: number; // in minutes
+  dropOffRate: number; // percentage
+  mostAnsweredQuestionId?: string;
+  leastAnsweredQuestionId?: string;
   lastResponseAt: Date | null;
   status: string;
 }
@@ -336,6 +371,8 @@ export interface ResponseTrend {
   date: string;
   count: number;
   completed: number;
+  avgCompletionTime: number; // in minutes
+  totalTimeSpent: number; // in minutes
 }
 
 export interface BulkOperationRequest {
@@ -402,6 +439,61 @@ export interface FileUploadConfig {
   maxFiles: number; // maximum number of files
   required: boolean;
   allowMultiple: boolean;
+}
+
+// Enhanced analytics types
+export interface QuestionAnalytics {
+  questionId: string;
+  questionTitle: string;
+  questionType: string;
+  pageId: string;
+  totalViews: number;
+  totalAnswers: number;
+  totalSkips: number;
+  answerRate: number; // percentage
+  avgTimeSpent: number; // in seconds
+  medianTimeSpent: number; // in seconds
+  dropOffCount: number; // how many people left at this question
+}
+
+export interface PageAnalytics {
+  pageId: string;
+  pageTitle: string;
+  pageOrder: number;
+  totalViews: number;
+  totalCompletions: number;
+  completionRate: number; // percentage
+  avgTimeSpent: number; // in seconds
+  medianTimeSpent: number; // in seconds
+  dropOffCount: number;
+  questions: QuestionAnalytics[];
+}
+
+export interface CompletionFunnelData {
+  pageId: string;
+  pageTitle: string;
+  pageOrder: number;
+  entrances: number;
+  exits: number;
+  completions: number;
+  dropOffRate: number;
+}
+
+export interface TimeSpentData {
+  surveyId: string;
+  responseId: string;
+  totalTime: number; // in milliseconds
+  pageTimeSpent: { pageId: string; duration: number }[];
+  questionTimeSpent: { questionId: string; duration: number }[];
+}
+
+export interface EngagementMetrics {
+  surveyId: string;
+  avgSessionDuration: number; // in minutes
+  bounceRate: number; // percentage who left without answering any questions
+  engagementScore: number; // calculated based on time spent vs expected time
+  peakEngagementHour: number; // hour of day with most engagement
+  completionTrends: { hour: number; completions: number }[];
 }
 
 // File metadata type

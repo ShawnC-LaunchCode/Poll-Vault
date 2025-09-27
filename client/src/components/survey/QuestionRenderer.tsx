@@ -37,10 +37,12 @@ interface QuestionRendererProps {
   };
   value?: any;
   onChange: (value: any) => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
   answerId?: string; // For file uploads
 }
 
-export default function QuestionRenderer({ question, value, onChange, answerId }: QuestionRendererProps) {
+export default function QuestionRenderer({ question, value, onChange, onFocus, onBlur, answerId }: QuestionRendererProps) {
   
   // Initialize loop instances if needed
   const initializeLoopInstances = () => {
@@ -212,6 +214,8 @@ export default function QuestionRenderer({ question, value, onChange, answerId }
             placeholder="Your answer"
             value={value || ""}
             onChange={(e) => onChange(e.target.value)}
+            onFocus={onFocus}
+            onBlur={onBlur}
             data-testid={`input-question-${question.id}`}
           />
         );
@@ -223,6 +227,8 @@ export default function QuestionRenderer({ question, value, onChange, answerId }
             rows={4}
             value={value || ""}
             onChange={(e) => onChange(e.target.value)}
+            onFocus={onFocus}
+            onBlur={onBlur}
             data-testid={`textarea-question-${question.id}`}
           />
         );
@@ -293,6 +299,8 @@ export default function QuestionRenderer({ question, value, onChange, answerId }
             type="datetime-local"
             value={value || ""}
             onChange={(e) => onChange(e.target.value)}
+            onFocus={onFocus}
+            onBlur={onBlur}
             data-testid={`datetime-question-${question.id}`}
           />
         );

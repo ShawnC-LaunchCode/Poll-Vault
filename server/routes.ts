@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertSurveySchema, insertSurveyPageSchema, insertQuestionSchema, insertLoopGroupSubquestionSchema, insertConditionalRuleSchema, insertRecipientSchema, insertResponseSchema, insertAnswerSchema } from "@shared/schema";
+import { insertSurveySchema, insertSurveyPageSchema, insertQuestionSchema, insertLoopGroupSubquestionSchema, insertConditionalRuleSchema, insertRecipientSchema, insertResponseSchema, insertAnswerSchema, insertAnalyticsEventSchema } from "@shared/schema";
 import { sendNotificationEmail } from "./services/emailService";
 import { upload, isFileTypeAccepted, deleteFile, getFilePath, fileExists } from "./services/fileService";
 import path from "path";
@@ -38,6 +38,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     message: {
       success: false,
       errors: ['Too many file upload attempts, please try again later.']
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  // Rate limiting for analytics events
+  const analyticsRateLimit = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 100, // limit each IP to 100 analytics events per minute
+    message: {
+      success: false,
+      errors: ['Too many analytics events, please slow down.']
     },
     standardHeaders: true,
     legacyHeaders: false,
@@ -740,6 +752,186 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching recent activity:", error);
       res.status(500).json({ message: "Failed to fetch recent activity" });
+    }
+  });
+
+  // Enhanced Analytics Routes
+  app.get('/api/analytics/questions/:surveyId', isAuthenticated, async (req: any, res) => {
+    try {
+      const survey = await storage.getSurvey(req.params.surveyId);
+      if (!survey || survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const analytics = await storage.getQuestionAnalytics(req.params.surveyId);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching question analytics:", error);
+      res.status(500).json({ message: "Failed to fetch question analytics" });
+    }
+  });
+
+  app.get('/api/analytics/pages/:surveyId', isAuthenticated, async (req: any, res) => {
+    try {
+      const survey = await storage.getSurvey(req.params.surveyId);
+      if (!survey || survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const analytics = await storage.getPageAnalytics(req.params.surveyId);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching page analytics:", error);
+      res.status(500).json({ message: "Failed to fetch page analytics" });
+    }
+  });
+
+  app.get('/api/analytics/funnel/:surveyId', isAuthenticated, async (req: any, res) => {
+    try {
+      const survey = await storage.getSurvey(req.params.surveyId);
+      if (!survey || survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const funnelData = await storage.getCompletionFunnelData(req.params.surveyId);
+      res.json(funnelData);
+    } catch (error) {
+      console.error("Error fetching funnel data:", error);
+      res.status(500).json({ message: "Failed to fetch funnel data" });
+    }
+  });
+
+  app.get('/api/analytics/time-spent/:surveyId', isAuthenticated, async (req: any, res) => {
+    try {
+      const survey = await storage.getSurvey(req.params.surveyId);
+      if (!survey || survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const timeData = await storage.getTimeSpentData(req.params.surveyId);
+      res.json(timeData);
+    } catch (error) {
+      console.error("Error fetching time spent data:", error);
+      res.status(500).json({ message: "Failed to fetch time spent data" });
+    }
+  });
+
+  app.get('/api/analytics/engagement/:surveyId', isAuthenticated, async (req: any, res) => {
+    try {
+      const survey = await storage.getSurvey(req.params.surveyId);
+      if (!survey || survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const engagement = await storage.getEngagementMetrics(req.params.surveyId);
+      res.json(engagement);
+    } catch (error) {
+      console.error("Error fetching engagement metrics:", error);
+      res.status(500).json({ message: "Failed to fetch engagement metrics" });
+    }
+  });
+
+  app.get('/api/analytics/survey/:surveyId', isAuthenticated, async (req: any, res) => {
+    try {
+      const survey = await storage.getSurvey(req.params.surveyId);
+      if (!survey || survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const analytics = await storage.getAnalyticsBySurvey(req.params.surveyId);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching survey analytics:", error);
+      res.status(500).json({ message: "Failed to fetch survey analytics" });
+    }
+  });
+
+  // Analytics events - SECURED with validation, rate limiting, and consistency checks
+  app.post('/api/analytics/events', analyticsRateLimit, async (req, res) => {
+    try {
+      // Validate the analytics event payload with strict Zod schema
+      const eventData = insertAnalyticsEventSchema.parse(req.body);
+      
+      // Critical security checks: Verify responseId and surveyId consistency
+      const response = await storage.getResponse(eventData.responseId);
+      if (!response) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Invalid response ID - response does not exist" 
+        });
+      }
+      
+      if (response.surveyId !== eventData.surveyId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Response ID and survey ID are inconsistent" 
+        });
+      }
+      
+      // Additional validation for pageId if provided
+      if (eventData.pageId) {
+        const page = await storage.getSurveyPage(eventData.pageId);
+        if (!page || page.surveyId !== eventData.surveyId) {
+          return res.status(400).json({ 
+            success: false, 
+            message: "Invalid page ID or page does not belong to specified survey" 
+          });
+        }
+      }
+      
+      // Additional validation for questionId if provided
+      if (eventData.questionId) {
+        const question = await storage.getQuestion(eventData.questionId);
+        if (!question) {
+          return res.status(400).json({ 
+            success: false, 
+            message: "Invalid question ID - question does not exist" 
+          });
+        }
+        
+        // If pageId is provided, verify question belongs to that page
+        if (eventData.pageId && question.pageId !== eventData.pageId) {
+          return res.status(400).json({ 
+            success: false, 
+            message: "Question does not belong to specified page" 
+          });
+        }
+        
+        // If pageId not provided, verify question's page belongs to the survey
+        if (!eventData.pageId) {
+          const questionPage = await storage.getSurveyPage(question.pageId);
+          if (!questionPage || questionPage.surveyId !== eventData.surveyId) {
+            return res.status(400).json({ 
+              success: false, 
+              message: "Question does not belong to specified survey" 
+            });
+          }
+        }
+      }
+      
+      const event = await storage.createAnalyticsEvent(eventData);
+      
+      // Cache invalidation: Since we don't have a cache service here, 
+      // we'll rely on client-side cache invalidation in the frontend
+      // The frontend should invalidate analytics-related queries after posting events
+      
+      res.json({ success: true, event });
+    } catch (error) {
+      console.error("Error creating analytics event:", error);
+      
+      // Handle validation errors specifically
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          success: false,
+          message: "Invalid analytics event data",
+          errors: error.errors 
+        });
+      }
+      
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to create analytics event" 
+      });
     }
   });
 
