@@ -9,6 +9,7 @@ import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import SurveyBuilder from "@/pages/SurveyBuilder";
 import SurveyPlayer from "@/pages/SurveyPlayer";
+import SurveysList from "@/pages/SurveysList";
 import Responses from "@/pages/Responses";
 import Recipients from "@/pages/Recipients";
 
@@ -21,17 +22,24 @@ function Router() {
         <>
           <Route path="/" component={Landing} />
           <Route path="/survey/:token" component={SurveyPlayer} />
+          {/* Redirect all other routes to landing for unauthenticated users */}
+          <Route component={Landing} />
         </>
       ) : (
         <>
           <Route path="/" component={Dashboard} />
+          <Route path="/surveys" component={SurveysList} />
           <Route path="/surveys/new" component={SurveyBuilder} />
           <Route path="/surveys/:id/edit" component={SurveyBuilder} />
           <Route path="/surveys/:id/responses" component={Responses} />
           <Route path="/surveys/:id/recipients" component={Recipients} />
+          <Route path="/responses" component={Responses} />
+          <Route path="/recipients" component={Recipients} />
+          <Route path="/analytics" component={Dashboard} />
+          {/* 404 for authenticated users only */}
+          <Route component={NotFound} />
         </>
       )}
-      <Route component={NotFound} />
     </Switch>
   );
 }
