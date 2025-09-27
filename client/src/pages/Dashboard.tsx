@@ -155,14 +155,10 @@ export default function Dashboard() {
 
           {/* Comprehensive Dashboard Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="overview" data-testid="tab-overview">
                 <Home className="mr-2 h-4 w-4" />
                 Overview
-              </TabsTrigger>
-              <TabsTrigger value="analytics" data-testid="tab-analytics">
-                <PieChart className="mr-2 h-4 w-4" />
-                Analytics
               </TabsTrigger>
               <TabsTrigger value="management" data-testid="tab-management">
                 <Settings className="mr-2 h-4 w-4" />
@@ -309,13 +305,6 @@ export default function Dashboard() {
               </div>
             </TabsContent>
 
-            <TabsContent value="analytics" className="space-y-6">
-              <AnalyticsCharts 
-                responsesTrend={trends || []}
-                surveyAnalytics={analytics || []}
-                isLoading={trendsLoading || analyticsLoading}
-              />
-            </TabsContent>
 
             <TabsContent value="management" className="space-y-6">
               <SurveyManagement 

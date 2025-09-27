@@ -99,7 +99,8 @@ export default function SurveyPlayer() {
         return await apiRequest("POST", `/api/survey/${surveyIdentifier}/start-response`, {});
       }
     },
-    onSuccess: (data) => {
+    onSuccess: async (response) => {
+      const data = await response.json();
       setResponseId(data.responseId || data.id);
       if (data.sessionId) {
         setSessionId(data.sessionId);
@@ -138,7 +139,8 @@ export default function SurveyPlayer() {
         value: typeof value === 'object' ? value : { text: value }
       });
     },
-    onSuccess: (data, variables) => {
+    onSuccess: async (response, variables) => {
+      const data = await response.json();
       setAnswerIds(prev => ({
         ...prev,
         [variables.questionId]: data.id
