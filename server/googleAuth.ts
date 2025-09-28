@@ -118,7 +118,6 @@ function validateOrigin(req: any): boolean {
       'localhost',
       '127.0.0.1',
       '0.0.0.0',
-      process.env.REPLIT_DEV_DOMAIN, // Replit development domain
       process.env.ALLOWED_ORIGIN // Custom allowed origin from env
     ].filter(Boolean); // Remove falsy values
     

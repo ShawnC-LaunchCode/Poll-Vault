@@ -1073,11 +1073,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (survey) {
         const creator = await storage.getUser(survey.creatorId);
         if (creator && creator.email) {
+          const baseUrl = process.env.BASE_URL || process.env.VITE_BASE_URL || 'http://localhost:5000';
           await sendNotificationEmail(
             creator.email,
             survey.title,
             recipient.name,
-            `${process.env.REPLIT_DOMAINS?.split(',')[0]}/responses/${response.id}`
+            `${baseUrl}/responses/${response.id}`
           );
         }
       }
@@ -1334,11 +1335,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send notification email to creator (anonymous)
       const creator = await storage.getUser(survey.creatorId);
       if (creator && creator.email) {
+        const baseUrl = process.env.BASE_URL || process.env.VITE_BASE_URL || 'http://localhost:5000';
         await sendNotificationEmail(
           creator.email,
           survey.title,
           'Anonymous User',
-          `${process.env.REPLIT_DOMAINS?.split(',')[0]}/responses/${responseId}`
+          `${baseUrl}/responses/${responseId}`
         );
       }
       

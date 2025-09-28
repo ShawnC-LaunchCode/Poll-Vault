@@ -15,7 +15,7 @@ import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Session storage table for Replit Auth
+// Session storage table for Google Auth
 export const sessions = pgTable(
   "sessions",
   {
@@ -65,7 +65,7 @@ export const conditionalActionEnum = pgEnum('conditional_action', [
   'make_optional'
 ]);
 
-// Users table for Replit Auth
+// Users table for Google Auth
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),

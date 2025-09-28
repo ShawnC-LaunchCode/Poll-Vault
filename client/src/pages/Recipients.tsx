@@ -65,7 +65,7 @@ export default function Recipients() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/";
       }, 500);
       return;
     }
@@ -291,7 +291,7 @@ export default function Recipients() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        window.location.href = "/";
       }, 500);
       return;
     }
@@ -489,8 +489,8 @@ export default function Recipients() {
   const availableTags = getAllTags();
 
   const getSurveyUrl = (token: string) => {
-    const domain = import.meta.env.VITE_REPLIT_DOMAINS?.split(',')[0] || window.location.host;
-    return `https://${domain}/survey/${token}`;
+    const baseUrl = import.meta.env.VITE_BASE_URL || `${window.location.protocol}//${window.location.host}`;
+    return `${baseUrl}/survey/${token}`;
   };
 
   const copyToClipboard = (text: string) => {

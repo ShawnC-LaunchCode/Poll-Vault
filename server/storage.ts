@@ -56,7 +56,7 @@ import { eq, desc, and, count, sql, gte, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
-  // User operations (required for Replit Auth)
+  // User operations (required for Google Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   
@@ -191,7 +191,7 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  // User operations (required for Replit Auth)
+  // User operations (required for Google Auth)
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
@@ -573,9 +573,8 @@ export class DatabaseStorage implements IStorage {
       if (recipientsToDelete.length !== ids.length) {
         return {
           success: false,
-          message: "Some recipients not found or access denied",
-          processedCount: 0,
-          totalCount: ids.length
+          updatedCount: 0,
+          errors: ["Some recipients not found or access denied"]
         };
       }
 
@@ -585,17 +584,15 @@ export class DatabaseStorage implements IStorage {
 
       return {
         success: true,
-        message: `Successfully deleted ${ids.length} global recipients`,
-        processedCount: ids.length,
-        totalCount: ids.length
+        updatedCount: ids.length,
+        errors: []
       };
     } catch (error) {
       console.error("Error in bulk delete global recipients:", error);
       return {
         success: false,
-        message: "Failed to bulk delete global recipients",
-        processedCount: 0,
-        totalCount: ids.length
+        updatedCount: 0,
+        errors: ["Failed to bulk delete global recipients"]
       };
     }
   }
@@ -722,6 +719,7 @@ export class DatabaseStorage implements IStorage {
         id: answers.id,
         responseId: answers.responseId,
         questionId: answers.questionId,
+        subquestionId: answers.subquestionId,
         loopIndex: answers.loopIndex,
         value: answers.value,
         createdAt: answers.createdAt,
@@ -733,6 +731,8 @@ export class DatabaseStorage implements IStorage {
           description: questions.description,
           required: questions.required,
           options: questions.options,
+          loopConfig: questions.loopConfig,
+          conditionalLogic: questions.conditionalLogic,
           order: questions.order,
           createdAt: questions.createdAt,
         }
@@ -746,6 +746,7 @@ export class DatabaseStorage implements IStorage {
       id: row.id,
       responseId: row.responseId,
       questionId: row.questionId,
+      subquestionId: row.subquestionId,
       loopIndex: row.loopIndex,
       value: row.value,
       createdAt: row.createdAt,
@@ -1155,7 +1156,7 @@ export class DatabaseStorage implements IStorage {
 
   async getPageAnalytics(surveyId: string): Promise<PageAnalytics[]> {
     // Get all pages for this survey
-    const surveyPages = await db
+    const pages = await db
       .select({
         pageId: surveyPages.id,
         pageTitle: surveyPages.title,
@@ -1167,7 +1168,7 @@ export class DatabaseStorage implements IStorage {
 
     const analytics: PageAnalytics[] = [];
 
-    for (const page of surveyPages) {
+    for (const page of pages) {
       // Count page views
       const [viewsResult] = await db
         .select({ count: count() })
