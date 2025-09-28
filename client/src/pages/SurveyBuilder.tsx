@@ -190,8 +190,9 @@ export default function SurveyBuilder() {
   // Anonymous settings mutations
   const enableAnonymousMutation = useMutation({
     mutationFn: async (data: { accessType: string; anonymousConfig?: any }) => {
-      if (!id) throw new Error("Survey ID is required");
-      return await apiRequest("POST", `/api/surveys/${id}/anonymous`, data);
+      const surveyId = id || currentSurveyId;
+      if (!surveyId) throw new Error("Survey must be saved first before enabling anonymous access");
+      return await apiRequest("POST", `/api/surveys/${surveyId}/anonymous`, data);
     },
     onSuccess: async (response) => {
       try {
@@ -233,8 +234,9 @@ export default function SurveyBuilder() {
 
   const disableAnonymousMutation = useMutation({
     mutationFn: async () => {
-      if (!id) throw new Error("Survey ID is required");
-      return await apiRequest("DELETE", `/api/surveys/${id}/anonymous`);
+      const surveyId = id || currentSurveyId;
+      if (!surveyId) throw new Error("Survey must be saved first before disabling anonymous access");
+      return await apiRequest("DELETE", `/api/surveys/${surveyId}/anonymous`);
     },
     onSuccess: () => {
       setAnonymousSettings(prev => ({ 
@@ -277,6 +279,17 @@ export default function SurveyBuilder() {
   };
 
   const handleToggleAnonymous = (enabled: boolean) => {
+    // Ensure survey is saved first
+    const surveyId = id || currentSurveyId;
+    if (!surveyId) {
+      toast({
+        title: "Save Required",
+        description: "Please save your survey first before enabling anonymous access",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (enabled) {
       enableAnonymousMutation.mutate({
         accessType: anonymousSettings.accessType
@@ -288,7 +301,8 @@ export default function SurveyBuilder() {
 
   const handleAccessTypeChange = (accessType: string) => {
     setAnonymousSettings(prev => ({ ...prev, accessType }));
-    if (anonymousSettings.enabled && id) {
+    const surveyId = id || currentSurveyId;
+    if (anonymousSettings.enabled && surveyId) {
       enableAnonymousMutation.mutate({ accessType });
     }
   };
