@@ -37,7 +37,7 @@ export default function SurveyPlayer() {
   // Use the identifier from URL params
   const surveyIdentifier = identifier;
   
-  // Load survey data - try token-based first, then anonymous if that fails
+  // Load survey data - detect if it's a token or public link
   const { data: surveyData, isLoading, error } = useQuery<{
     survey: Survey;
     pages?: SurveyPageWithQuestions[];
@@ -48,22 +48,24 @@ export default function SurveyPlayer() {
   }>({
     queryKey: ["/api/survey-by-identifier", surveyIdentifier],
     queryFn: async () => {
-      // First try as a token-based survey
-      try {
-        const response = await fetch(`/api/survey/${surveyIdentifier}`);
-        if (response.ok) {
-          return await response.json();
-        }
-      } catch (error) {
-        // Continue to try anonymous
-      }
+      // Public links are UUIDs (36 chars with dashes), tokens are usually shorter
+      const isPublicLink = surveyIdentifier?.length === 36 && surveyIdentifier.includes('-');
       
-      // If token-based fails, try as anonymous survey
-      const response = await fetch(`/api/anonymous-survey/${surveyIdentifier}`);
-      if (!response.ok) {
-        throw new Error(`Survey not found: ${response.status}`);
+      if (isPublicLink) {
+        // Try anonymous survey first for public links
+        const response = await fetch(`/api/anonymous-survey/${surveyIdentifier}`);
+        if (!response.ok) {
+          throw new Error(`Survey not found: ${response.status}`);
+        }
+        return await response.json();
+      } else {
+        // Try token-based survey for recipient tokens
+        const response = await fetch(`/api/survey/${surveyIdentifier}`);
+        if (!response.ok) {
+          throw new Error(`Survey not found: ${response.status}`);
+        }
+        return await response.json();
       }
-      return await response.json();
     },
     retry: false,
   });
