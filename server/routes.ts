@@ -18,7 +18,7 @@ declare global {
   }
 }
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated } from "./googleAuth";
 import { insertSurveySchema, insertSurveyPageSchema, insertQuestionSchema, insertLoopGroupSubquestionSchema, insertConditionalRuleSchema, insertRecipientSchema, insertGlobalRecipientSchema, insertResponseSchema, insertAnswerSchema, insertAnalyticsEventSchema } from "@shared/schema";
 import { sendNotificationEmail } from "./services/emailService";
 import { sendSurveyInvitation } from "./services/sendgrid";
@@ -90,28 +90,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Upsert the test user
         await storage.upsertUser(testUser);
         
-        // Simulate authentication by setting up the session
+        // Simulate authentication by setting up the session (Google auth format)
         const mockAuthUser = {
           claims: {
             sub: testUser.id,
             email: testUser.email,
-            first_name: testUser.firstName,
-            last_name: testUser.lastName,
+            name: `${testUser.firstName} ${testUser.lastName}`,
+            given_name: testUser.firstName,
+            family_name: testUser.lastName,
+            picture: testUser.profileImageUrl,
             exp: Math.floor(Date.now() / 1000) + 3600, // Expires in 1 hour
           },
           expires_at: Math.floor(Date.now() / 1000) + 3600,
-          access_token: "dev-token",
-          refresh_token: "dev-refresh-token"
         };
         
-        // Set up the session
-        req.login(mockAuthUser, (err) => {
-          if (err) {
-            console.error("Dev login error:", err);
-            return res.status(500).json({ message: "Failed to create dev session" });
-          }
-          res.json({ message: "Development authentication successful", user: testUser });
-        });
+        // Set up the session (using session directly instead of req.login)
+        (req.session as any).user = mockAuthUser;
+        
+        res.json({ message: "Development authentication successful", user: testUser });
       } catch (error) {
         console.error("Dev login error:", error);
         res.status(500).json({ message: "Failed to authenticate in dev mode" });
@@ -901,10 +897,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error bulk adding global recipients to survey:", error);
-      if (error.message.includes("All selected recipients are already in this survey")) {
-        res.status(409).json({ message: error.message });
-      } else if (error.message.includes("No valid global recipients found")) {
-        res.status(404).json({ message: error.message });
+      if (error instanceof Error) {
+        if (error.message.includes("All selected recipients are already in this survey")) {
+          res.status(409).json({ message: error.message });
+        } else if (error.message.includes("No valid global recipients found")) {
+          res.status(404).json({ message: error.message });
+        } else {
+          res.status(500).json({ message: "Failed to add recipients to survey" });
+        }
       } else {
         res.status(500).json({ message: "Failed to add recipients to survey" });
       }
@@ -1591,7 +1591,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const event = await storage.createAnalyticsEvent(eventData);
+      const event = await storage.createAnalyticsEvent({
+        ...eventData,
+        data: eventData.data || {},
+        pageId: eventData.pageId || null,
+        questionId: eventData.questionId || null,
+        duration: eventData.duration || null
+      });
       
       // Cache invalidation: Since we don't have a cache service here, 
       // we'll rely on client-side cache invalidation in the frontend
@@ -1602,11 +1608,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error creating analytics event:", error);
       
       // Handle validation errors specifically
-      if (error.name === 'ZodError') {
+      if (error instanceof Error && error.name === 'ZodError') {
         return res.status(400).json({ 
           success: false,
           message: "Invalid analytics event data",
-          errors: error.errors 
+          errors: (error as any).errors 
         });
       }
       
@@ -1831,6 +1837,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user is survey creator or the recipient
+      if (!req.user?.claims?.sub) {
+        return res.status(401).json({ message: 'Access denied - no user ID' });
+      }
       const userId = req.user.claims.sub;
       const recipient = response.recipientId ? await storage.getRecipient(response.recipientId) : null;
       const isCreator = survey.creatorId === userId;
@@ -1882,6 +1891,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user is survey creator or the recipient
+      if (!req.user?.claims?.sub) {
+        return res.status(401).json({ message: 'Access denied - no user ID' });
+      }
       const userId = req.user.claims.sub;
       const recipient = response.recipientId ? await storage.getRecipient(response.recipientId) : null;
       const isCreator = survey.creatorId === userId;
@@ -1926,6 +1938,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user is survey creator or the recipient
+      if (!req.user?.claims?.sub) {
+        return res.status(401).json({ message: 'Access denied - no user ID' });
+      }
       const userId = req.user.claims.sub;
       const recipient = response.recipientId ? await storage.getRecipient(response.recipientId) : null;
       const isCreator = survey.creatorId === userId;
