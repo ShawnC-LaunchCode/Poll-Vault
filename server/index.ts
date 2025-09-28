@@ -1,8 +1,69 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
+
+// CORS configuration for external hosting
+const corsOptions = {
+  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // In development, allow localhost and Replit URLs
+    if (process.env.NODE_ENV === 'development') {
+      if (origin.includes('localhost') || 
+          origin.includes('127.0.0.1') || 
+          origin.includes('0.0.0.0') ||
+          origin.includes('.replit.') ||
+          origin.includes('.repl.co')) {
+        return callback(null, true);
+      }
+    }
+    
+    // In production, check against allowed origins
+    const allowedOrigins = process.env.ALLOWED_ORIGIN ? 
+      process.env.ALLOWED_ORIGIN.split(',').map(origin => {
+        const trimmed = origin.trim();
+        try {
+          // If it contains protocol, extract hostname for consistency
+          if (trimmed.includes('://')) {
+            return new URL(trimmed).hostname;
+          }
+          // Otherwise treat as hostname
+          return trimmed;
+        } catch {
+          // If URL parsing fails, treat as hostname
+          return trimmed;
+        }
+      }) : [];
+    
+    // Check if the origin's hostname matches any allowed origin
+    try {
+      const originUrl = new URL(origin);
+      const isAllowed = allowedOrigins.some(allowedOrigin => {
+        // Allow exact matches or subdomains
+        return originUrl.hostname === allowedOrigin || 
+               originUrl.hostname.endsWith(`.${allowedOrigin}`);
+      });
+      
+      if (isAllowed) {
+        return callback(null, true);
+      }
+    } catch (error) {
+      // Invalid URL format
+    }
+    
+    // Reject the request
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true, // Allow cookies to be sent with requests
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 

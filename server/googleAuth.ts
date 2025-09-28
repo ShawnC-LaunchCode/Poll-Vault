@@ -27,6 +27,15 @@ export function getSession() {
     ttl: sessionTtl,
     tableName: "sessions",
   });
+
+  // Detect cross-origin deployment scenario
+  // This occurs when ALLOWED_ORIGIN is set and differs from the current app domain
+  const isCrossOrigin = process.env.NODE_ENV === 'production' && 
+                       process.env.ALLOWED_ORIGIN && 
+                       !process.env.ALLOWED_ORIGIN.includes('localhost') &&
+                       !process.env.ALLOWED_ORIGIN.includes('127.0.0.1') &&
+                       !process.env.ALLOWED_ORIGIN.includes('0.0.0.0');
+
   return session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
@@ -36,8 +45,15 @@ export function getSession() {
     cookie: {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', // CSRF protection
+      // For cross-origin deployments, use SameSite=None to allow cross-origin cookies
+      // For same-origin deployments, use SameSite=lax for CSRF protection
+      sameSite: isCrossOrigin ? 'none' : 'lax',
       maxAge: sessionTtl,
+      // Additional cookie settings for cross-origin scenarios
+      ...(isCrossOrigin && {
+        domain: undefined, // Let browser determine the correct domain
+        path: '/'  // Ensure cookie is available site-wide
+      })
     },
   });
 }
@@ -113,16 +129,37 @@ function validateOrigin(req: any): boolean {
   if (!origin) return false;
   
   try {
-    const url = new URL(origin);
+    const originUrl = new URL(origin);
     const allowedHosts = [
       'localhost',
       '127.0.0.1',
-      '0.0.0.0',
-      process.env.ALLOWED_ORIGIN // Custom allowed origin from env
-    ].filter(Boolean); // Remove falsy values
+      '0.0.0.0'
+    ];
     
-    return allowedHosts.some(host => 
-      url.hostname === host || url.hostname.endsWith(`.${host}`)
+    // Add ALLOWED_ORIGIN environment variable (expecting hostname-only format)
+    if (process.env.ALLOWED_ORIGIN) {
+      // Split by comma for multiple allowed origins and normalize to hostnames
+      const allowedOrigins = process.env.ALLOWED_ORIGIN.split(',').map(origin => {
+        const trimmed = origin.trim();
+        try {
+          // If it contains protocol, extract hostname
+          if (trimmed.includes('://')) {
+            return new URL(trimmed).hostname;
+          }
+          // Otherwise treat as hostname
+          return trimmed;
+        } catch {
+          // If URL parsing fails, treat as hostname
+          return trimmed;
+        }
+      });
+      allowedHosts.push(...allowedOrigins);
+    }
+    
+    // Remove falsy values and check against origin hostname
+    const validHosts = allowedHosts.filter(Boolean);
+    return validHosts.some(host => 
+      originUrl.hostname === host || originUrl.hostname.endsWith(`.${host}`)
     );
   } catch {
     return false;

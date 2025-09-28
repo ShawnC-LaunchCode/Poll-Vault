@@ -56,6 +56,9 @@ import { eq, desc, and, count, sql, gte, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
+  // Health check operations
+  ping(): Promise<boolean>;
+  
   // User operations (required for Google Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
@@ -191,6 +194,18 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // Health check operations
+  async ping(): Promise<boolean> {
+    try {
+      // Simple database connectivity test using SELECT 1
+      await db.execute(sql`SELECT 1`);
+      return true;
+    } catch (error) {
+      console.error('Database ping failed:', error);
+      return false;
+    }
+  }
+
   // User operations (required for Google Auth)
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));

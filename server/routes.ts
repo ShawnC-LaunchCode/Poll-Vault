@@ -50,6 +50,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
+  // Health check endpoint for Docker health checks and monitoring
+  app.get('/api/health', async (req, res) => {
+    try {
+      // Robust health check - verify database connectivity with lightweight ping
+      const isDbHealthy = await storage.ping();
+      
+      if (!isDbHealthy) {
+        return res.status(503).json({
+          status: 'unhealthy',
+          timestamp: new Date().toISOString(),
+          error: 'Database connection failed'
+        });
+      }
+      
+      res.status(200).json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        version: process.env.npm_package_version || '1.0.0',
+        environment: process.env.NODE_ENV || 'development'
+      });
+    } catch (error) {
+      console.error('Health check failed:', error);
+      res.status(503).json({
+        status: 'unhealthy',
+        timestamp: new Date().toISOString(),
+        error: 'Health check error'
+      });
+    }
+  });
+
   // Rate limiting for file uploads
   const uploadRateLimit = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes

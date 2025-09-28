@@ -8,8 +8,10 @@ const unlinkAsync = promisify(fs.unlink);
 const mkdirAsync = promisify(fs.mkdir);
 
 // File upload configuration
-export const UPLOAD_DIR = './uploads';
-export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+export const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
+export const MAX_FILE_SIZE = process.env.MAX_FILE_SIZE ? 
+  parseInt(process.env.MAX_FILE_SIZE, 10) : 
+  10 * 1024 * 1024; // 10MB default
 export const ALLOWED_FILE_TYPES = [
   'image/jpeg',
   'image/png', 
