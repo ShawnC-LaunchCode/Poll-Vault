@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { GoogleLogin } from "@/components/GoogleLogin";
 
 export default function Landing() {
   return (
@@ -14,12 +15,7 @@ export default function Landing() {
               </div>
               <span className="text-xl font-bold text-foreground">Poll Vault</span>
             </div>
-            <Button 
-              onClick={() => window.location.href = '/api/login'}
-              data-testid="button-login"
-            >
-              Sign In
-            </Button>
+            <GoogleLogin data-testid="button-login" />
           </div>
         </div>
       </header>
@@ -36,13 +32,9 @@ export default function Landing() {
             from your audience with beautiful, mobile-responsive surveys.
           </p>
           <div className="mt-10">
-            <Button 
-              size="lg" 
-              onClick={() => window.location.href = '/api/login'}
-              data-testid="button-get-started"
-            >
-              Get Started Free
-            </Button>
+            <div className="flex justify-center">
+              <GoogleLogin data-testid="button-get-started" />
+            </div>
           </div>
         </div>
 
