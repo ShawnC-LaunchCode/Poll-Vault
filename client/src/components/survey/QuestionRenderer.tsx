@@ -24,7 +24,7 @@ interface QuestionRendererProps {
     title: string;
     description?: string;
     required: boolean;
-    options?: string[];
+    options?: Array<string | {text: string; value: string}>;
     loopConfig?: {
       minIterations: number;
       maxIterations: number;
@@ -110,7 +110,8 @@ export default function QuestionRenderer({ question, value, onChange, onFocus, o
     onChange(files);
   };
 
-  const handleMultipleChoice = (optionValue: string, checked: boolean) => {
+  const handleMultipleChoice = (option: any, checked: boolean) => {
+    const optionValue = typeof option === 'object' && option.value ? option.value : option;
     const currentValues = Array.isArray(value) ? value : [];
     if (checked) {
       onChange([...currentValues, optionValue]);
@@ -239,11 +240,11 @@ export default function QuestionRenderer({ question, value, onChange, onFocus, o
             {question.options?.map((option, index) => (
               <div key={index} className="flex items-center space-x-3 p-3 border border-border rounded-lg hover:bg-accent cursor-pointer">
                 <Checkbox
-                  checked={Array.isArray(value) && value.includes(option)}
+                  checked={Array.isArray(value) && value.includes(typeof option === 'object' && 'value' in option ? option.value : option)}
                   onCheckedChange={(checked) => handleMultipleChoice(option, !!checked)}
                   data-testid={`checkbox-question-${question.id}-option-${index}`}
                 />
-                <Label className="flex-1 cursor-pointer">{option}</Label>
+                <Label className="flex-1 cursor-pointer">{typeof option === 'object' && 'text' in option ? option.text : option}</Label>
               </div>
             ))}
           </div>
@@ -260,12 +261,12 @@ export default function QuestionRenderer({ question, value, onChange, onFocus, o
               {question.options?.map((option, index) => (
                 <div key={index} className="flex items-center space-x-3 p-3 border border-border rounded-lg hover:bg-accent cursor-pointer">
                   <RadioGroupItem 
-                    value={option} 
+                    value={typeof option === 'object' && 'value' in option ? option.value : option} 
                     id={`${question.id}-${index}`}
                     data-testid={`radio-question-${question.id}-option-${index}`}
                   />
                   <Label htmlFor={`${question.id}-${index}`} className="flex-1 cursor-pointer">
-                    {option}
+                    {typeof option === 'object' && 'text' in option ? option.text : option}
                   </Label>
                 </div>
               ))}
