@@ -1,11 +1,36 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { User } from "@shared/schema";
 
 export default function Sidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
+  const { toast } = useToast();
+
+  const handleLogout = async () => {
+    try {
+      // Call backend logout endpoint
+      await apiRequest('POST', '/api/auth/logout');
+
+      // Invalidate auth queries
+      await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+
+      toast({
+        title: 'Signed Out',
+        description: 'You have been successfully signed out.',
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast({
+        title: 'Logout Error',
+        description: 'There was an error signing out. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const navigation = [
     { name: "Dashboard", href: "/", icon: "fas fa-home" },
@@ -38,8 +63,8 @@ export default function Sidebar() {
       <nav className="flex-1 p-4 space-y-2">
         {navigation.map((item) => (
           <Link key={item.name} href={item.href}>
-            <a 
-              className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
+            <div 
+              className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
                 isActive(item.href)
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent"
@@ -48,7 +73,7 @@ export default function Sidebar() {
             >
               <i className={`${item.icon} w-5`}></i>
               <span className="font-medium">{item.name}</span>
-            </a>
+            </div>
           </Link>
         ))}
       </nav>
@@ -85,7 +110,7 @@ export default function Sidebar() {
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={() => window.location.href = '/api/logout'}
+            onClick={handleLogout}
             data-testid="button-logout"
             className="flex items-center space-x-2 px-3 py-1"
           >

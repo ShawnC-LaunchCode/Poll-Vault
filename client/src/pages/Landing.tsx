@@ -3,6 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { GoogleLogin } from "@/components/GoogleLogin";
 
 export default function Landing() {
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -15,7 +17,13 @@ export default function Landing() {
               </div>
               <span className="text-xl font-bold text-foreground">Poll Vault</span>
             </div>
-            <GoogleLogin data-testid="button-login" />
+            {googleClientId ? (
+              <GoogleLogin data-testid="button-login" />
+            ) : (
+              <Button onClick={() => window.location.href = '/api/auth/dev-login'} data-testid="button-dev-login">
+                Dev Login
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -33,7 +41,13 @@ export default function Landing() {
           </p>
           <div className="mt-10">
             <div className="flex justify-center">
-              <GoogleLogin data-testid="button-get-started" />
+              {googleClientId ? (
+                <GoogleLogin data-testid="button-get-started" />
+              ) : (
+                <Button onClick={() => window.location.href = '/api/auth/dev-login'} data-testid="button-get-started">
+                  Get Started (Dev Login)
+                </Button>
+              )}
             </div>
           </div>
         </div>

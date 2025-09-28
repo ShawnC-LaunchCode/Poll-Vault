@@ -31,6 +31,7 @@ function Router() {
       ) : (
         <>
           <Route path="/" component={Dashboard} />
+          <Route path="/dashboard" component={Dashboard} />
           <Route path="/surveys" component={SurveysList} />
           <Route path="/surveys/new" component={SurveyBuilder} />
           <Route path="/surveys/:id/edit" component={SurveyBuilder} />
@@ -53,16 +54,15 @@ function App() {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
   if (!googleClientId) {
-    console.error('VITE_GOOGLE_CLIENT_ID environment variable is not set');
+    console.warn('VITE_GOOGLE_CLIENT_ID environment variable is not set - running in development mode');
+    // Allow app to run without Google OAuth in development mode
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-destructive mb-2">Configuration Error</h1>
-          <p className="text-muted-foreground">
-            Google OAuth2 is not properly configured. Please contact the administrator.
-          </p>
-        </div>
-      </div>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </QueryClientProvider>
     );
   }
 

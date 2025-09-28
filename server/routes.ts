@@ -106,7 +106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Development authentication helper (only for testing in development)
   if (process.env.NODE_ENV === 'development') {
-    app.post('/api/auth/dev-login', async (req, res) => {
+    const devLoginHandler = async (req: any, res: any) => {
       try {
         // Create a test user for development
         const testUser = {
@@ -134,15 +134,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           expires_at: Math.floor(Date.now() / 1000) + 3600,
         };
         
-        // Set up the session (using session directly instead of req.login)
-        (req.session as any).user = mockAuthUser;
-        
-        res.json({ message: "Development authentication successful", user: testUser });
+        // Session fixation protection: regenerate session before login (same as Google auth)
+        req.session.regenerate((err: any) => {
+          if (err) {
+            console.error('Dev login session regeneration error:', err);
+            return res.status(500).json({ message: "Session creation failed" });
+          }
+          
+          // Set up the session with new session ID
+          (req as any).user = mockAuthUser;
+          (req.session as any).user = mockAuthUser;
+          
+          // For GET requests, redirect to dashboard; for POST, return JSON
+          if (req.method === 'GET') {
+            res.redirect('/dashboard');
+          } else {
+            res.json({ message: "Development authentication successful", user: testUser });
+          }
+        });
       } catch (error) {
         console.error("Dev login error:", error);
         res.status(500).json({ message: "Failed to authenticate in dev mode" });
       }
-    });
+    };
+
+    // Support both GET and POST for dev login
+    app.get('/api/auth/dev-login', devLoginHandler);
+    app.post('/api/auth/dev-login', devLoginHandler);
   }
 
   // Auth routes
