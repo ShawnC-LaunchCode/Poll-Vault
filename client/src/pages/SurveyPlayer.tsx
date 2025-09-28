@@ -110,17 +110,20 @@ export default function SurveyPlayer() {
       setSurveyStartTime(Date.now());
       
       // Track survey start event
-      trackAnalyticsEvent({
-        responseId: data.responseId || data.id,
-        surveyId: surveyData?.survey?.id || '',
-        event: 'survey_start',
-        data: {
-          timestamp: Date.now(),
-          userAgent: navigator.userAgent,
-          screenResolution: `${screen.width}x${screen.height}`,
-          anonymous: isAnonymous
-        },
-      });
+      const startResponseId = data.responseId || data.id;
+      if (startResponseId && surveyData?.survey?.id) {
+        trackAnalyticsEvent({
+          responseId: startResponseId,
+          surveyId: surveyData.survey.id,
+          event: 'survey_start',
+          data: {
+            timestamp: Date.now(),
+            userAgent: navigator.userAgent,
+            screenResolution: `${screen.width}x${screen.height}`,
+            anonymous: isAnonymous
+          },
+        });
+      }
     },
     onError: (error) => {
       toast({
@@ -152,19 +155,22 @@ export default function SurveyPlayer() {
       const questionStartTime = questionStartTimes[variables.questionId];
       const timeSpent = questionStartTime ? Date.now() - questionStartTime : 0;
       
-      trackAnalyticsEvent({
-        responseId: responseId || '',
-        surveyId: surveyData?.survey?.id || '',
-        questionId: variables.questionId,
-        pageId: surveyData?.pages?.[currentPageIndex]?.id || null,
-        event: 'question_answer',
-        duration: timeSpent,
-        data: {
-          questionType: surveyData?.pages?.[currentPageIndex]?.questions?.find(q => q.id === variables.questionId)?.type,
-          answerValue: variables.value,
-          timeSpent,
-        },
-      });
+      // Only track analytics if we have valid IDs
+      if (responseId && surveyData?.survey?.id) {
+        trackAnalyticsEvent({
+          responseId,
+          surveyId: surveyData.survey.id,
+          questionId: variables.questionId,
+          pageId: surveyData?.pages?.[currentPageIndex]?.id || null,
+          event: 'question_answer',
+          duration: timeSpent,
+          data: {
+            questionType: surveyData?.pages?.[currentPageIndex]?.questions?.find(q => q.id === variables.questionId)?.type,
+            answerValue: variables.value,
+            timeSpent,
+          },
+        });
+      }
     },
   });
 
@@ -187,18 +193,21 @@ export default function SurveyPlayer() {
       const totalTime = surveyStartTime ? Date.now() - surveyStartTime : 0;
       
       // CRITICAL FIX: Send analytics event in submitMutation success handler
-      await trackAnalyticsEvent({
-        responseId: responseId || '',
-        surveyId: surveyData?.survey?.id || '',
-        event: 'survey_complete',
-        duration: totalTime,
-        data: {
-          totalQuestions: surveyData?.pages?.reduce((sum, page) => sum + (page.questions?.length || 0), 0) || 0,
-          answeredQuestions: Object.keys(answers).length,
-          totalTimeSpent: totalTime,
-          completionRate: 100,
-        },
-      });
+      // Only track analytics if we have valid IDs
+      if (responseId && surveyData?.survey?.id) {
+        await trackAnalyticsEvent({
+          responseId,
+          surveyId: surveyData.survey.id,
+          event: 'survey_complete',
+          duration: totalTime,
+          data: {
+            totalQuestions: surveyData?.pages?.reduce((sum, page) => sum + (page.questions?.length || 0), 0) || 0,
+            answeredQuestions: Object.keys(answers).length,
+            totalTimeSpent: totalTime,
+            completionRate: 100,
+          },
+        });
+      }
       
       toast({
         title: "Success",
@@ -290,36 +299,42 @@ export default function SurveyPlayer() {
       const timeSpent = newPageStartTime - pageStartTime;
       const previousPage = surveyData.pages[currentPageIndex - 1];
       
-      trackAnalyticsEvent({
-        responseId,
-        surveyId: surveyData.survey.id,
-        pageId: previousPage.id,
-        event: 'page_leave',
-        duration: timeSpent,
-        data: {
-          pageTitle: previousPage.title,
-          pageOrder: previousPage.order,
-          timeSpent,
-          questionsOnPage: previousPage.questions?.length || 0,
-          answeredQuestions: previousPage.questions?.filter(q => answers[q.id]).length || 0,
-        },
-      });
+      // Only track analytics if we have valid IDs
+      if (responseId && surveyData.survey.id) {
+        trackAnalyticsEvent({
+          responseId,
+          surveyId: surveyData.survey.id,
+          pageId: previousPage.id,
+          event: 'page_leave',
+          duration: timeSpent,
+          data: {
+            pageTitle: previousPage.title,
+            pageOrder: previousPage.order,
+            timeSpent,
+            questionsOnPage: previousPage.questions?.length || 0,
+            answeredQuestions: previousPage.questions?.filter(q => answers[q.id]).length || 0,
+          },
+        });
+      }
     }
 
     // Track current page view
     setPageStartTime(newPageStartTime);
-    trackAnalyticsEvent({
-      responseId,
-      surveyId: surveyData.survey.id,
-      pageId: currentPage.id,
-      event: 'page_view',
-      data: {
-        pageTitle: currentPage.title,
-        pageOrder: currentPage.order,
-        questionsOnPage: currentPage.questions?.length || 0,
-        timestamp: newPageStartTime,
-      },
-    });
+    // Only track analytics if we have valid IDs
+    if (responseId && surveyData.survey.id) {
+      trackAnalyticsEvent({
+        responseId,
+        surveyId: surveyData.survey.id,
+        pageId: currentPage.id,
+        event: 'page_view',
+        data: {
+          pageTitle: currentPage.title,
+          pageOrder: currentPage.order,
+          questionsOnPage: currentPage.questions?.length || 0,
+          timestamp: newPageStartTime,
+        },
+      });
+    }
 
     // Initialize question start times for visible questions on this page
     if (currentPage.questions) {
@@ -350,17 +365,20 @@ export default function SurveyPlayer() {
 
     // Set a timeout to track focus event (debounced to avoid too many events)
     questionFocusTimeouts.current[questionId] = setTimeout(() => {
-      trackAnalyticsEvent({
-        responseId,
-        surveyId: surveyData.survey.id,
-        questionId,
-        pageId: surveyData.pages?.[currentPageIndex]?.id || null,
-        event: 'question_focus',
-        data: {
-          questionType: surveyData.pages?.[currentPageIndex]?.questions?.find(q => q.id === questionId)?.type,
-          timestamp: currentTime,
-        },
-      });
+      // Only track analytics if we have valid IDs
+      if (responseId && surveyData.survey.id) {
+        trackAnalyticsEvent({
+          responseId,
+          surveyId: surveyData.survey.id,
+          questionId,
+          pageId: surveyData.pages?.[currentPageIndex]?.id || null,
+          event: 'question_focus',
+          data: {
+            questionType: surveyData.pages?.[currentPageIndex]?.questions?.find(q => q.id === questionId)?.type,
+            timestamp: currentTime,
+          },
+        });
+      }
     }, 1000); // 1 second delay to avoid too many events
   };
 
@@ -380,19 +398,22 @@ export default function SurveyPlayer() {
 
     // Only track blur if we have a valid time spent
     if (timeSpent > 0) {
-      trackAnalyticsEvent({
-        responseId,
-        surveyId: surveyData.survey.id,
-        questionId,
-        pageId: surveyData.pages?.[currentPageIndex]?.id || null,
-        event: 'question_blur',
-        duration: timeSpent,
-        data: {
-          questionType: surveyData.pages?.[currentPageIndex]?.questions?.find(q => q.id === questionId)?.type,
-          timeSpent,
-          timestamp: currentTime,
-        },
-      });
+      // Only track analytics if we have valid IDs
+      if (responseId && surveyData.survey.id) {
+        trackAnalyticsEvent({
+          responseId,
+          surveyId: surveyData.survey.id,
+          questionId,
+          pageId: surveyData.pages?.[currentPageIndex]?.id || null,
+          event: 'question_blur',
+          duration: timeSpent,
+          data: {
+            questionType: surveyData.pages?.[currentPageIndex]?.questions?.find(q => q.id === questionId)?.type,
+            timeSpent,
+            timestamp: currentTime,
+          },
+        });
+      }
     }
   };
 
@@ -403,21 +424,24 @@ export default function SurveyPlayer() {
         const totalTime = surveyStartTime ? Date.now() - surveyStartTime : 0;
         
         // Use sendBeacon for reliable event tracking on page unload
-        const eventData = JSON.stringify({
-          responseId,
-          surveyId: surveyData.survey.id,
-          event: 'survey_abandon',
-          duration: totalTime,
-          data: {
-            currentPageIndex,
-            totalPages: surveyData.pages?.length || 0,
-            answeredQuestions: Object.keys(answers).length,
-            totalTimeSpent: totalTime,
-            exitPoint: 'page_unload',
-          },
-        });
-        
-        navigator.sendBeacon('/api/analytics/events', eventData);
+        // Only send beacon if we have valid IDs
+        if (responseId && surveyData.survey.id) {
+          const eventData = JSON.stringify({
+            responseId,
+            surveyId: surveyData.survey.id,
+            event: 'survey_abandon',
+            duration: totalTime,
+            data: {
+              currentPageIndex,
+              totalPages: surveyData.pages?.length || 0,
+              answeredQuestions: Object.keys(answers).length,
+              totalTimeSpent: totalTime,
+              exitPoint: 'page_unload',
+            },
+          });
+          
+          navigator.sendBeacon('/api/analytics/events', eventData);
+        }
       }
     };
 
@@ -609,6 +633,7 @@ export default function SurveyPlayer() {
               const subAnswer = instance.answers[subquestion.id];
               if (subAnswer !== undefined && subAnswer !== null && subAnswer !== "") {
                 formattedAnswers.push({
+                  responseId,
                   questionId: questionId,
                   subquestionId: subquestion.id,
                   loopIndex: loopIndex,
@@ -621,6 +646,7 @@ export default function SurveyPlayer() {
       } else if (value !== undefined && value !== null && value !== "") {
         // Handle regular question answers
         formattedAnswers.push({
+          responseId,
           questionId,
           value: typeof value === 'object' ? value : { text: value }
         });
