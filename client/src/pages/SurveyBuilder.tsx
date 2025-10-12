@@ -18,6 +18,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Copy, ExternalLink } from "lucide-react";
 import QuestionEditor from "@/components/survey/QuestionEditor";
+import { DraggablePageList } from "@/components/survey/DraggablePageList";
+import { DraggableQuestionList } from "@/components/survey/DraggableQuestionList";
 
 export default function SurveyBuilder() {
   const { id } = useParams();
@@ -163,7 +165,7 @@ export default function SurveyBuilder() {
       if (!surveyId) {
         throw new Error("Survey ID is required");
       }
-      
+
       const pageCount = pages ? pages.length : 0;
       return await apiRequest("POST", `/api/surveys/${surveyId}/pages`, {
         title,
@@ -176,6 +178,32 @@ export default function SurveyBuilder() {
       toast({
         title: "Success",
         description: "Page created successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete page mutation
+  const deletePageMutation = useMutation({
+    mutationFn: async (pageId: string) => {
+      const surveyId = id || currentSurveyId;
+      if (!surveyId) {
+        throw new Error("Survey ID is required");
+      }
+      return await apiRequest("DELETE", `/api/surveys/${surveyId}/pages/${pageId}`);
+    },
+    onSuccess: () => {
+      const surveyIdForCache = id || currentSurveyId;
+      queryClient.invalidateQueries({ queryKey: ["/api/surveys", surveyIdForCache, "pages"] });
+      toast({
+        title: "Success",
+        description: "Page deleted successfully",
       });
     },
     onError: (error) => {
@@ -276,6 +304,22 @@ export default function SurveyBuilder() {
     if (title) {
       pageMutation.mutate(title);
     }
+  };
+
+  const handleDeletePage = (pageId: string) => {
+    if (confirm("Are you sure you want to delete this page? All questions on this page will be deleted.")) {
+      deletePageMutation.mutate(pageId);
+      // If deleting the selected page, clear selection
+      if (selectedPage === pageId) {
+        setSelectedPage(null);
+      }
+    }
+  };
+
+  const handlePagesReordered = (reorderedPages: SurveyPage[]) => {
+    // Optimistically update the cache
+    const surveyIdForCache = id || currentSurveyId;
+    queryClient.setQueryData(["/api/surveys", surveyIdForCache, "pages"], reorderedPages);
   };
 
   const handleToggleAnonymous = (enabled: boolean) => {
@@ -468,80 +512,35 @@ export default function SurveyBuilder() {
               </TabsContent>
               
               <TabsContent value="pages" className="space-y-4">
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-medium text-foreground">Pages & Questions</h3>
-                    <Button 
-                      size="sm" 
+                {pagesLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2].map((i) => (
+                      <div key={i} className="h-16 bg-muted rounded-lg animate-pulse"></div>
+                    ))}
+                  </div>
+                ) : pages && pages.length > 0 ? (
+                  <DraggablePageList
+                    pages={pages}
+                    surveyId={id || currentSurveyId || ""}
+                    selectedPageId={selectedPage}
+                    onSelectPage={setSelectedPage}
+                    onAddPage={handleAddPage}
+                    onDeletePage={handleDeletePage}
+                    onPagesReordered={handlePagesReordered}
+                  />
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-sm text-muted-foreground mb-2">No pages yet</p>
+                    <Button
+                      size="sm"
                       onClick={handleAddPage}
                       disabled={!id && !currentSurveyId}
-                      data-testid="button-add-page"
+                      data-testid="button-add-first-page"
                     >
-                      <i className="fas fa-plus mr-1"></i>Add Page
+                      Add First Page
                     </Button>
                   </div>
-                  
-                  {pagesLoading ? (
-                    <div className="space-y-2">
-                      {[1, 2].map((i) => (
-                        <div key={i} className="h-16 bg-muted rounded-lg animate-pulse"></div>
-                      ))}
-                    </div>
-                  ) : pages && pages.length > 0 ? (
-                    <div className="space-y-2">
-                      {pages.map((page) => (
-                        <Card 
-                          key={page.id} 
-                          className={`cursor-pointer transition-colors ${
-                            selectedPage === page.id ? 'ring-2 ring-primary' : ''
-                          }`}
-                          onClick={() => setSelectedPage(page.id)}
-                          data-testid={`card-page-${page.id}`}
-                        >
-                          <CardContent className="p-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-medium text-foreground">{page.title}</span>
-                              <Button variant="ghost" size="sm">
-                                <i className="fas fa-ellipsis-v text-xs"></i>
-                              </Button>
-                            </div>
-                            
-                            {questions && selectedPage === page.id && (
-                              <div className="ml-3 space-y-1">
-                                {questions.map((question) => (
-                                  <div 
-                                    key={question.id} 
-                                    className="flex items-center space-x-2 text-xs text-muted-foreground cursor-pointer hover:text-foreground"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedQuestion(question.id);
-                                    }}
-                                    data-testid={`text-question-${question.id}`}
-                                  >
-                                    <i className="fas fa-grip-vertical"></i>
-                                    <span>{question.type}: {question.title}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-4">
-                      <p className="text-sm text-muted-foreground mb-2">No pages yet</p>
-                      <Button 
-                        size="sm" 
-                        onClick={handleAddPage}
-                        disabled={!id && !currentSurveyId}
-                        data-testid="button-add-first-page"
-                      >
-                        Add First Page
-                      </Button>
-                    </div>
-                  )}
-                </div>
+                )}
               </TabsContent>
             </Tabs>
           </div>

@@ -24,6 +24,7 @@ import { sendNotificationEmail } from "./services/emailService";
 import { sendSurveyInvitation } from "./services/sendgrid";
 import { upload, isFileTypeAccepted, deleteFile, getFilePath, fileExists } from "./services/fileService";
 import { exportService, type ExportOptions } from "./services/exportService";
+import { validateSurveyForPublish, canChangeStatus } from "./services/surveyValidation";
 import path from "path";
 import fs from "fs";
 import { z } from "zod";
@@ -274,16 +275,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!survey) {
         return res.status(404).json({ message: "Survey not found" });
       }
-      
+
       if (survey.creatorId !== req.user.claims.sub) {
         return res.status(403).json({ message: "Access denied" });
       }
-      
+
       await storage.deleteSurvey(req.params.id);
       res.json({ message: "Survey deleted successfully" });
     } catch (error) {
       console.error("Error deleting survey:", error);
       res.status(500).json({ message: "Failed to delete survey" });
+    }
+  });
+
+  // Survey validation endpoint
+  app.get('/api/surveys/:id/validate', isAuthenticated, async (req: any, res) => {
+    try {
+      const survey = await storage.getSurvey(req.params.id);
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
+      }
+
+      if (survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const validation = await validateSurveyForPublish(req.params.id);
+      res.json(validation);
+    } catch (error) {
+      console.error("Error validating survey:", error);
+      res.status(500).json({ message: "Failed to validate survey" });
+    }
+  });
+
+  // Survey status change endpoint
+  app.put('/api/surveys/:id/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const survey = await storage.getSurvey(req.params.id);
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
+      }
+
+      if (survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { status } = req.body;
+      if (!status || !['draft', 'open', 'closed'].includes(status)) {
+        return res.status(400).json({ message: "Invalid status. Must be 'draft', 'open', or 'closed'" });
+      }
+
+      // Check if status change is allowed
+      const statusCheck = await canChangeStatus(req.params.id, survey.status, status);
+      if (!statusCheck.allowed) {
+        return res.status(400).json({
+          message: statusCheck.reason || "Status change not allowed",
+          validation: statusCheck.reason
+        });
+      }
+
+      // Update the survey status
+      const updatedSurvey = await storage.updateSurvey(req.params.id, { status });
+
+      res.json({
+        survey: updatedSurvey,
+        message: statusCheck.reason || "Status updated successfully"
+      });
+    } catch (error) {
+      console.error("Error updating survey status:", error);
+      res.status(500).json({ message: "Failed to update survey status" });
     }
   });
 
@@ -310,12 +370,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!survey || survey.creatorId !== req.user.claims.sub) {
         return res.status(403).json({ message: "Access denied" });
       }
-      
+
       const pages = await storage.getSurveyPages(req.params.surveyId);
       res.json(pages);
     } catch (error) {
       console.error("Error fetching pages:", error);
       res.status(500).json({ message: "Failed to fetch pages" });
+    }
+  });
+
+  app.put('/api/surveys/:surveyId/pages/reorder', isAuthenticated, async (req: any, res) => {
+    try {
+      const survey = await storage.getSurvey(req.params.surveyId);
+      if (!survey || survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { pages } = req.body;
+      if (!pages || !Array.isArray(pages)) {
+        return res.status(400).json({ message: "Invalid request: pages array is required" });
+      }
+
+      // Validate pages data
+      for (const page of pages) {
+        if (!page.id || typeof page.order !== 'number') {
+          return res.status(400).json({ message: "Invalid page data: id and order are required" });
+        }
+      }
+
+      const reorderedPages = await storage.bulkReorderPages(req.params.surveyId, pages);
+      res.json(reorderedPages);
+    } catch (error) {
+      console.error("Error reordering pages:", error);
+      res.status(500).json({ message: "Failed to reorder pages" });
     }
   });
 
@@ -473,27 +560,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!subquestion) {
         return res.status(404).json({ message: "Subquestion not found" });
       }
-      
+
       const question = await storage.getQuestion(subquestion.loopQuestionId);
       if (!question) {
         return res.status(404).json({ message: "Question not found" });
       }
-      
+
       const page = await storage.getSurveyPage(question.pageId);
       if (!page) {
         return res.status(404).json({ message: "Page not found" });
       }
-      
+
       const survey = await storage.getSurvey(page.surveyId);
       if (!survey || survey.creatorId !== req.user.claims.sub) {
         return res.status(403).json({ message: "Access denied" });
       }
-      
+
       await storage.deleteLoopGroupSubquestion(req.params.id);
       res.json({ message: "Subquestion deleted successfully" });
     } catch (error) {
       console.error("Error deleting subquestion:", error);
       res.status(500).json({ message: "Failed to delete subquestion" });
+    }
+  });
+
+  // Bulk reorder questions
+  app.put('/api/surveys/:surveyId/questions/reorder', isAuthenticated, async (req: any, res) => {
+    try {
+      const survey = await storage.getSurvey(req.params.surveyId);
+      if (!survey || survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { questions } = req.body;
+      if (!questions || !Array.isArray(questions)) {
+        return res.status(400).json({ message: "Invalid request: questions array is required" });
+      }
+
+      // Validate questions data
+      for (const question of questions) {
+        if (!question.id || !question.pageId || typeof question.order !== 'number') {
+          return res.status(400).json({ message: "Invalid question data: id, pageId, and order are required" });
+        }
+      }
+
+      const reorderedQuestions = await storage.bulkReorderQuestions(req.params.surveyId, questions);
+      res.json(reorderedQuestions);
+    } catch (error) {
+      console.error("Error reordering questions:", error);
+      res.status(500).json({ message: "Failed to reorder questions" });
     }
   });
 

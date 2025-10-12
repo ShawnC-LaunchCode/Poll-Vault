@@ -76,28 +76,46 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
     return null
   }
 
-  return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
-          .map(
-            ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
-${colorConfig
-  .map(([key, itemConfig]) => {
-    const color =
-      itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
-      itemConfig.color
-    return color ? `  --color-${key}: ${color};` : null
-  })
-  .join("\n")}
-}
-`
-          )
-          .join("\n"),
-      }}
-    />
-  )
+  // Sanitize the chart ID to prevent CSS injection
+  const sanitizedId = id.replace(/[^a-zA-Z0-9-_]/g, '')
+
+  // Generate CSS rules safely without dangerouslySetInnerHTML
+  const cssRules = Object.entries(THEMES)
+    .map(([theme, prefix]) => {
+      const rules = colorConfig
+        .map(([key, itemConfig]) => {
+          const color =
+            itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
+            itemConfig.color
+          // Sanitize color values and keys
+          const sanitizedKey = key.replace(/[^a-zA-Z0-9-_]/g, '')
+          const sanitizedColor = color?.replace(/[^a-zA-Z0-9#(),.\s%-]/g, '') || ''
+          return sanitizedColor ? `  --color-${sanitizedKey}: ${sanitizedColor};` : null
+        })
+        .filter(Boolean)
+        .join("\n")
+
+      return rules ? `${prefix} [data-chart="${sanitizedId}"] {\n${rules}\n}` : null
+    })
+    .filter(Boolean)
+    .join("\n")
+
+  // Use a style element without dangerouslySetInnerHTML
+  React.useEffect(() => {
+    const styleElement = document.createElement('style')
+    styleElement.textContent = cssRules
+    styleElement.setAttribute('data-chart-style', sanitizedId)
+    document.head.appendChild(styleElement)
+
+    return () => {
+      const existingStyle = document.querySelector(`style[data-chart-style="${sanitizedId}"]`)
+      if (existingStyle) {
+        document.head.removeChild(existingStyle)
+      }
+    }
+  }, [cssRules, sanitizedId])
+
+  return null
 }
 
 const ChartTooltip = RechartsPrimitive.Tooltip

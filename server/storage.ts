@@ -76,6 +76,7 @@ export interface IStorage {
   getSurveyPages(surveyId: string): Promise<SurveyPage[]>;
   updateSurveyPage(id: string, updates: Partial<InsertSurveyPage>): Promise<SurveyPage>;
   deleteSurveyPage(id: string): Promise<void>;
+  bulkReorderPages(surveyId: string, pageOrders: Array<{ id: string; order: number }>): Promise<SurveyPage[]>;
   
   // Question operations
   createQuestion(question: InsertQuestion): Promise<Question>;
@@ -84,6 +85,7 @@ export interface IStorage {
   getQuestionsWithSubquestionsByPage(pageId: string): Promise<QuestionWithSubquestions[]>;
   updateQuestion(id: string, updates: Partial<InsertQuestion>): Promise<Question>;
   deleteQuestion(id: string): Promise<void>;
+  bulkReorderQuestions(surveyId: string, questionOrders: Array<{ id: string; pageId: string; order: number }>): Promise<Question[]>;
   
   // Loop group subquestion operations
   createLoopGroupSubquestion(subquestion: InsertLoopGroupSubquestion): Promise<LoopGroupSubquestion>;
@@ -361,7 +363,27 @@ export class DatabaseStorage implements IStorage {
   async deleteSurveyPage(id: string): Promise<void> {
     await db.delete(surveyPages).where(eq(surveyPages.id, id));
   }
-  
+
+  async bulkReorderPages(surveyId: string, pageOrders: Array<{ id: string; order: number }>): Promise<SurveyPage[]> {
+    return await db.transaction(async (tx) => {
+      const reorderedPages: SurveyPage[] = [];
+
+      for (const { id, order } of pageOrders) {
+        const [updatedPage] = await tx
+          .update(surveyPages)
+          .set({ order })
+          .where(and(eq(surveyPages.id, id), eq(surveyPages.surveyId, surveyId)))
+          .returning();
+
+        if (updatedPage) {
+          reorderedPages.push(updatedPage);
+        }
+      }
+
+      return reorderedPages;
+    });
+  }
+
   // Question operations
   async createQuestion(question: InsertQuestion): Promise<Question> {
     const [newQuestion] = await db.insert(questions).values(question).returning();
@@ -392,6 +414,36 @@ export class DatabaseStorage implements IStorage {
 
   async deleteQuestion(id: string): Promise<void> {
     await db.delete(questions).where(eq(questions.id, id));
+  }
+
+  async bulkReorderQuestions(surveyId: string, questionOrders: Array<{ id: string; pageId: string; order: number }>): Promise<Question[]> {
+    return await db.transaction(async (tx) => {
+      const reorderedQuestions: Question[] = [];
+
+      for (const { id, pageId, order } of questionOrders) {
+        // Verify the question belongs to a page in this survey
+        const [page] = await tx
+          .select()
+          .from(surveyPages)
+          .where(and(eq(surveyPages.id, pageId), eq(surveyPages.surveyId, surveyId)));
+
+        if (!page) {
+          throw new Error(`Page ${pageId} does not belong to survey ${surveyId}`);
+        }
+
+        const [updatedQuestion] = await tx
+          .update(questions)
+          .set({ pageId, order })
+          .where(eq(questions.id, id))
+          .returning();
+
+        if (updatedQuestion) {
+          reorderedQuestions.push(updatedQuestion);
+        }
+      }
+
+      return reorderedQuestions;
+    });
   }
 
   async getQuestionsWithSubquestionsByPage(pageId: string): Promise<QuestionWithSubquestions[]> {

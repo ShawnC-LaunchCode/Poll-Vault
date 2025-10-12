@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Trash2, Plus, Settings } from "lucide-react";
+import { DraggableQuestionList } from "./DraggableQuestionList";
 
 interface QuestionEditorProps {
   pageId: string;
@@ -150,6 +151,60 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
       toast({
         title: "Success",
         description: "Question created successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete question mutation
+  const deleteQuestionMutation = useMutation({
+    mutationFn: async (questionId: string) => {
+      return await apiRequest("DELETE", `/api/questions/${questionId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/pages", pageId, "questions"] });
+      toast({
+        title: "Success",
+        description: "Question deleted successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Duplicate question mutation
+  const duplicateQuestionMutation = useMutation({
+    mutationFn: async (questionId: string) => {
+      const question = questions?.find(q => q.id === questionId);
+      if (!question) throw new Error("Question not found");
+
+      const questionCount = questions ? questions.length : 0;
+      return await apiRequest("POST", `/api/pages/${pageId}/questions`, {
+        type: question.type,
+        title: `${question.title} (Copy)`,
+        description: question.description,
+        required: question.required,
+        options: question.options,
+        loopConfig: question.loopConfig,
+        order: questionCount + 1
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/pages", pageId, "questions"] });
+      toast({
+        title: "Success",
+        description: "Question duplicated successfully",
       });
     },
     onError: (error) => {
@@ -342,6 +397,29 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
       ...prev,
       options: prev.options.filter((_, i) => i !== index)
     }));
+  };
+
+  // Handlers for question actions
+  const handleEditQuestion = (questionId: string) => {
+    onQuestionSelect(questionId);
+  };
+
+  const handleDeleteQuestion = (questionId: string) => {
+    if (confirm("Are you sure you want to delete this question?")) {
+      deleteQuestionMutation.mutate(questionId);
+      if (selectedQuestion === questionId) {
+        onQuestionSelect(null);
+      }
+    }
+  };
+
+  const handleDuplicateQuestion = (questionId: string) => {
+    duplicateQuestionMutation.mutate(questionId);
+  };
+
+  const handleQuestionsReordered = (reorderedQuestions: Question[]) => {
+    // Optimistically update the cache
+    queryClient.setQueryData(["/api/pages", pageId, "questions"], reorderedQuestions);
   };
 
   return (
@@ -727,35 +805,22 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
         </Card>
       )}
 
-      {/* Existing Questions List */}
+      {/* Existing Questions List with Drag & Drop */}
       {questions && questions.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Existing Questions</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {questions.map((question) => (
-                <div
-                  key={question.id}
-                  className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                    selectedQuestion === question.id ? 'ring-2 ring-primary' : 'hover:bg-accent'
-                  }`}
-                  onClick={() => onQuestionSelect(question.id)}
-                  data-testid={`card-question-${question.id}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-sm font-medium text-foreground">{question.title}</span>
-                      <span className="text-xs text-muted-foreground ml-2">({question.type})</span>
-                    </div>
-                    {question.required && (
-                      <span className="text-xs text-destructive">Required</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <DraggableQuestionList
+              questions={questions}
+              pageId={pageId}
+              surveyId={surveyId}
+              onEditQuestion={handleEditQuestion}
+              onDeleteQuestion={handleDeleteQuestion}
+              onDuplicateQuestion={handleDuplicateQuestion}
+              onQuestionsReordered={handleQuestionsReordered}
+            />
           </CardContent>
         </Card>
       )}
