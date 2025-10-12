@@ -21,10 +21,12 @@ function Router() {
 
   return (
     <Switch>
+      {/* Survey response route - available to everyone (authenticated or not) */}
+      <Route path="/survey/:identifier" component={SurveyPlayer} />
+
       {isLoading || !isAuthenticated ? (
         <>
           <Route path="/" component={Landing} />
-          <Route path="/survey/:identifier" component={SurveyPlayer} />
           {/* Redirect all other routes to landing for unauthenticated users */}
           <Route component={Landing} />
         </>
