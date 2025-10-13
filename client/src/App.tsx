@@ -10,11 +10,13 @@ import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import SurveyBuilder from "@/pages/SurveyBuilder";
 import SurveyPlayer from "@/pages/SurveyPlayer";
+import SurveyPreview from "@/pages/SurveyPreview";
 import SurveysList from "@/pages/SurveysList";
 import Responses from "@/pages/Responses";
 import ResponseDetails from "@/pages/ResponseDetails";
 import Recipients from "@/pages/Recipients";
 import SurveyAnalytics from "@/pages/SurveyAnalytics";
+import SurveyResults from "@/pages/SurveyResults";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -37,6 +39,8 @@ function Router() {
           <Route path="/surveys" component={SurveysList} />
           <Route path="/surveys/new" component={SurveyBuilder} />
           <Route path="/surveys/:id/edit" component={SurveyBuilder} />
+          <Route path="/surveys/:id/preview" component={SurveyPreview} />
+          <Route path="/surveys/:surveyId/results" component={SurveyResults} />
           <Route path="/surveys/:id/responses" component={Responses} />
           <Route path="/surveys/:id/recipients" component={Recipients} />
           <Route path="/surveys/:surveyId/analytics" component={SurveyAnalytics} />

@@ -91,14 +91,18 @@ export default function SurveyPlayer() {
         // Generate session ID for anonymous surveys
         const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         setSessionId(newSessionId);
-        
-        return await apiRequest("POST", `/api/anonymous-survey/${surveyIdentifier}/start-response`, {
+
+        // Use new anonymous response endpoint
+        return await apiRequest("POST", `/api/surveys/${surveyIdentifier}/responses`, {
           sessionId: newSessionId,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           screenResolution: `${screen.width}x${screen.height}`
         });
       } else {
-        return await apiRequest("POST", `/api/survey/${surveyIdentifier}/start-response`, {});
+        // Use new authenticated/token-based response endpoint
+        return await apiRequest("POST", `/api/surveys/${surveyData?.survey?.id}/responses`, {
+          token: surveyIdentifier // Pass token for recipient validation
+        });
       }
     },
     onSuccess: async (response) => {
@@ -138,8 +142,8 @@ export default function SurveyPlayer() {
   const createAnswerMutation = useMutation({
     mutationFn: async ({ questionId, value }: { questionId: string; value: any }) => {
       if (!responseId) throw new Error("No response ID available");
-      return await apiRequest("POST", "/api/answers", {
-        responseId,
+      // Use new answer submission endpoint
+      return await apiRequest("POST", `/api/responses/${responseId}/answers`, {
         questionId,
         value: typeof value === 'object' ? value : { text: value }
       });
@@ -174,17 +178,12 @@ export default function SurveyPlayer() {
     },
   });
 
-  // Submit response mutation
+  // Submit response mutation - marks response as complete
   const submitMutation = useMutation({
-    mutationFn: async (responseData: any) => {
-      if (isAnonymous) {
-        return await apiRequest("POST", `/api/anonymous-survey/${surveyIdentifier}/response`, {
-          ...responseData,
-          responseId
-        });
-      } else {
-        return await apiRequest("POST", `/api/survey/${surveyIdentifier}/response`, responseData);
-      }
+    mutationFn: async () => {
+      if (!responseId) throw new Error("No response ID available");
+      // Use new completion endpoint
+      return await apiRequest("PUT", `/api/responses/${responseId}/complete`, {});
     },
     onSuccess: async () => {
       setIsSubmitted(true);
@@ -619,41 +618,60 @@ export default function SurveyPlayer() {
     }
   };
 
-  const handleSubmit = () => {
-    const formattedAnswers: any[] = [];
-    
-    Object.entries(answers).forEach(([questionId, value]) => {
-      const question = pages?.flatMap(p => p.questions || []).find(q => q.id === questionId);
-      
-      if (question?.type === 'loop_group' && Array.isArray(value)) {
-        // Handle loop group answers
-        value.forEach((instance: any, loopIndex: number) => {
-          if (instance.answers && question.subquestions) {
-            question.subquestions.forEach((subquestion) => {
-              const subAnswer = instance.answers[subquestion.id];
-              if (subAnswer !== undefined && subAnswer !== null && subAnswer !== "") {
-                formattedAnswers.push({
-                  responseId,
-                  questionId: questionId,
-                  subquestionId: subquestion.id,
-                  loopIndex: loopIndex,
-                  value: typeof subAnswer === 'object' ? subAnswer : { text: subAnswer }
-                });
-              }
-            });
-          }
-        });
-      } else if (value !== undefined && value !== null && value !== "") {
-        // Handle regular question answers
-        formattedAnswers.push({
-          responseId,
-          questionId,
-          value: typeof value === 'object' ? value : { text: value }
-        });
-      }
-    });
+  const handleSubmit = async () => {
+    if (!responseId) {
+      toast({
+        title: "Error",
+        description: "No response ID available. Please refresh and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    submitMutation.mutate({ answers: formattedAnswers });
+    // Submit any pending answers first (in case they haven't been saved yet)
+    const pendingAnswers = Object.entries(answers).filter(([questionId]) => !answerIds[questionId]);
+
+    try {
+      // Save any pending answers before completing
+      for (const [questionId, value] of pendingAnswers) {
+        const question = pages?.flatMap(p => p.questions || []).find(q => q.id === questionId);
+
+        if (question?.type === 'loop_group' && Array.isArray(value)) {
+          // Handle loop group answers
+          for (let loopIndex = 0; loopIndex < value.length; loopIndex++) {
+            const instance = value[loopIndex];
+            if (instance.answers && question.subquestions) {
+              for (const subquestion of question.subquestions) {
+                const subAnswer = instance.answers[subquestion.id];
+                if (subAnswer !== undefined && subAnswer !== null && subAnswer !== "") {
+                  await apiRequest("POST", `/api/responses/${responseId}/answers`, {
+                    questionId: questionId,
+                    subquestionId: subquestion.id,
+                    loopIndex: loopIndex,
+                    value: typeof subAnswer === 'object' ? subAnswer : { text: subAnswer }
+                  });
+                }
+              }
+            }
+          }
+        } else if (value !== undefined && value !== null && value !== "") {
+          // Handle regular question answers
+          await apiRequest("POST", `/api/responses/${responseId}/answers`, {
+            questionId,
+            value: typeof value === 'object' ? value : { text: value }
+          });
+        }
+      }
+
+      // Now complete the response
+      submitMutation.mutate();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save answers. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (

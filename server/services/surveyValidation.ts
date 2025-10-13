@@ -221,7 +221,7 @@ function detectCircularConditionalLogic(
 
     const neighbors = graph.get(node);
     if (neighbors) {
-      for (const neighbor of neighbors) {
+      for (const neighbor of Array.from(neighbors)) {
         if (!visited.has(neighbor)) {
           if (hasCycle(neighbor)) {
             circularNodes.push(node);
@@ -239,13 +239,13 @@ function detectCircularConditionalLogic(
   }
 
   // Check all nodes
-  for (const node of graph.keys()) {
+  for (const node of Array.from(graph.keys())) {
     if (!visited.has(node)) {
       hasCycle(node);
     }
   }
 
-  return [...new Set(circularNodes)];
+  return Array.from(new Set(circularNodes));
 }
 
 /**

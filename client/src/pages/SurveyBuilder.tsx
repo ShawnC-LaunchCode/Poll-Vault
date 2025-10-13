@@ -16,10 +16,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Copy, ExternalLink } from "lucide-react";
+import { Copy, ExternalLink, Eye } from "lucide-react";
 import QuestionEditor from "@/components/survey/QuestionEditor";
 import { DraggablePageList } from "@/components/survey/DraggablePageList";
 import { DraggableQuestionList } from "@/components/survey/DraggableQuestionList";
+import { PublishChecklistModal } from "@/components/survey/PublishChecklistModal";
+import { StatusBadge } from "@/components/survey/StatusBadge";
 
 export default function SurveyBuilder() {
   const { id } = useParams();
@@ -50,6 +52,7 @@ export default function SurveyBuilder() {
   const [selectedPage, setSelectedPage] = useState<string | null>(null);
   const [selectedQuestion, setSelectedQuestion] = useState<string | null>(null);
   const [currentSurveyId, setCurrentSurveyId] = useState<string | null>(id || null);
+  const [publishModalOpen, setPublishModalOpen] = useState(false);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -296,7 +299,33 @@ export default function SurveyBuilder() {
   };
 
   const handlePublish = () => {
-    surveyMutation.mutate({ ...surveyData, status: "open" });
+    if (!id && !currentSurveyId) {
+      toast({
+        title: "Save Required",
+        description: "Please save your survey first before publishing",
+        variant: "destructive",
+      });
+      return;
+    }
+    setPublishModalOpen(true);
+  };
+
+  const handlePublishSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/surveys", id] });
+    queryClient.invalidateQueries({ queryKey: ["/api/surveys"] });
+  };
+
+  const handlePreview = () => {
+    if (!id && !currentSurveyId) {
+      toast({
+        title: "Save Required",
+        description: "Please save your survey first before previewing",
+        variant: "destructive",
+      });
+      return;
+    }
+    const surveyId = id || currentSurveyId;
+    navigate(`/surveys/${surveyId}/preview`);
   };
 
   const handleAddPage = () => {
@@ -374,25 +403,35 @@ export default function SurveyBuilder() {
       <Sidebar />
       
       <main className="flex-1 flex flex-col overflow-hidden">
-        <Header 
-          title="Survey Builder" 
+        <Header
+          title="Survey Builder"
           description="Create and design your survey"
           actions={
             <div className="flex items-center space-x-3">
-              <Button 
-                variant="outline" 
+              {survey && <StatusBadge status={survey.status} />}
+              <Button
+                variant="outline"
+                onClick={handlePreview}
+                disabled={!id && !currentSurveyId}
+                data-testid="button-preview-survey"
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                Preview
+              </Button>
+              <Button
+                variant="outline"
                 onClick={handleSave}
                 disabled={surveyMutation.isPending}
                 data-testid="button-save-survey"
               >
                 {surveyMutation.isPending ? "Saving..." : "Save Draft"}
               </Button>
-              <Button 
+              <Button
                 onClick={handlePublish}
-                disabled={surveyMutation.isPending || !surveyData.title}
+                disabled={surveyMutation.isPending || !surveyData.title || survey?.status === "open"}
                 data-testid="button-publish-survey"
               >
-                {surveyMutation.isPending ? "Publishing..." : "Publish Survey"}
+                {survey?.status === "open" ? "Published" : "Publish Survey"}
               </Button>
             </div>
           }
@@ -568,6 +607,16 @@ export default function SurveyBuilder() {
           </div>
         </div>
       </main>
+
+      {/* Publish Checklist Modal */}
+      {(id || currentSurveyId) && (
+        <PublishChecklistModal
+          surveyId={id || currentSurveyId!}
+          open={publishModalOpen}
+          onOpenChange={setPublishModalOpen}
+          onSuccess={handlePublishSuccess}
+        />
+      )}
     </div>
   );
 }

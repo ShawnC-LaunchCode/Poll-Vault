@@ -1074,32 +1074,378 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Start response endpoint (public, token-based)
+  // =============================================================================
+  // RESPONSE SUBMISSION ENDPOINTS
+  // =============================================================================
+
+  /**
+   * POST /api/surveys/:surveyId/responses
+   * Creates a new response for authenticated users or token-based recipients
+   * This is the main endpoint for starting a survey response
+   */
+  app.post('/api/surveys/:surveyId/responses', async (req, res) => {
+    try {
+      const { surveyId } = req.params;
+      const { token } = req.body; // Optional token for recipient-based access
+
+      // Get survey and verify it's open
+      const survey = await storage.getSurvey(surveyId);
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
+      }
+
+      if (survey.status !== 'open') {
+        return res.status(400).json({ message: "Survey is not currently open for responses" });
+      }
+
+      let recipientId: string | undefined;
+
+      // Check if this is a token-based response (recipient invitation)
+      if (token) {
+        const recipient = await storage.getRecipientByToken(token);
+        if (!recipient || recipient.surveyId !== surveyId) {
+          return res.status(403).json({ message: "Invalid token for this survey" });
+        }
+
+        // Check if recipient already has a response
+        const existingResponse = await storage.getResponseByRecipient(recipient.id);
+        if (existingResponse) {
+          return res.status(400).json({
+            message: "Response already exists",
+            responseId: existingResponse.id
+          });
+        }
+
+        recipientId = recipient.id;
+      }
+
+      // Create new response
+      const responseData = insertResponseSchema.parse({
+        surveyId,
+        recipientId: recipientId || null,
+        completed: false,
+        isAnonymous: false
+      });
+
+      const response = await storage.createResponse(responseData);
+
+      res.status(201).json({
+        responseId: response.id,
+        surveyId: response.surveyId,
+        message: "Response created successfully"
+      });
+    } catch (error) {
+      console.error("Error creating response:", error);
+      res.status(500).json({ message: "Failed to create response" });
+    }
+  });
+
+  /**
+   * POST /api/surveys/:publicLink/responses
+   * Creates a new anonymous response using the survey's public link
+   * Enforces anonymousAccessType limits (unlimited, one_per_ip, one_per_session)
+   */
+  app.post('/api/surveys/:publicLink/responses', async (req, res) => {
+    try {
+      const { publicLink } = req.params;
+
+      // Get survey by public link
+      const survey = await storage.getSurveyByPublicLink(publicLink);
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
+      }
+
+      // Verify anonymous access is enabled
+      if (!survey.allowAnonymous) {
+        return res.status(403).json({ message: "Anonymous responses are not allowed for this survey" });
+      }
+
+      if (survey.status !== 'open') {
+        return res.status(400).json({ message: "Survey is not currently open for responses" });
+      }
+
+      // Get request metadata
+      const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+                       req.socket.remoteAddress ||
+                       'unknown';
+      const userAgent = req.get('user-agent') || '';
+      const sessionId = req.body.sessionId || `session_${Date.now()}_${Math.random().toString(36)}`;
+
+      // Check anonymous response limits based on anonymousAccessType
+      if (survey.anonymousAccessType === 'one_per_ip') {
+        const canRespond = await storage.checkAnonymousResponseLimit(survey.id, ipAddress, sessionId);
+        if (!canRespond) {
+          return res.status(429).json({
+            message: "Response limit reached",
+            error: "You have already responded to this survey from this IP address."
+          });
+        }
+      } else if (survey.anonymousAccessType === 'one_per_session') {
+        const canRespond = await storage.checkAnonymousResponseLimit(survey.id, ipAddress, sessionId);
+        if (!canRespond) {
+          return res.status(429).json({
+            message: "Response limit reached",
+            error: "You have already responded to this survey in this session."
+          });
+        }
+      }
+      // Note: 'unlimited' and 'disabled' don't have limits (disabled is handled by allowAnonymous check)
+
+      // Collect anonymous metadata
+      const anonymousMetadata = {
+        browserInfo: {
+          userAgent,
+          language: req.get('accept-language') || 'unknown',
+          timezone: req.body.timezone || 'unknown'
+        },
+        deviceInfo: {
+          isMobile: /Mobile|Android|iPhone|iPad/i.test(userAgent),
+          screenResolution: req.body.screenResolution || 'unknown'
+        },
+        accessInfo: {
+          referrer: req.get('referer'),
+          entryTime: Date.now()
+        }
+      };
+
+      // Create anonymous response
+      const response = await storage.createAnonymousResponse({
+        surveyId: survey.id,
+        ipAddress,
+        userAgent,
+        sessionId,
+        anonymousMetadata
+      });
+
+      // Create tracking record for response limiting
+      await storage.createAnonymousResponseTracking({
+        surveyId: survey.id,
+        ipAddress,
+        sessionId,
+        responseId: response.id
+      });
+
+      res.status(201).json({
+        responseId: response.id,
+        surveyId: response.surveyId,
+        sessionId,
+        message: "Anonymous response created successfully"
+      });
+    } catch (error) {
+      console.error("Error creating anonymous response:", error);
+      res.status(500).json({ message: "Failed to create anonymous response" });
+    }
+  });
+
+  /**
+   * POST /api/responses/:responseId/answers
+   * Submits an answer for a specific question
+   * Validates question IDs and data types
+   * Upserts answers (updates if already exists)
+   */
+  app.post('/api/responses/:responseId/answers', async (req, res) => {
+    try {
+      const { responseId } = req.params;
+      const { questionId, subquestionId, loopIndex, value } = req.body;
+
+      // Validate required fields
+      if (!questionId || value === undefined) {
+        return res.status(400).json({
+          message: "questionId and value are required"
+        });
+      }
+
+      // Get and validate response
+      const response = await storage.getResponse(responseId);
+      if (!response) {
+        return res.status(404).json({ message: "Response not found" });
+      }
+
+      // Don't allow updating completed responses
+      if (response.completed) {
+        return res.status(400).json({
+          message: "Cannot modify a completed response"
+        });
+      }
+
+      // Get survey to validate question belongs to survey
+      const survey = await storage.getSurvey(response.surveyId);
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
+      }
+
+      // Validate question exists and belongs to survey
+      const question = await storage.getQuestion(questionId);
+      if (!question) {
+        return res.status(404).json({ message: "Question not found" });
+      }
+
+      // Verify question belongs to this survey (through page)
+      const page = await storage.getSurveyPage(question.pageId);
+      if (!page || page.surveyId !== survey.id) {
+        return res.status(400).json({
+          message: "Question does not belong to this survey"
+        });
+      }
+
+      // Validate subquestion if provided
+      if (subquestionId) {
+        const subquestion = await storage.getLoopGroupSubquestion(subquestionId);
+        if (!subquestion || subquestion.loopQuestionId !== questionId) {
+          return res.status(400).json({
+            message: "Invalid subquestion for this question"
+          });
+        }
+      }
+
+      // Check if answer already exists (for upsert behavior)
+      const existingAnswers = await storage.getAnswersByResponse(responseId);
+      const existingAnswer = existingAnswers.find(a =>
+        a.questionId === questionId &&
+        a.subquestionId === (subquestionId || null) &&
+        a.loopIndex === (loopIndex || null)
+      );
+
+      let answer;
+      if (existingAnswer) {
+        // Update existing answer
+        answer = await storage.updateAnswer(existingAnswer.id, { value });
+      } else {
+        // Create new answer
+        const answerData = insertAnswerSchema.parse({
+          responseId,
+          questionId,
+          subquestionId: subquestionId || null,
+          loopIndex: loopIndex || null,
+          value
+        });
+        answer = await storage.createAnswer(answerData);
+      }
+
+      res.status(200).json({
+        answer,
+        message: existingAnswer ? "Answer updated successfully" : "Answer created successfully"
+      });
+    } catch (error) {
+      console.error("Error submitting answer:", error);
+      res.status(500).json({ message: "Failed to submit answer" });
+    }
+  });
+
+  /**
+   * PUT /api/responses/:responseId/complete
+   * Marks a response as complete
+   * Validates all required questions are answered using conditional logic
+   */
+  app.put('/api/responses/:responseId/complete', async (req, res) => {
+    try {
+      const { responseId } = req.params;
+
+      // Get response with all related data
+      const response = await storage.getResponse(responseId);
+      if (!response) {
+        return res.status(404).json({ message: "Response not found" });
+      }
+
+      // Check if already completed
+      if (response.completed) {
+        return res.status(400).json({
+          message: "Response is already completed",
+          submittedAt: response.submittedAt
+        });
+      }
+
+      // Get survey with pages, questions, and conditional rules
+      const survey = await storage.getSurvey(response.surveyId);
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
+      }
+
+      const pages = await storage.getSurveyPages(survey.id);
+      const conditionalRules = await storage.getConditionalRulesBySurvey(survey.id);
+      const answers = await storage.getAnswersByResponse(responseId);
+
+      // Build answers map for conditional logic evaluation
+      const answersMap: Record<string, any> = {};
+      answers.forEach(answer => {
+        answersMap[answer.questionId] = answer.value;
+      });
+
+      // Import conditional logic evaluator
+      const { createEvaluationContext } = await import('@shared/conditionalLogic');
+      const evaluationContext = createEvaluationContext(conditionalRules, answersMap);
+
+      // Collect all questions and validate required ones
+      const missingRequired: string[] = [];
+
+      for (const page of pages) {
+        const questions = await storage.getQuestionsWithSubquestionsByPage(page.id);
+
+        for (const question of questions) {
+          // Evaluate conditional logic for this question
+          const evaluation = evaluationContext.evaluate(question.id);
+
+          // If question is visible and required, check if answered
+          if (evaluation.visible && (evaluation.required || question.required)) {
+            const hasAnswer = answers.some(a => a.questionId === question.id);
+            if (!hasAnswer) {
+              missingRequired.push(question.title);
+            }
+          }
+        }
+      }
+
+      // If there are missing required questions, return error
+      if (missingRequired.length > 0) {
+        return res.status(400).json({
+          message: "Missing required questions",
+          missingQuestions: missingRequired,
+          count: missingRequired.length
+        });
+      }
+
+      // Mark response as completed
+      const updatedResponse = await storage.updateResponse(responseId, {
+        completed: true,
+        submittedAt: new Date()
+      });
+
+      res.status(200).json({
+        response: updatedResponse,
+        message: "Response completed successfully"
+      });
+    } catch (error) {
+      console.error("Error completing response:", error);
+      res.status(500).json({ message: "Failed to complete response" });
+    }
+  });
+
+  // Legacy token-based endpoint (kept for backward compatibility)
   app.post('/api/survey/:token/start-response', async (req, res) => {
     try {
       const recipient = await storage.getRecipientByToken(req.params.token);
       if (!recipient) {
         return res.status(404).json({ message: "Survey not found" });
       }
-      
+
       const survey = await storage.getSurvey(recipient.surveyId);
       if (!survey || survey.status !== 'open') {
         return res.status(404).json({ message: "Survey not available" });
       }
-      
+
       // Check if recipient has already started a response
       let existingResponse = await storage.getResponseByRecipient(recipient.id);
       if (existingResponse) {
         return res.json({ responseId: existingResponse.id });
       }
-      
+
       // Create new response
       const responseData = insertResponseSchema.parse({
         surveyId: recipient.surveyId,
         recipientId: recipient.id,
         completed: false // Not completed yet
       });
-      
+
       const response = await storage.createResponse(responseData);
       res.json({ responseId: response.id });
     } catch (error) {
@@ -1514,6 +1860,179 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error submitting anonymous response:", error);
       res.status(500).json({ message: "Failed to submit anonymous response" });
+    }
+  });
+
+  // =============================================================================
+  // SURVEY RESULTS & RESPONSES ENDPOINTS
+  // =============================================================================
+
+  /**
+   * GET /api/surveys/:id/results
+   * Returns aggregated survey results with statistics and question breakdowns
+   * Requires survey ownership
+   */
+  app.get('/api/surveys/:id/results', isAuthenticated, async (req: any, res) => {
+    try {
+      const surveyId = req.params.id;
+      const userId = req.user.claims.sub;
+
+      // Verify survey ownership
+      const survey = await storage.getSurvey(surveyId);
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
+      }
+
+      if (survey.creatorId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Get all responses for this survey
+      const responses = await storage.getResponsesBySurvey(surveyId);
+      const completedResponses = responses.filter(r => r.completed);
+
+      // Calculate basic stats
+      const totalResponses = responses.length;
+      const completedCount = completedResponses.length;
+      const completionRate = totalResponses > 0 ? (completedCount / totalResponses) * 100 : 0;
+
+      // Get survey pages and questions
+      const pages = await storage.getSurveyPages(surveyId);
+      const allQuestions: any[] = [];
+
+      for (const page of pages) {
+        const questions = await storage.getQuestionsWithSubquestionsByPage(page.id);
+        allQuestions.push(...questions);
+      }
+
+      // Get all answers for completed responses
+      const questionBreakdown: Record<string, any> = {};
+
+      for (const question of allQuestions) {
+        const questionId = question.id;
+
+        // Initialize breakdown for this question
+        questionBreakdown[questionId] = {
+          questionId,
+          questionTitle: question.title,
+          questionType: question.type,
+          totalResponses: 0,
+          answers: [],
+          breakdown: {}
+        };
+
+        // Collect answers for this question from completed responses
+        for (const response of completedResponses) {
+          const answers = await storage.getAnswersByResponse(response.id);
+          const questionAnswers = answers.filter(a => a.questionId === questionId);
+
+          if (questionAnswers.length > 0) {
+            questionBreakdown[questionId].totalResponses++;
+
+            // Process answers based on question type
+            for (const answer of questionAnswers) {
+              if (question.type === 'multiple_choice' || question.type === 'radio') {
+                // For choice questions, count each option
+                const value = answer.value;
+                let selectedOptions: string[] = [];
+
+                if (Array.isArray(value)) {
+                  selectedOptions = value;
+                } else if (typeof value === 'object' && value !== null) {
+                  // Handle {text: "value"} format
+                  if (value.text) {
+                    selectedOptions = Array.isArray(value.text) ? value.text : [value.text];
+                  } else if (value.selected) {
+                    selectedOptions = Array.isArray(value.selected) ? value.selected : [value.selected];
+                  }
+                } else if (typeof value === 'string') {
+                  selectedOptions = [value];
+                }
+
+                // Count each selected option
+                selectedOptions.forEach(option => {
+                  const optionStr = String(option);
+                  questionBreakdown[questionId].breakdown[optionStr] =
+                    (questionBreakdown[questionId].breakdown[optionStr] || 0) + 1;
+                });
+
+              } else if (question.type === 'yes_no') {
+                // Count yes/no responses
+                const value = answer.value;
+                let boolValue: string;
+
+                if (typeof value === 'boolean') {
+                  boolValue = value ? 'Yes' : 'No';
+                } else if (typeof value === 'object' && value !== null) {
+                  boolValue = value.text === true || value.text === 'true' || value.text === 'Yes' ? 'Yes' : 'No';
+                } else {
+                  boolValue = String(value) === 'true' || String(value) === 'Yes' ? 'Yes' : 'No';
+                }
+
+                questionBreakdown[questionId].breakdown[boolValue] =
+                  (questionBreakdown[questionId].breakdown[boolValue] || 0) + 1;
+
+              } else if (question.type === 'short_text' || question.type === 'long_text') {
+                // For text questions, just store the raw answer for potential later display
+                questionBreakdown[questionId].answers.push({
+                  responseId: response.id,
+                  value: answer.value
+                });
+
+              } else if (question.type === 'date_time') {
+                // Store date/time responses
+                questionBreakdown[questionId].answers.push({
+                  responseId: response.id,
+                  value: answer.value
+                });
+
+              } else if (question.type === 'file_upload') {
+                // Count file uploads
+                questionBreakdown[questionId].answers.push({
+                  responseId: response.id,
+                  value: 'File uploaded'
+                });
+
+              } else if (question.type === 'loop_group') {
+                // For loop groups, count iterations
+                questionBreakdown[questionId].answers.push({
+                  responseId: response.id,
+                  value: answer.value
+                });
+              }
+            }
+          }
+        }
+
+        // Convert breakdown object to array for easier frontend consumption
+        if (Object.keys(questionBreakdown[questionId].breakdown).length > 0) {
+          questionBreakdown[questionId].breakdownArray = Object.entries(
+            questionBreakdown[questionId].breakdown
+          ).map(([option, count]) => ({
+            option,
+            count: count as number,
+            percentage: questionBreakdown[questionId].totalResponses > 0
+              ? ((count as number) / questionBreakdown[questionId].totalResponses) * 100
+              : 0
+          }));
+        }
+
+        // For text questions, only include count (not the actual text)
+        if (question.type === 'short_text' || question.type === 'long_text') {
+          questionBreakdown[questionId].textResponseCount = questionBreakdown[questionId].answers.length;
+          delete questionBreakdown[questionId].answers; // Don't send actual text in summary
+        }
+      }
+
+      res.json({
+        totalResponses,
+        completedResponses: completedCount,
+        completionRate: Math.round(completionRate * 10) / 10,
+        questionBreakdown: Object.values(questionBreakdown)
+      });
+    } catch (error) {
+      console.error("Error fetching survey results:", error);
+      res.status(500).json({ message: "Failed to fetch survey results" });
     }
   });
 

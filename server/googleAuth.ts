@@ -173,9 +173,10 @@ export async function setupAuth(app: Express) {
   // Google OAuth2 login route - accepts ID token from frontend
   app.post("/api/auth/google", authRateLimit, async (req, res) => {
     try {
-      const { token } = req.body;
-      
-      if (!token) {
+      const { token, idToken } = req.body;
+      const googleToken = token || idToken; // Accept both 'token' and 'idToken' for compatibility
+
+      if (!googleToken) {
         return res.status(400).json({ message: "ID token is required" });
       }
 
@@ -186,7 +187,7 @@ export async function setupAuth(app: Express) {
       }
 
       // Verify the Google ID token
-      const payload = await verifyGoogleToken(token);
+      const payload = await verifyGoogleToken(googleToken);
       
       // Create user session data
       const user: any = {};
