@@ -21,13 +21,21 @@ export async function sendEmail(params: EmailParams): Promise<{ success: boolean
 
     mailService.setApiKey(process.env.SENDGRID_API_KEY);
 
-    await mailService.send({
+    const mailData: any = {
       to: params.to,
       from: params.from,
       subject: params.subject,
-      text: params.text,
-      html: params.html,
-    });
+    };
+
+    if (params.text) {
+      mailData.text = params.text;
+    }
+
+    if (params.html) {
+      mailData.html = params.html;
+    }
+
+    await mailService.send(mailData);
     
     console.log(`Email sent successfully to ${params.to}`);
     return { success: true };
@@ -123,8 +131,12 @@ Sent from Poll Vault
   `;
 
   // Use provided fromEmail or fallback to environment variable or default
-  const senderEmail = fromEmail || process.env.SENDGRID_FROM_EMAIL || 'noreply@pollvault.com';
-  
+  const senderEmail = fromEmail || process.env.SENDGRID_FROM_EMAIL;
+
+  if (!senderEmail) {
+    return { success: false, error: 'Sender email not configured. Please set SENDGRID_FROM_EMAIL environment variable.' };
+  }
+
   return await sendEmail({
     to: recipientEmail,
     from: senderEmail,

@@ -362,10 +362,11 @@ export function registerSurveyRoutes(app: Express): void {
                 if (Array.isArray(value)) {
                   selectedOptions = value;
                 } else if (typeof value === 'object' && value !== null) {
-                  if (value.text) {
-                    selectedOptions = Array.isArray(value.text) ? value.text : [value.text];
-                  } else if (value.selected) {
-                    selectedOptions = Array.isArray(value.selected) ? value.selected : [value.selected];
+                  const valueObj = value as Record<string, any>;
+                  if (valueObj.text) {
+                    selectedOptions = Array.isArray(valueObj.text) ? valueObj.text : [valueObj.text];
+                  } else if (valueObj.selected) {
+                    selectedOptions = Array.isArray(valueObj.selected) ? valueObj.selected : [valueObj.selected];
                   }
                 } else if (typeof value === 'string') {
                   selectedOptions = [value];
@@ -384,7 +385,8 @@ export function registerSurveyRoutes(app: Express): void {
                 if (typeof value === 'boolean') {
                   boolValue = value ? 'Yes' : 'No';
                 } else if (typeof value === 'object' && value !== null) {
-                  boolValue = value.text === true || value.text === 'true' || value.text === 'Yes' ? 'Yes' : 'No';
+                  const valueObj = value as Record<string, any>;
+                  boolValue = valueObj.text === true || valueObj.text === 'true' || valueObj.text === 'Yes' ? 'Yes' : 'No';
                 } else {
                   boolValue = String(value) === 'true' || String(value) === 'Yes' ? 'Yes' : 'No';
                 }

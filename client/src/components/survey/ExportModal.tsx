@@ -48,7 +48,8 @@ export default function ExportModal({ surveyId, surveyTitle, isOpen, onClose }: 
   const exportMutation = useMutation<ExportResponse, Error, ExportOptions>({
     mutationFn: async (options: ExportOptions): Promise<ExportResponse> => {
       const response = await apiRequest("POST", `/api/surveys/${surveyId}/export`, options);
-      return response as ExportResponse;
+      const data = await response.json();
+      return data as ExportResponse;
     },
     onSuccess: (data) => {
       setDownloadInfo(data);

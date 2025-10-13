@@ -169,15 +169,15 @@ class ExportService {
 
     for (const response of responses) {
       const answers = await storage.getAnswersWithQuestionsByResponse(response.id);
-      const recipient = await storage.getRecipient(response.recipientId);
-      
+      const recipient = response.recipientId ? await storage.getRecipient(response.recipientId) : null;
+
       const record: Record<string, any> = {
         response_id: response.id,
         recipient_name: recipient?.name || '',
         recipient_email: recipient?.email || '',
         completed: response.completed ? 'Yes' : 'No',
-        submitted_at: response.submittedAt ? format(new Date(response.submittedAt!), 'yyyy-MM-dd HH:mm:ss') : '',
-        created_at: format(new Date(response.createdAt!), 'yyyy-MM-dd HH:mm:ss')
+        submitted_at: response.submittedAt ? format(new Date(response.submittedAt), 'yyyy-MM-dd HH:mm:ss') : '',
+        created_at: response.createdAt ? format(new Date(response.createdAt), 'yyyy-MM-dd HH:mm:ss') : ''
       };
 
       // Filter questions if specified
@@ -343,7 +343,7 @@ class ExportService {
     // Response summary table
     const responseData = [];
     for (const response of responses.slice(0, 20)) { // Limit to first 20 for PDF
-      const recipient = await storage.getRecipient(response.recipientId);
+      const recipient = response.recipientId ? await storage.getRecipient(response.recipientId) : null;
       responseData.push([
         response.id.slice(-8),
         recipient?.name || 'Unknown',

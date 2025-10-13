@@ -177,13 +177,17 @@ export default function SurveyPreview() {
                     <div key={question.id} className="p-4 bg-muted/30 rounded-lg">
                       <QuestionRenderer
                         question={{
-                          ...question,
+                          id: question.id,
+                          type: question.type,
+                          title: question.title,
                           description: question.description || undefined,
                           required: question.required || false,
-                        }}
+                          options: question.options as (string | { text: string; value: string })[] | undefined,
+                          loopConfig: question.loopConfig as any,
+                          subquestions: (question as any).subquestions,
+                        } as any}
                         value={answers[question.id]}
                         onChange={(value) => handleAnswerChange(question.id, value)}
-                        disabled={false}
                       />
                     </div>
                   ))
