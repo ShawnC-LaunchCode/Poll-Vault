@@ -52,8 +52,13 @@ import {
   type AnonymousSurveyConfig,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, count, sql, gte, inArray } from "drizzle-orm";
+import { eq, desc, and, count, sql, gte, inArray, type ExtractTablesWithRelations } from "drizzle-orm";
+import type { PgTransaction } from "drizzle-orm/pg-core";
+import type { NodePgQueryResultHKT } from "drizzle-orm/node-postgres";
 import { randomUUID } from "crypto";
+
+// Type alias for database transactions
+type DbTransaction = PgTransaction<NodePgQueryResultHKT, Record<string, never>, ExtractTablesWithRelations<Record<string, never>>>;
 
 export interface IStorage {
   // Health check operations
@@ -280,7 +285,7 @@ export class DatabaseStorage implements IStorage {
       description: survey.description?.substring(0, 100) 
     });
     
-    return await db.transaction(async (tx) => {
+    return await db.transaction(async (tx: DbTransaction) => {
       try {
         const [newSurvey] = await tx.insert(surveys).values(survey).returning();
         
@@ -365,7 +370,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async bulkReorderPages(surveyId: string, pageOrders: Array<{ id: string; order: number }>): Promise<SurveyPage[]> {
-    return await db.transaction(async (tx) => {
+    return await db.transaction(async (tx: DbTransaction) => {
       const reorderedPages: SurveyPage[] = [];
 
       for (const { id, order } of pageOrders) {
@@ -417,7 +422,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async bulkReorderQuestions(surveyId: string, questionOrders: Array<{ id: string; pageId: string; order: number }>): Promise<Question[]> {
-    return await db.transaction(async (tx) => {
+    return await db.transaction(async (tx: DbTransaction) => {
       const reorderedQuestions: Question[] = [];
 
       for (const { id, pageId, order } of questionOrders) {
@@ -681,8 +686,8 @@ export class DatabaseStorage implements IStorage {
       .from(recipients)
       .where(eq(recipients.surveyId, surveyId));
 
-    const existingEmails = new Set(existingRecipients.map(r => r.email.toLowerCase()));
-    const recipientsToAdd = globalRecipientsToAdd.filter(gr => 
+    const existingEmails = new Set(existingRecipients.map((r: typeof recipients.$inferSelect) => r.email.toLowerCase()));
+    const recipientsToAdd = globalRecipientsToAdd.filter((gr: typeof globalRecipients.$inferSelect) =>
       !existingEmails.has(gr.email.toLowerCase())
     );
 
@@ -718,8 +723,8 @@ export class DatabaseStorage implements IStorage {
       .from(recipients)
       .where(eq(recipients.surveyId, surveyId));
 
-    const existingEmails = new Set(existingRecipients.map(r => r.email.toLowerCase()));
-    return emails.filter(email => existingEmails.has(email.toLowerCase()));
+    const existingEmails = new Set(existingRecipients.map((r: typeof recipients.$inferSelect) => r.email.toLowerCase()));
+    return emails.filter((email: string) => existingEmails.has(email.toLowerCase()));
   }
   
   // Response operations
@@ -809,7 +814,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(answers.responseId, responseId))
       .orderBy(questions.order);
     
-    return result.map(row => ({
+    return result.map((row: any) => ({
       id: row.id,
       responseId: row.responseId,
       questionId: row.questionId,
@@ -1041,10 +1046,10 @@ export class DatabaseStorage implements IStorage {
         );
         
       const avgCompletionTime = dayTimeData.length > 0
-        ? dayTimeData.reduce((sum, event) => sum + (event.duration || 0), 0) / dayTimeData.length / 60000
+        ? dayTimeData.reduce((sum: number, event: any) => sum + (event.duration || 0), 0) / dayTimeData.length / 60000
         : 0;
-        
-      const totalTimeSpent = dayTimeData.reduce((sum, event) => sum + (event.duration || 0), 0) / 60000;
+
+      const totalTimeSpent = dayTimeData.reduce((sum: number, event: any) => sum + (event.duration || 0), 0) / 60000;
       
       trendsWithTime.push({
         date: row.date,
@@ -1194,11 +1199,11 @@ export class DatabaseStorage implements IStorage {
       const totalViews = viewsResult.count;
       const totalAnswers = answersResult.count;
       const totalSkips = skipsResult.count;
-      const avgTimeSpent = timeEvents.length > 0 
-        ? timeEvents.reduce((sum, event) => sum + (event.duration || 0), 0) / timeEvents.length / 1000
+      const avgTimeSpent = timeEvents.length > 0
+        ? timeEvents.reduce((sum: number, event: any) => sum + (event.duration || 0), 0) / timeEvents.length / 1000
         : 0;
-      
-      const sortedTimes = timeEvents.map(e => e.duration || 0).sort((a, b) => a - b);
+
+      const sortedTimes = timeEvents.map((e: any) => e.duration || 0).sort((a: number, b: number) => a - b);
       const medianTimeSpent = sortedTimes.length > 0
         ? sortedTimes[Math.floor(sortedTimes.length / 2)] / 1000
         : 0;
@@ -1276,10 +1281,10 @@ export class DatabaseStorage implements IStorage {
       const totalViews = viewsResult.count;
       const totalCompletions = completionsResult.count;
       const avgTimeSpent = pageTimeEvents.length > 0
-        ? pageTimeEvents.reduce((sum, event) => sum + (event.duration || 0), 0) / pageTimeEvents.length / 1000
+        ? pageTimeEvents.reduce((sum: number, event: any) => sum + (event.duration || 0), 0) / pageTimeEvents.length / 1000
         : 0;
-      
-      const sortedTimes = pageTimeEvents.map(e => e.duration || 0).sort((a, b) => a - b);
+
+      const sortedTimes = pageTimeEvents.map((e: any) => e.duration || 0).sort((a: number, b: number) => a - b);
       const medianTimeSpent = sortedTimes.length > 0
         ? sortedTimes[Math.floor(sortedTimes.length / 2)] / 1000
         : 0;
@@ -1345,15 +1350,15 @@ export class DatabaseStorage implements IStorage {
           )
         );
 
-      const totalTime = events.reduce((sum, event) => sum + (event.duration || 0), 0);
-      
+      const totalTime = events.reduce((sum: number, event: any) => sum + (event.duration || 0), 0);
+
       const pageTimeSpent = events
-        .filter(e => e.pageId && e.event === 'page_leave')
-        .map(e => ({ pageId: e.pageId!, duration: e.duration || 0 }));
-      
+        .filter((e: any) => e.pageId && e.event === 'page_leave')
+        .map((e: any) => ({ pageId: e.pageId!, duration: e.duration || 0 }));
+
       const questionTimeSpent = events
-        .filter(e => e.questionId && (e.event === 'question_answer' || e.event === 'question_skip'))
-        .map(e => ({ questionId: e.questionId!, duration: e.duration || 0 }));
+        .filter((e: any) => e.questionId && (e.event === 'question_answer' || e.event === 'question_skip'))
+        .map((e: any) => ({ questionId: e.questionId!, duration: e.duration || 0 }));
 
       timeSpentData.push({
         surveyId,
@@ -1415,7 +1420,7 @@ export class DatabaseStorage implements IStorage {
       .groupBy(sql`EXTRACT(HOUR FROM timestamp)`);
 
     const peakEngagementHour = completionTrends.length > 0
-      ? completionTrends.reduce((max, current) => current.completions > max.completions ? current : max).hour
+      ? completionTrends.reduce((max: any, current: any) => current.completions > max.completions ? current : max).hour
       : 12; // Default to noon
 
     return {
@@ -1424,7 +1429,7 @@ export class DatabaseStorage implements IStorage {
       bounceRate,
       engagementScore,
       peakEngagementHour,
-      completionTrends: completionTrends.map(trend => ({ hour: trend.hour, completions: trend.completions })),
+      completionTrends: completionTrends.map((trend: any) => ({ hour: trend.hour, completions: trend.completions })),
     };
   }
 
@@ -1635,7 +1640,7 @@ export class DatabaseStorage implements IStorage {
 
   async getFilesByAnswer(answerId: string): Promise<FileMetadata[]> {
     const fileList = await db.select().from(files).where(eq(files.answerId, answerId));
-    return fileList.map(file => ({
+    return fileList.map((file: any) => ({
       id: file.id,
       answerId: file.answerId,
       filename: file.filename,
@@ -1702,8 +1707,8 @@ export class DatabaseStorage implements IStorage {
 
   async enableAnonymousAccess(surveyId: string, config: { accessType: string; anonymousConfig?: AnonymousSurveyConfig }): Promise<Survey> {
     console.log('Enabling anonymous access in database for survey:', surveyId);
-    
-    return await db.transaction(async (tx) => {
+
+    return await db.transaction(async (tx: DbTransaction) => {
       // First verify the survey exists within transaction
       const [existingSurvey] = await tx.select().from(surveys).where(eq(surveys.id, surveyId));
       if (!existingSurvey) {

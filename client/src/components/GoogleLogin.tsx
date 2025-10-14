@@ -36,9 +36,28 @@ export function GoogleLogin({ onSuccess, onError, 'data-testid': testId }: Googl
 
       onSuccess?.();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Login failed';
       console.error('Google login error:', error);
-      
+
+      // Extract error message from API error response
+      let errorMessage = 'Login failed';
+
+      if (error instanceof Error) {
+        // Try to parse structured error from API response
+        // Format: "401: {\"message\":\"...\",\"error\":\"...\"}"
+        const jsonMatch = error.message.match(/\d+:\s*(.+)/);
+        if (jsonMatch?.[1]) {
+          try {
+            const errorData = JSON.parse(jsonMatch[1]);
+            errorMessage = errorData.message || errorMessage;
+          } catch {
+            // If JSON parsing fails, use the original error message
+            errorMessage = error.message;
+          }
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
       toast({
         title: 'Login Failed',
         description: errorMessage,

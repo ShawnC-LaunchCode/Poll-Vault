@@ -82,13 +82,13 @@ export async function validateSurveyForPublish(
       .where(
         eq(
           questions.pageId,
-          pages.map((p) => p.id)[0]
+          pages.map((p: typeof surveyPages.$inferSelect) => p.id)[0]
         )
       );
 
     // Get questions for all pages
     const questionCounts = await Promise.all(
-      pages.map(async (page) => {
+      pages.map(async (page: typeof surveyPages.$inferSelect) => {
         const pageQuestions = await db
           .select()
           .from(questions)
