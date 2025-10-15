@@ -8,16 +8,17 @@ import Header from "@/components/layout/Header";
 import StatsCard from "@/components/ui/stats-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { SkeletonList } from "@/components/shared/SkeletonList";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AnalyticsCharts } from "@/components/dashboard/AnalyticsCharts";
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
 import { SurveyManagement } from "@/components/dashboard/SurveyManagement";
 import { Link } from "wouter";
-import { 
-  FileText, PlayCircle, TrendingUp, Percent, History, 
+import {
+  FileText, PlayCircle, TrendingUp, Percent, History,
   Home, PieChart, Settings, Zap, Plus, ChevronRight,
-  BarChart3, Download, Clock, ExternalLink 
+  BarChart3, Download, Clock, ExternalLink
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -74,20 +75,6 @@ export default function Dashboard() {
   if (isLoading || !isAuthenticated) {
     return null;
   }
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-      case 'open':
-        return <Badge className="bg-success/10 text-success hover:bg-success/20">Active</Badge>;
-      case 'draft':
-        return <Badge className="bg-warning/10 text-warning hover:bg-warning/20">Draft</Badge>;
-      case 'closed':
-        return <Badge variant="secondary">Closed</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
 
   return (
     <div className="flex h-screen bg-background">
@@ -245,20 +232,7 @@ export default function Dashboard() {
                   </CardHeader>
                   <CardContent>
                     {surveysLoading ? (
-                      <div className="space-y-4">
-                        {[1, 2, 3].map((i) => (
-                          <div key={i} className="flex items-center justify-between p-3 border border-border rounded-lg animate-pulse">
-                            <div className="flex items-center space-x-3">
-                              <div className="w-8 h-8 bg-muted rounded-lg"></div>
-                              <div>
-                                <div className="h-4 bg-muted rounded w-32 mb-2"></div>
-                                <div className="h-3 bg-muted rounded w-24"></div>
-                              </div>
-                            </div>
-                            <div className="w-16 h-5 bg-muted rounded"></div>
-                          </div>
-                        ))}
-                      </div>
+                      <SkeletonList count={3} showAvatar />
                     ) : surveys && surveys.length > 0 ? (
                       <div className="space-y-3">
                         {surveys.slice(0, 4).map((survey) => (
@@ -278,7 +252,7 @@ export default function Dashboard() {
                                 </div>
                               </div>
                               <div className="flex items-center space-x-2">
-                                {getStatusBadge(survey.status)}
+                                <StatusBadge status={survey.status} />
                                 <ExternalLink className="h-4 w-4 text-muted-foreground" />
                               </div>
                             </div>

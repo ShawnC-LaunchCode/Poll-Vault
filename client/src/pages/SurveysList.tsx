@@ -11,7 +11,8 @@ import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { SkeletonCard } from "@/components/shared/SkeletonCard";
 import { Link } from "wouter";
 import { Plus, Edit, BarChart, Users, Trash2, FileText } from "lucide-react";
 
@@ -84,20 +85,6 @@ export default function SurveysList() {
     return null;
   }
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-      case 'open':
-        return <Badge className="bg-success/10 text-success hover:bg-success/20">Active</Badge>;
-      case 'draft':
-        return <Badge className="bg-warning/10 text-warning hover:bg-warning/20">Draft</Badge>;
-      case 'closed':
-        return <Badge variant="secondary">Closed</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
-
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
@@ -121,18 +108,7 @@ export default function SurveysList() {
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
             {surveysLoading ? (
               // Loading State
-              Array.from({ length: 6 }).map((_, i) => (
-                <Card key={i} className="h-48">
-                  <CardContent className="p-6">
-                    <div className="animate-pulse">
-                      <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
-                      <div className="h-3 bg-muted rounded w-1/2 mb-4"></div>
-                      <div className="h-20 bg-muted rounded mb-4"></div>
-                      <div className="h-3 bg-muted rounded w-1/4"></div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
+              <SkeletonCard count={6} height="h-48" />
             ) : surveys && surveys.length > 0 ? (
               surveys.map((survey) => (
                 <Card key={survey.id} className="hover:shadow-md transition-shadow min-h-[220px]">
@@ -141,7 +117,7 @@ export default function SurveysList() {
                       <CardTitle className="text-lg font-semibold text-foreground line-clamp-2" data-testid={`text-survey-title-${survey.id}`}>
                         {survey.title}
                       </CardTitle>
-                      {getStatusBadge(survey.status)}
+                      <StatusBadge status={survey.status} />
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0">

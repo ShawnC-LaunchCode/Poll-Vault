@@ -1,4 +1,4 @@
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { ConfirmationDialog } from "@/components/shared/ConfirmationDialog";
 import { Button } from "@/components/ui/button";
 import { Mail } from "lucide-react";
 
@@ -18,32 +18,21 @@ export function SendInvitationsDialog({
   isPending
 }: SendInvitationsDialogProps) {
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogTrigger asChild>
+    <ConfirmationDialog
+      trigger={
         <Button data-testid="button-send-invitations">
           <Mail className="w-4 h-4 mr-2" />
           Send Invitations ({selectedCount})
         </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Send Survey Invitations</AlertDialogTitle>
-          <AlertDialogDescription>
-            Are you sure you want to send invitations to {selectedCount} selected recipient(s)?
-            This will send personalized email invitations with unique survey links.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={onConfirm}
-            disabled={isPending}
-            data-testid="button-confirm-send-invitations"
-          >
-            {isPending ? "Sending..." : "Send Invitations"}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+      }
+      title="Send Survey Invitations"
+      description={`Are you sure you want to send invitations to ${selectedCount} selected recipient(s)? This will send personalized email invitations with unique survey links.`}
+      confirmText="Send Invitations"
+      onConfirm={onConfirm}
+      isPending={isPending}
+      open={open}
+      onOpenChange={onOpenChange}
+      confirmTestId="button-confirm-send-invitations"
+    />
   );
 }
