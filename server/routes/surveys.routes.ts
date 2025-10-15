@@ -28,7 +28,11 @@ export function registerSurveyRoutes(app: Express): void {
         return res.status(401).json({ message: "Unauthorized - no user ID" });
       }
 
-      const surveyData = insertSurveySchema.parse(req.body);
+      // Add creatorId to request body before validation
+      const surveyData = insertSurveySchema.parse({
+        ...req.body,
+        creatorId: userId
+      });
       const survey = await surveyService.createSurvey(surveyData, userId);
 
       res.json(survey);
