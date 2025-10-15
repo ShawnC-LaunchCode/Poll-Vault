@@ -1,12 +1,7 @@
 import {
-  users,
   surveys,
   surveyPages,
   questions,
-  loopGroupSubquestions,
-  conditionalRules,
-  recipients,
-  globalRecipients,
   responses,
   answers,
   analyticsEvents,
@@ -56,6 +51,18 @@ import { eq, desc, and, count, sql, gte, inArray, type ExtractTablesWithRelation
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import type { NodePgQueryResultHKT } from "drizzle-orm/node-postgres";
 import { randomUUID } from "crypto";
+
+// Import repositories
+import {
+  userRepository,
+  surveyRepository,
+  pageRepository,
+  questionRepository,
+  recipientRepository,
+  responseRepository,
+  analyticsRepository,
+  fileRepository,
+} from "./repositories";
 
 // Type alias for database transactions
 type DbTransaction = PgTransaction<NodePgQueryResultHKT, Record<string, never>, ExtractTablesWithRelations<Record<string, never>>>;
@@ -203,658 +210,258 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   // Health check operations
   async ping(): Promise<boolean> {
-    try {
-      // Simple database connectivity test using SELECT 1
-      await db.execute(sql`SELECT 1`);
-      return true;
-    } catch (error) {
-      console.error('Database ping failed:', error);
-      return false;
-    }
+    return await userRepository.ping();
   }
 
   // User operations (required for Google Auth)
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+    return await userRepository.findById(id);
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
-    try {
-      // First, try to find existing user by email
-      if (userData.email) {
-        const existingUser = await db.select().from(users).where(eq(users.email, userData.email));
-        
-        if (existingUser.length > 0) {
-          // Update existing user with new data
-          const [updatedUser] = await db
-            .update(users)
-            .set({
-              ...userData,
-              updatedAt: new Date(),
-            })
-            .where(eq(users.email, userData.email))
-            .returning();
-          return updatedUser;
-        }
-      }
-
-      // If no existing user found, insert new user
-      // Handle conflict on ID in case it's provided and already exists
-      const [user] = await db
-        .insert(users)
-        .values(userData)
-        .onConflictDoUpdate({
-          target: users.id,
-          set: {
-            ...userData,
-            updatedAt: new Date(),
-          },
-        })
-        .returning();
-      return user;
-    } catch (error) {
-      // If we still get a constraint violation, it could be due to race conditions
-      // Try to find the existing user again and update
-      if (error instanceof Error && error.message.includes('duplicate key') && userData.email) {
-        const existingUser = await db.select().from(users).where(eq(users.email, userData.email));
-        
-        if (existingUser.length > 0) {
-          const [updatedUser] = await db
-            .update(users)
-            .set({
-              ...userData,
-              updatedAt: new Date(),
-            })
-            .where(eq(users.email, userData.email))
-            .returning();
-          return updatedUser;
-        }
-      }
-      
-      // If we can't handle the error, re-throw it
-      throw error;
-    }
+    return await userRepository.upsert(userData);
   }
   
   // Survey operations
   async createSurvey(survey: InsertSurvey): Promise<Survey> {
-    console.log('Creating survey in database:', { 
-      title: survey.title, 
-      creatorId: survey.creatorId,
-      description: survey.description?.substring(0, 100) 
-    });
-    
-    return await db.transaction(async (tx: DbTransaction) => {
-      try {
-        const [newSurvey] = await tx.insert(surveys).values(survey).returning();
-        
-        console.log('Survey created in database successfully:', { 
-          id: newSurvey.id, 
-          title: newSurvey.title,
-          status: newSurvey.status 
-        });
-        
-        // Verify the survey was actually saved within the transaction
-        const [verification] = await tx.select().from(surveys).where(eq(surveys.id, newSurvey.id));
-        if (!verification) {
-          console.error('CRITICAL: Survey not found immediately after creation within transaction!', newSurvey.id);
-          throw new Error('Survey creation failed - survey not persisted to database');
-        }
-        
-        console.log('Survey creation verified successfully within transaction');
-        return newSurvey;
-      } catch (error) {
-        console.error('Database error creating survey:', error);
-        throw error;
-      }
-    });
+    return await surveyRepository.create(survey);
   }
 
   async getSurvey(id: string): Promise<Survey | undefined> {
-    const [survey] = await db.select().from(surveys).where(eq(surveys.id, id));
-    return survey;
+    return await surveyRepository.findById(id);
   }
 
   async getSurveysByCreator(creatorId: string): Promise<Survey[]> {
-    return await db
-      .select()
-      .from(surveys)
-      .where(eq(surveys.creatorId, creatorId))
-      .orderBy(desc(surveys.updatedAt));
+    return await surveyRepository.findByCreator(creatorId);
   }
 
   async updateSurvey(id: string, updates: Partial<InsertSurvey>): Promise<Survey> {
-    const [updatedSurvey] = await db
-      .update(surveys)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(surveys.id, id))
-      .returning();
-    return updatedSurvey;
+    return await surveyRepository.update(id, updates);
   }
 
   async deleteSurvey(id: string): Promise<void> {
-    await db.delete(surveys).where(eq(surveys.id, id));
+    await surveyRepository.delete(id);
   }
   
   // Survey page operations
   async createSurveyPage(page: InsertSurveyPage): Promise<SurveyPage> {
-    const [newPage] = await db.insert(surveyPages).values(page).returning();
-    return newPage;
+    return await pageRepository.create(page);
   }
 
   async getSurveyPage(id: string): Promise<SurveyPage | undefined> {
-    const [page] = await db.select().from(surveyPages).where(eq(surveyPages.id, id));
-    return page;
+    return await pageRepository.findById(id);
   }
 
   async getSurveyPages(surveyId: string): Promise<SurveyPage[]> {
-    return await db
-      .select()
-      .from(surveyPages)
-      .where(eq(surveyPages.surveyId, surveyId))
-      .orderBy(surveyPages.order);
+    return await pageRepository.findBySurvey(surveyId);
   }
 
   async updateSurveyPage(id: string, updates: Partial<InsertSurveyPage>): Promise<SurveyPage> {
-    const [updatedPage] = await db
-      .update(surveyPages)
-      .set(updates)
-      .where(eq(surveyPages.id, id))
-      .returning();
-    return updatedPage;
+    return await pageRepository.update(id, updates);
   }
 
   async deleteSurveyPage(id: string): Promise<void> {
-    await db.delete(surveyPages).where(eq(surveyPages.id, id));
+    await pageRepository.delete(id);
   }
 
   async bulkReorderPages(surveyId: string, pageOrders: Array<{ id: string; order: number }>): Promise<SurveyPage[]> {
-    return await db.transaction(async (tx: DbTransaction) => {
-      const reorderedPages: SurveyPage[] = [];
-
-      for (const { id, order } of pageOrders) {
-        const [updatedPage] = await tx
-          .update(surveyPages)
-          .set({ order })
-          .where(and(eq(surveyPages.id, id), eq(surveyPages.surveyId, surveyId)))
-          .returning();
-
-        if (updatedPage) {
-          reorderedPages.push(updatedPage);
-        }
-      }
-
-      return reorderedPages;
-    });
+    return await pageRepository.bulkReorder(surveyId, pageOrders);
   }
 
   // Question operations
   async createQuestion(question: InsertQuestion): Promise<Question> {
-    const [newQuestion] = await db.insert(questions).values(question).returning();
-    return newQuestion;
+    return await questionRepository.create(question);
   }
 
   async getQuestionsByPage(pageId: string): Promise<Question[]> {
-    return await db
-      .select()
-      .from(questions)
-      .where(eq(questions.pageId, pageId))
-      .orderBy(questions.order);
+    return await questionRepository.findByPage(pageId);
   }
 
   async updateQuestion(id: string, updates: Partial<InsertQuestion>): Promise<Question> {
-    const [updatedQuestion] = await db
-      .update(questions)
-      .set(updates)
-      .where(eq(questions.id, id))
-      .returning();
-    return updatedQuestion;
+    return await questionRepository.update(id, updates);
   }
 
   async getQuestion(id: string): Promise<Question | undefined> {
-    const [question] = await db.select().from(questions).where(eq(questions.id, id));
-    return question;
+    return await questionRepository.findById(id);
   }
 
   async deleteQuestion(id: string): Promise<void> {
-    await db.delete(questions).where(eq(questions.id, id));
+    await questionRepository.delete(id);
   }
 
   async bulkReorderQuestions(surveyId: string, questionOrders: Array<{ id: string; pageId: string; order: number }>): Promise<Question[]> {
-    return await db.transaction(async (tx: DbTransaction) => {
-      const reorderedQuestions: Question[] = [];
-
-      for (const { id, pageId, order } of questionOrders) {
-        // Verify the question belongs to a page in this survey
-        const [page] = await tx
-          .select()
-          .from(surveyPages)
-          .where(and(eq(surveyPages.id, pageId), eq(surveyPages.surveyId, surveyId)));
-
-        if (!page) {
-          throw new Error(`Page ${pageId} does not belong to survey ${surveyId}`);
-        }
-
-        const [updatedQuestion] = await tx
-          .update(questions)
-          .set({ pageId, order })
-          .where(eq(questions.id, id))
-          .returning();
-
-        if (updatedQuestion) {
-          reorderedQuestions.push(updatedQuestion);
-        }
-      }
-
-      return reorderedQuestions;
-    });
+    return await questionRepository.bulkReorder(surveyId, questionOrders);
   }
 
   async getQuestionsWithSubquestionsByPage(pageId: string): Promise<QuestionWithSubquestions[]> {
-    const questionsData = await db
-      .select()
-      .from(questions)
-      .where(eq(questions.pageId, pageId))
-      .orderBy(questions.order);
-
-    const result: QuestionWithSubquestions[] = [];
-    
-    for (const question of questionsData) {
-      if (question.type === 'loop_group') {
-        const subquestions = await this.getLoopGroupSubquestions(question.id);
-        result.push({ ...question, subquestions });
-      } else {
-        result.push(question);
-      }
-    }
-    
-    return result;
+    return await questionRepository.findByPageWithSubquestions(pageId);
   }
-  
+
   // Loop group subquestion operations
   async createLoopGroupSubquestion(subquestion: InsertLoopGroupSubquestion): Promise<LoopGroupSubquestion> {
-    const [newSubquestion] = await db.insert(loopGroupSubquestions).values(subquestion).returning();
-    return newSubquestion;
+    return await questionRepository.createSubquestion(subquestion);
   }
 
   async getLoopGroupSubquestion(id: string): Promise<LoopGroupSubquestion | undefined> {
-    const [subquestion] = await db.select().from(loopGroupSubquestions).where(eq(loopGroupSubquestions.id, id));
-    return subquestion;
+    return await questionRepository.findSubquestionById(id);
   }
 
   async getLoopGroupSubquestions(loopQuestionId: string): Promise<LoopGroupSubquestion[]> {
-    return await db
-      .select()
-      .from(loopGroupSubquestions)
-      .where(eq(loopGroupSubquestions.loopQuestionId, loopQuestionId))
-      .orderBy(loopGroupSubquestions.order);
+    return await questionRepository.findSubquestionsByLoopId(loopQuestionId);
   }
 
   async updateLoopGroupSubquestion(id: string, updates: Partial<InsertLoopGroupSubquestion>): Promise<LoopGroupSubquestion> {
-    const [updatedSubquestion] = await db
-      .update(loopGroupSubquestions)
-      .set(updates)
-      .where(eq(loopGroupSubquestions.id, id))
-      .returning();
-    return updatedSubquestion;
+    return await questionRepository.updateSubquestion(id, updates);
   }
 
   async deleteLoopGroupSubquestion(id: string): Promise<void> {
-    await db.delete(loopGroupSubquestions).where(eq(loopGroupSubquestions.id, id));
+    await questionRepository.deleteSubquestion(id);
   }
 
   async deleteLoopGroupSubquestionsByLoopId(loopQuestionId: string): Promise<void> {
-    await db.delete(loopGroupSubquestions).where(eq(loopGroupSubquestions.loopQuestionId, loopQuestionId));
+    await questionRepository.deleteSubquestionsByLoopId(loopQuestionId);
   }
-  
+
   // Conditional rules operations
   async createConditionalRule(rule: InsertConditionalRule): Promise<ConditionalRule> {
-    const [newRule] = await db.insert(conditionalRules).values(rule).returning();
-    return newRule;
+    return await questionRepository.createConditionalRule(rule);
   }
 
   async getConditionalRule(id: string): Promise<ConditionalRule | undefined> {
-    const [rule] = await db.select().from(conditionalRules).where(eq(conditionalRules.id, id));
-    return rule;
+    return await questionRepository.findConditionalRuleById(id);
   }
 
   async getConditionalRulesBySurvey(surveyId: string): Promise<ConditionalRule[]> {
-    return await db
-      .select()
-      .from(conditionalRules)
-      .where(eq(conditionalRules.surveyId, surveyId))
-      .orderBy(conditionalRules.order);
+    return await questionRepository.findConditionalRulesBySurvey(surveyId);
   }
 
   async getConditionalRulesByQuestion(questionId: string): Promise<ConditionalRule[]> {
-    return await db
-      .select()
-      .from(conditionalRules)
-      .where(eq(conditionalRules.targetQuestionId, questionId))
-      .orderBy(conditionalRules.order);
+    return await questionRepository.findConditionalRulesByQuestion(questionId);
   }
 
   async updateConditionalRule(id: string, updates: Partial<InsertConditionalRule>): Promise<ConditionalRule> {
-    const [updatedRule] = await db
-      .update(conditionalRules)
-      .set(updates)
-      .where(eq(conditionalRules.id, id))
-      .returning();
-    return updatedRule;
+    return await questionRepository.updateConditionalRule(id, updates);
   }
 
   async deleteConditionalRule(id: string): Promise<void> {
-    await db.delete(conditionalRules).where(eq(conditionalRules.id, id));
+    await questionRepository.deleteConditionalRule(id);
   }
 
   async deleteConditionalRulesBySurvey(surveyId: string): Promise<void> {
-    await db.delete(conditionalRules).where(eq(conditionalRules.surveyId, surveyId));
+    await questionRepository.deleteConditionalRulesBySurvey(surveyId);
   }
   
   // Recipient operations
   async createRecipient(recipient: InsertRecipient): Promise<Recipient> {
-    const token = randomUUID();
-    const [newRecipient] = await db
-      .insert(recipients)
-      .values({ ...recipient, token })
-      .returning();
-    return newRecipient;
+    return await recipientRepository.create(recipient);
   }
 
   async getRecipient(id: string): Promise<Recipient | undefined> {
-    const [recipient] = await db.select().from(recipients).where(eq(recipients.id, id));
-    return recipient;
+    return await recipientRepository.findById(id);
   }
 
   async getRecipientByToken(token: string): Promise<Recipient | undefined> {
-    const [recipient] = await db.select().from(recipients).where(eq(recipients.token, token));
-    return recipient;
+    return await recipientRepository.findByToken(token);
   }
 
   async getRecipientsBySurvey(surveyId: string): Promise<Recipient[]> {
-    return await db
-      .select()
-      .from(recipients)
-      .where(eq(recipients.surveyId, surveyId))
-      .orderBy(desc(recipients.createdAt));
+    return await recipientRepository.findBySurvey(surveyId);
   }
 
   async updateRecipient(id: string, updates: Partial<InsertRecipient>): Promise<Recipient> {
-    const [updatedRecipient] = await db
-      .update(recipients)
-      .set(updates)
-      .where(eq(recipients.id, id))
-      .returning();
-    return updatedRecipient;
+    return await recipientRepository.update(id, updates);
   }
-  
+
   // Global recipient operations
   async createGlobalRecipient(globalRecipient: InsertGlobalRecipient): Promise<GlobalRecipient> {
-    const [newGlobalRecipient] = await db
-      .insert(globalRecipients)
-      .values({ ...globalRecipient, updatedAt: new Date() })
-      .returning();
-    return newGlobalRecipient;
+    return await recipientRepository.createGlobal(globalRecipient);
   }
 
   async getGlobalRecipient(id: string): Promise<GlobalRecipient | undefined> {
-    const [globalRecipient] = await db.select().from(globalRecipients).where(eq(globalRecipients.id, id));
-    return globalRecipient;
+    return await recipientRepository.findGlobalById(id);
   }
 
   async getGlobalRecipientsByCreator(creatorId: string): Promise<GlobalRecipient[]> {
-    return await db
-      .select()
-      .from(globalRecipients)
-      .where(eq(globalRecipients.creatorId, creatorId))
-      .orderBy(desc(globalRecipients.createdAt));
+    return await recipientRepository.findGlobalByCreator(creatorId);
   }
 
   async updateGlobalRecipient(id: string, updates: Partial<InsertGlobalRecipient>): Promise<GlobalRecipient> {
-    const [updatedGlobalRecipient] = await db
-      .update(globalRecipients)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(globalRecipients.id, id))
-      .returning();
-    return updatedGlobalRecipient;
+    return await recipientRepository.updateGlobal(id, updates);
   }
 
   async deleteGlobalRecipient(id: string): Promise<void> {
-    await db
-      .delete(globalRecipients)
-      .where(eq(globalRecipients.id, id));
+    await recipientRepository.deleteGlobal(id);
   }
 
   async getGlobalRecipientByCreatorAndEmail(creatorId: string, email: string): Promise<GlobalRecipient | undefined> {
-    const [globalRecipient] = await db
-      .select()
-      .from(globalRecipients)
-      .where(and(eq(globalRecipients.creatorId, creatorId), eq(globalRecipients.email, email)));
-    return globalRecipient;
+    return await recipientRepository.findGlobalByCreatorAndEmail(creatorId, email);
   }
 
   async bulkDeleteGlobalRecipients(ids: string[], creatorId: string): Promise<BulkOperationResult> {
-    try {
-      // Verify ownership of all recipients before deletion
-      const recipientsToDelete = await db
-        .select()
-        .from(globalRecipients)
-        .where(and(inArray(globalRecipients.id, ids), eq(globalRecipients.creatorId, creatorId)));
-
-      if (recipientsToDelete.length !== ids.length) {
-        return {
-          success: false,
-          updatedCount: 0,
-          errors: ["Some recipients not found or access denied"]
-        };
-      }
-
-      await db
-        .delete(globalRecipients)
-        .where(and(inArray(globalRecipients.id, ids), eq(globalRecipients.creatorId, creatorId)));
-
-      return {
-        success: true,
-        updatedCount: ids.length,
-        errors: []
-      };
-    } catch (error) {
-      console.error("Error in bulk delete global recipients:", error);
-      return {
-        success: false,
-        updatedCount: 0,
-        errors: ["Failed to bulk delete global recipients"]
-      };
-    }
+    return await recipientRepository.bulkDeleteGlobal(ids, creatorId);
   }
 
   async bulkAddGlobalRecipientsToSurvey(surveyId: string, globalRecipientIds: string[], creatorId: string): Promise<Recipient[]> {
-    // Get the global recipients and verify ownership
-    const globalRecipientsToAdd = await db
-      .select()
-      .from(globalRecipients)
-      .where(and(inArray(globalRecipients.id, globalRecipientIds), eq(globalRecipients.creatorId, creatorId)));
-
-    if (globalRecipientsToAdd.length === 0) {
-      throw new Error("No valid global recipients found");
-    }
-
-    // Check for duplicates in the survey
-    const existingRecipients = await db
-      .select()
-      .from(recipients)
-      .where(eq(recipients.surveyId, surveyId));
-
-    const existingEmails = new Set(existingRecipients.map((r: typeof recipients.$inferSelect) => r.email.toLowerCase()));
-    const recipientsToAdd = globalRecipientsToAdd.filter((gr: typeof globalRecipients.$inferSelect) =>
-      !existingEmails.has(gr.email.toLowerCase())
-    );
-
-    if (recipientsToAdd.length === 0) {
-      throw new Error("All selected recipients are already in this survey");
-    }
-
-    // Create survey recipients from global recipients
-    const newRecipients: Recipient[] = [];
-    for (const globalRecipient of recipientsToAdd) {
-      const token = randomUUID();
-      const recipientData = {
-        surveyId,
-        name: globalRecipient.name,
-        email: globalRecipient.email,
-        token
-      };
-      
-      const [newRecipient] = await db
-        .insert(recipients)
-        .values(recipientData)
-        .returning();
-      
-      newRecipients.push(newRecipient);
-    }
-
-    return newRecipients;
+    return await recipientRepository.bulkAddGlobalToSurvey(surveyId, globalRecipientIds, creatorId);
   }
 
   async checkRecipientDuplicatesInSurvey(surveyId: string, emails: string[]): Promise<string[]> {
-    const existingRecipients = await db
-      .select()
-      .from(recipients)
-      .where(eq(recipients.surveyId, surveyId));
-
-    const existingEmails = new Set(existingRecipients.map((r: typeof recipients.$inferSelect) => r.email.toLowerCase()));
-    return emails.filter((email: string) => existingEmails.has(email.toLowerCase()));
+    return await recipientRepository.checkDuplicates(surveyId, emails);
   }
   
   // Response operations
   async createResponse(response: InsertResponse): Promise<Response> {
-    const [newResponse] = await db.insert(responses).values(response).returning();
-    return newResponse;
+    return await responseRepository.create(response);
   }
 
   async getResponse(id: string): Promise<Response | undefined> {
-    const [response] = await db.select().from(responses).where(eq(responses.id, id));
-    return response;
+    return await responseRepository.findById(id);
   }
 
   async getResponsesBySurvey(surveyId: string): Promise<Response[]> {
-    return await db
-      .select()
-      .from(responses)
-      .where(eq(responses.surveyId, surveyId))
-      .orderBy(desc(responses.createdAt));
+    return await responseRepository.findBySurvey(surveyId);
   }
 
   async getResponseByRecipient(recipientId: string): Promise<Response | undefined> {
-    const [response] = await db
-      .select()
-      .from(responses)
-      .where(and(eq(responses.recipientId, recipientId), eq(responses.completed, true)))
-      .orderBy(desc(responses.submittedAt));
-    return response;
+    return await responseRepository.findByRecipient(recipientId);
   }
 
   async updateResponse(id: string, updates: Partial<InsertResponse>): Promise<Response> {
-    const [updatedResponse] = await db
-      .update(responses)
-      .set(updates)
-      .where(eq(responses.id, id))
-      .returning();
-    return updatedResponse;
+    return await responseRepository.update(id, updates);
   }
-  
+
   // Answer operations
   async createAnswer(answer: InsertAnswer): Promise<Answer> {
-    const [newAnswer] = await db.insert(answers).values(answer).returning();
-    return newAnswer;
+    return await responseRepository.createAnswer(answer);
   }
 
   async getAnswer(id: string): Promise<Answer | undefined> {
-    const [answer] = await db
-      .select()
-      .from(answers)
-      .where(eq(answers.id, id));
-    return answer;
+    return await responseRepository.findAnswerById(id);
   }
 
   async getAnswersByResponse(responseId: string): Promise<Answer[]> {
-    return await db
-      .select()
-      .from(answers)
-      .where(eq(answers.responseId, responseId));
+    return await responseRepository.findAnswersByResponse(responseId);
   }
 
   async getAnswersWithQuestionsByResponse(responseId: string): Promise<(Answer & { question: Question })[]> {
-    const result = await db
-      .select({
-        id: answers.id,
-        responseId: answers.responseId,
-        questionId: answers.questionId,
-        subquestionId: answers.subquestionId,
-        loopIndex: answers.loopIndex,
-        value: answers.value,
-        createdAt: answers.createdAt,
-        question: {
-          id: questions.id,
-          pageId: questions.pageId,
-          type: questions.type,
-          title: questions.title,
-          description: questions.description,
-          required: questions.required,
-          options: questions.options,
-          loopConfig: questions.loopConfig,
-          conditionalLogic: questions.conditionalLogic,
-          order: questions.order,
-          createdAt: questions.createdAt,
-        }
-      })
-      .from(answers)
-      .innerJoin(questions, eq(answers.questionId, questions.id))
-      .where(eq(answers.responseId, responseId))
-      .orderBy(questions.order);
-    
-    return result.map((row: any) => ({
-      id: row.id,
-      responseId: row.responseId,
-      questionId: row.questionId,
-      subquestionId: row.subquestionId,
-      loopIndex: row.loopIndex,
-      value: row.value,
-      createdAt: row.createdAt,
-      question: row.question
-    }));
+    return await responseRepository.findAnswersWithQuestionsByResponse(responseId);
   }
 
   async updateAnswer(id: string, updates: Partial<InsertAnswer>): Promise<Answer> {
-    const [updatedAnswer] = await db
-      .update(answers)
-      .set(updates)
-      .where(eq(answers.id, id))
-      .returning();
-    return updatedAnswer;
+    return await responseRepository.updateAnswer(id, updates);
   }
   
   // Analytics operations
   async createAnalyticsEvent(event: Omit<AnalyticsEvent, 'id' | 'timestamp'>): Promise<AnalyticsEvent> {
-    const [newEvent] = await db.insert(analyticsEvents).values(event).returning();
-    return newEvent;
+    return await analyticsRepository.createEvent(event as any);
   }
 
   async getAnalyticsByResponse(responseId: string): Promise<AnalyticsEvent[]> {
-    return await db
-      .select()
-      .from(analyticsEvents)
-      .where(eq(analyticsEvents.responseId, responseId))
-      .orderBy(analyticsEvents.timestamp);
+    return await analyticsRepository.findByResponse(responseId);
   }
 
   async getAnalyticsBySurvey(surveyId: string): Promise<AnalyticsEvent[]> {
-    return await db
-      .select()
-      .from(analyticsEvents)
-      .where(eq(analyticsEvents.surveyId, surveyId))
-      .orderBy(analyticsEvents.timestamp);
+    return await analyticsRepository.findBySurvey(surveyId);
   }
   
   // Enhanced dashboard analytics
@@ -1611,7 +1218,7 @@ export class DatabaseStorage implements IStorage {
     mimeType: string;
     size: number;
   }): Promise<FileMetadata> {
-    const [newFile] = await db.insert(files).values(fileData).returning();
+    const newFile = await fileRepository.create(fileData);
     return {
       id: newFile.id,
       answerId: newFile.answerId,
@@ -1624,9 +1231,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getFile(id: string): Promise<FileMetadata | undefined> {
-    const [file] = await db.select().from(files).where(eq(files.id, id));
+    const file = await fileRepository.findById(id);
     if (!file) return undefined;
-    
+
     return {
       id: file.id,
       answerId: file.answerId,
@@ -1639,8 +1246,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getFilesByAnswer(answerId: string): Promise<FileMetadata[]> {
-    const fileList = await db.select().from(files).where(eq(files.answerId, answerId));
-    return fileList.map((file: any) => ({
+    const fileList = await fileRepository.findByAnswer(answerId);
+    return fileList.map((file) => ({
       id: file.id,
       answerId: file.answerId,
       filename: file.filename,
@@ -1652,11 +1259,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteFile(id: string): Promise<void> {
-    await db.delete(files).where(eq(files.id, id));
+    await fileRepository.delete(id);
   }
 
   async deleteFilesByAnswer(answerId: string): Promise<void> {
-    await db.delete(files).where(eq(files.answerId, answerId));
+    await fileRepository.deleteByAnswer(answerId);
   }
 
   // Anonymous survey operations
@@ -1843,18 +1450,7 @@ export class DatabaseStorage implements IStorage {
     sessionId?: string;
     anonymousMetadata?: any;
   }): Promise<Response> {
-    const [newResponse] = await db.insert(responses).values({
-      surveyId: data.surveyId,
-      recipientId: null, // No recipient for anonymous responses
-      isAnonymous: true,
-      ipAddress: data.ipAddress,
-      userAgent: data.userAgent,
-      sessionId: data.sessionId,
-      anonymousMetadata: data.anonymousMetadata ? JSON.stringify(data.anonymousMetadata) : null,
-      completed: false
-    }).returning();
-    
-    return newResponse;
+    return await responseRepository.createAnonymousResponse(data);
   }
 
   async checkAnonymousResponseLimit(surveyId: string, ipAddress: string, sessionId?: string): Promise<boolean> {
@@ -1864,75 +1460,20 @@ export class DatabaseStorage implements IStorage {
       return false; // Survey doesn't allow anonymous responses
     }
 
-    const accessType = survey.anonymousAccessType;
-    
-    switch (accessType) {
-      case 'unlimited':
-        return true; // No limits
-      
-      case 'one_per_ip':
-        // Check if this IP has already responded
-        const existingIPResponse = await db
-          .select()
-          .from(anonymousResponseTracking)
-          .where(
-            and(
-              eq(anonymousResponseTracking.surveyId, surveyId),
-              eq(anonymousResponseTracking.ipAddress, ipAddress)
-            )
-          )
-          .limit(1);
-        return existingIPResponse.length === 0;
-      
-      case 'one_per_session':
-        if (!sessionId) return false;
-        // Check if this session has already responded
-        const existingSessionResponse = await db
-          .select()
-          .from(anonymousResponseTracking)
-          .where(
-            and(
-              eq(anonymousResponseTracking.surveyId, surveyId),
-              eq(anonymousResponseTracking.sessionId, sessionId)
-            )
-          )
-          .limit(1);
-        return existingSessionResponse.length === 0;
-      
-      default:
-        return false; // Unknown access type, deny access
-    }
+    const accessType = survey.anonymousAccessType || 'disabled';
+    return await responseRepository.checkAnonymousLimit(surveyId, ipAddress, sessionId, accessType);
   }
 
   async createAnonymousResponseTracking(tracking: InsertAnonymousResponseTracking): Promise<AnonymousResponseTracking> {
-    const [newTracking] = await db.insert(anonymousResponseTracking).values(tracking).returning();
-    return newTracking;
+    return await responseRepository.createAnonymousTracking(tracking);
   }
 
   async getAnonymousResponsesBySurvey(surveyId: string): Promise<Response[]> {
-    return await db
-      .select()
-      .from(responses)
-      .where(
-        and(
-          eq(responses.surveyId, surveyId),
-          eq(responses.isAnonymous, true)
-        )
-      )
-      .orderBy(desc(responses.createdAt));
+    return await responseRepository.findAnonymousBySurvey(surveyId);
   }
 
   async getAnonymousResponseCount(surveyId: string): Promise<number> {
-    const [result] = await db
-      .select({ count: count() })
-      .from(responses)
-      .where(
-        and(
-          eq(responses.surveyId, surveyId),
-          eq(responses.isAnonymous, true)
-        )
-      );
-    return result.count || 0;
+    return await responseRepository.countAnonymousBySurvey(surveyId);
   }
 }
 

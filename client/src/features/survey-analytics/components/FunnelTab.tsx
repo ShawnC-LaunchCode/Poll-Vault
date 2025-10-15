@@ -1,6 +1,7 @@
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Target } from "lucide-react";
+import { ChartEmptyState } from "@/components/shared/ChartEmptyState";
 import type { CompletionFunnelData } from "@shared/schema";
 
 interface FunnelTabProps {
@@ -56,12 +57,7 @@ export function FunnelTab({ funnelData }: FunnelTabProps) {
             })}
           </div>
         ) : (
-          <div className="h-64 flex items-center justify-center text-muted-foreground">
-            <div className="text-center">
-              <Target className="h-16 w-16 mb-4 opacity-50 mx-auto" />
-              <p>No funnel data available</p>
-            </div>
-          </div>
+          <ChartEmptyState icon={Target} message="No funnel data available" />
         )}
       </CardContent>
     </Card>

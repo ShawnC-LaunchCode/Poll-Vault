@@ -1,14 +1,15 @@
 import type { Express } from "express";
-import { storage } from "../storage";
 import { isAuthenticated } from "../googleAuth";
 import { insertSurveySchema } from "@shared/schema";
-import { validateSurveyForPublish, canChangeStatus } from "../services/surveyValidation";
+import { surveyService, analyticsService } from "../services";
 import { z } from "zod";
 import { exportService } from "../services/exportService";
 
 /**
  * Register survey-related routes
  * Handles survey CRUD operations, validation, status management, and export
+ *
+ * Uses surveyService for business logic and authorization
  */
 export function registerSurveyRoutes(app: Express): void {
 
@@ -23,35 +24,20 @@ export function registerSurveyRoutes(app: Express): void {
   app.post('/api/surveys', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      console.log('Creating survey for user:', userId);
-
       if (!userId) {
-        console.error('Survey creation failed: No user ID');
         return res.status(401).json({ message: "Unauthorized - no user ID" });
       }
 
-      const surveyData = insertSurveySchema.parse({ ...req.body, creatorId: userId });
-      console.log('Parsed survey data:', {
-        title: surveyData.title,
-        description: surveyData.description?.substring(0, 100),
-        creatorId: surveyData.creatorId
-      });
-
-      const survey = await storage.createSurvey(surveyData);
-      console.log('Survey created successfully:', { id: survey.id, title: survey.title });
+      const surveyData = insertSurveySchema.parse(req.body);
+      const survey = await surveyService.createSurvey(surveyData, userId);
 
       res.json(survey);
     } catch (error) {
       console.error("Error creating survey:", error);
-      if (error instanceof Error) {
-        console.error('Error stack:', error.stack);
-        res.status(500).json({
-          message: "Failed to create survey",
-          error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
-      } else {
-        res.status(500).json({ message: "Failed to create survey" });
-      }
+      res.status(500).json({
+        message: "Failed to create survey",
+        error: process.env.NODE_ENV === 'development' && error instanceof Error ? error.message : undefined
+      });
     }
   });
 
@@ -65,7 +51,8 @@ export function registerSurveyRoutes(app: Express): void {
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized - no user ID" });
       }
-      const surveys = await storage.getSurveysByCreator(userId);
+
+      const surveys = await surveyService.getSurveysByCreator(userId);
       res.json(surveys);
     } catch (error) {
       console.error("Error fetching surveys:", error);
@@ -79,18 +66,20 @@ export function registerSurveyRoutes(app: Express): void {
    */
   app.get('/api/surveys/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const survey = await storage.getSurvey(req.params.id);
-      if (!survey) {
-        return res.status(404).json({ message: "Survey not found" });
-      }
-
-      if (survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
-      }
+      const userId = req.user.claims.sub;
+      const survey = await surveyService.getSurveyForUser(req.params.id, userId);
 
       res.json(survey);
     } catch (error) {
       console.error("Error fetching survey:", error);
+      if (error instanceof Error) {
+        if (error.message === "Survey not found") {
+          return res.status(404).json({ message: error.message });
+        }
+        if (error.message.includes("Access denied")) {
+          return res.status(403).json({ message: error.message });
+        }
+      }
       res.status(500).json({ message: "Failed to fetch survey" });
     }
   });
@@ -101,20 +90,21 @@ export function registerSurveyRoutes(app: Express): void {
    */
   app.put('/api/surveys/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const survey = await storage.getSurvey(req.params.id);
-      if (!survey) {
-        return res.status(404).json({ message: "Survey not found" });
-      }
-
-      if (survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
+      const userId = req.user.claims.sub;
       const updates = insertSurveySchema.partial().parse(req.body);
-      const updatedSurvey = await storage.updateSurvey(req.params.id, updates);
+
+      const updatedSurvey = await surveyService.updateSurvey(req.params.id, userId, updates);
       res.json(updatedSurvey);
     } catch (error) {
       console.error("Error updating survey:", error);
+      if (error instanceof Error) {
+        if (error.message === "Survey not found") {
+          return res.status(404).json({ message: error.message });
+        }
+        if (error.message.includes("Access denied")) {
+          return res.status(403).json({ message: error.message });
+        }
+      }
       res.status(500).json({ message: "Failed to update survey" });
     }
   });
@@ -125,19 +115,20 @@ export function registerSurveyRoutes(app: Express): void {
    */
   app.delete('/api/surveys/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const survey = await storage.getSurvey(req.params.id);
-      if (!survey) {
-        return res.status(404).json({ message: "Survey not found" });
-      }
+      const userId = req.user.claims.sub;
+      await surveyService.deleteSurvey(req.params.id, userId);
 
-      if (survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
-      await storage.deleteSurvey(req.params.id);
       res.json({ message: "Survey deleted successfully" });
     } catch (error) {
       console.error("Error deleting survey:", error);
+      if (error instanceof Error) {
+        if (error.message === "Survey not found") {
+          return res.status(404).json({ message: error.message });
+        }
+        if (error.message.includes("Access denied")) {
+          return res.status(403).json({ message: error.message });
+        }
+      }
       res.status(500).json({ message: "Failed to delete survey" });
     }
   });
@@ -152,19 +143,20 @@ export function registerSurveyRoutes(app: Express): void {
    */
   app.get('/api/surveys/:id/validate', isAuthenticated, async (req: any, res) => {
     try {
-      const survey = await storage.getSurvey(req.params.id);
-      if (!survey) {
-        return res.status(404).json({ message: "Survey not found" });
-      }
+      const userId = req.user.claims.sub;
+      const validation = await surveyService.validateForPublish(req.params.id, userId);
 
-      if (survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
-      const validation = await validateSurveyForPublish(req.params.id);
       res.json(validation);
     } catch (error) {
       console.error("Error validating survey:", error);
+      if (error instanceof Error) {
+        if (error.message === "Survey not found") {
+          return res.status(404).json({ message: error.message });
+        }
+        if (error.message.includes("Access denied")) {
+          return res.status(403).json({ message: error.message });
+        }
+      }
       res.status(500).json({ message: "Failed to validate survey" });
     }
   });
@@ -175,36 +167,24 @@ export function registerSurveyRoutes(app: Express): void {
    */
   app.put('/api/surveys/:id/status', isAuthenticated, async (req: any, res) => {
     try {
-      const survey = await storage.getSurvey(req.params.id);
-      if (!survey) {
-        return res.status(404).json({ message: "Survey not found" });
-      }
-
-      if (survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
+      const userId = req.user.claims.sub;
       const { status } = req.body;
-      if (!status || !['draft', 'open', 'closed'].includes(status)) {
-        return res.status(400).json({ message: "Invalid status. Must be 'draft', 'open', or 'closed'" });
-      }
 
-      const statusCheck = await canChangeStatus(req.params.id, survey.status, status);
-      if (!statusCheck.allowed) {
-        return res.status(400).json({
-          message: statusCheck.reason || "Status change not allowed",
-          validation: statusCheck.reason
-        });
-      }
-
-      const updatedSurvey = await storage.updateSurvey(req.params.id, { status });
-
-      res.json({
-        survey: updatedSurvey,
-        message: statusCheck.reason || "Status updated successfully"
-      });
+      const result = await surveyService.changeStatus(req.params.id, userId, status);
+      res.json(result);
     } catch (error) {
       console.error("Error updating survey status:", error);
+      if (error instanceof Error) {
+        if (error.message === "Survey not found") {
+          return res.status(404).json({ message: error.message });
+        }
+        if (error.message.includes("Access denied")) {
+          return res.status(403).json({ message: error.message });
+        }
+        if (error.message.includes("Invalid status") || error.message.includes("not allowed")) {
+          return res.status(400).json({ message: error.message });
+        }
+      }
       res.status(500).json({ message: "Failed to update survey status" });
     }
   });
@@ -221,39 +201,13 @@ export function registerSurveyRoutes(app: Express): void {
     try {
       const surveyId = req.params.id;
       const userId = req.user.claims.sub;
-
-      console.log('Enabling anonymous access for survey:', surveyId, 'by user:', userId);
-
-      const survey = await storage.getSurvey(surveyId);
-      if (!survey) {
-        console.error('Survey not found when enabling anonymous access:', surveyId);
-        return res.status(404).json({ message: "Survey not found" });
-      }
-
-      console.log('Found survey for anonymous access:', {
-        id: survey.id,
-        title: survey.title,
-        creatorId: survey.creatorId
-      });
-
-      if (survey.creatorId !== userId) {
-        console.error('Access denied for anonymous access:', { surveyCreator: survey.creatorId, requestUser: userId });
-        return res.status(403).json({ message: "Access denied" });
-      }
-
       const { accessType, anonymousConfig } = req.body;
-      console.log('Anonymous access config:', { accessType, anonymousConfig });
 
-      const updatedSurvey = await storage.enableAnonymousAccess(surveyId, {
-        accessType,
-        anonymousConfig
-      });
-
-      console.log('Anonymous access enabled successfully:', {
-        id: updatedSurvey.id,
-        publicLink: updatedSurvey.publicLink,
-        allowAnonymous: updatedSurvey.allowAnonymous
-      });
+      const updatedSurvey = await surveyService.enableAnonymousAccess(
+        surveyId,
+        userId,
+        { accessType, anonymousConfig }
+      );
 
       res.json({
         survey: updatedSurvey,
@@ -262,7 +216,12 @@ export function registerSurveyRoutes(app: Express): void {
     } catch (error) {
       console.error("Error enabling anonymous access:", error);
       if (error instanceof Error) {
-        console.error('Error stack:', error.stack);
+        if (error.message === "Survey not found") {
+          return res.status(404).json({ message: error.message });
+        }
+        if (error.message.includes("Access denied")) {
+          return res.status(403).json({ message: error.message });
+        }
         res.status(500).json({
           message: "Failed to enable anonymous access",
           error: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -279,19 +238,20 @@ export function registerSurveyRoutes(app: Express): void {
    */
   app.delete('/api/surveys/:id/anonymous', isAuthenticated, async (req: any, res) => {
     try {
-      const survey = await storage.getSurvey(req.params.id);
-      if (!survey) {
-        return res.status(404).json({ message: "Survey not found" });
-      }
+      const userId = req.user.claims.sub;
+      const updatedSurvey = await surveyService.disableAnonymousAccess(req.params.id, userId);
 
-      if (survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
-      const updatedSurvey = await storage.disableAnonymousAccess(req.params.id);
       res.json(updatedSurvey);
     } catch (error) {
       console.error("Error disabling anonymous access:", error);
+      if (error instanceof Error) {
+        if (error.message === "Survey not found") {
+          return res.status(404).json({ message: error.message });
+        }
+        if (error.message.includes("Access denied")) {
+          return res.status(403).json({ message: error.message });
+        }
+      }
       res.status(500).json({ message: "Failed to disable anonymous access" });
     }
   });
@@ -309,107 +269,18 @@ export function registerSurveyRoutes(app: Express): void {
       const surveyId = req.params.id;
       const userId = req.user.claims.sub;
 
-      const survey = await storage.getSurvey(surveyId);
-      if (!survey) {
-        return res.status(404).json({ message: "Survey not found" });
-      }
-
-      if (survey.creatorId !== userId) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
-      const responses = await storage.getResponsesBySurvey(surveyId);
-      const completedResponses = responses.filter(r => r.completed);
-
-      const totalResponses = responses.length;
-      const completedCount = completedResponses.length;
-      const completionRate = totalResponses > 0 ? (completedCount / totalResponses) * 100 : 0;
-
-      const pages = await storage.getSurveyPages(surveyId);
-      const allQuestions: any[] = [];
-
-      for (const page of pages) {
-        const questions = await storage.getQuestionsWithSubquestionsByPage(page.id);
-        allQuestions.push(...questions);
-      }
-
-      const questionBreakdown: Record<string, any> = {};
-
-      for (const question of allQuestions) {
-        const questionId = question.id;
-
-        questionBreakdown[questionId] = {
-          questionId,
-          questionTitle: question.title,
-          questionType: question.type,
-          totalResponses: 0,
-          answers: [],
-          breakdown: {}
-        };
-
-        for (const response of completedResponses) {
-          const answers = await storage.getAnswersByResponse(response.id);
-          const questionAnswers = answers.filter(a => a.questionId === questionId);
-
-          if (questionAnswers.length > 0) {
-            questionBreakdown[questionId].totalResponses++;
-
-            for (const answer of questionAnswers) {
-              if (question.type === 'multiple_choice' || question.type === 'radio') {
-                const value = answer.value;
-                let selectedOptions: string[] = [];
-
-                if (Array.isArray(value)) {
-                  selectedOptions = value;
-                } else if (typeof value === 'object' && value !== null) {
-                  const valueObj = value as Record<string, any>;
-                  if (valueObj.text) {
-                    selectedOptions = Array.isArray(valueObj.text) ? valueObj.text : [valueObj.text];
-                  } else if (valueObj.selected) {
-                    selectedOptions = Array.isArray(valueObj.selected) ? valueObj.selected : [valueObj.selected];
-                  }
-                } else if (typeof value === 'string') {
-                  selectedOptions = [value];
-                }
-
-                selectedOptions.forEach(option => {
-                  const optionStr = String(option);
-                  questionBreakdown[questionId].breakdown[optionStr] =
-                    (questionBreakdown[questionId].breakdown[optionStr] || 0) + 1;
-                });
-
-              } else if (question.type === 'yes_no') {
-                const value = answer.value;
-                let boolValue: string;
-
-                if (typeof value === 'boolean') {
-                  boolValue = value ? 'Yes' : 'No';
-                } else if (typeof value === 'object' && value !== null) {
-                  const valueObj = value as Record<string, any>;
-                  boolValue = valueObj.text === true || valueObj.text === 'true' || valueObj.text === 'Yes' ? 'Yes' : 'No';
-                } else {
-                  boolValue = String(value) === 'true' || String(value) === 'Yes' ? 'Yes' : 'No';
-                }
-
-                questionBreakdown[questionId].breakdown[boolValue] =
-                  (questionBreakdown[questionId].breakdown[boolValue] || 0) + 1;
-              }
-            }
-          }
-        }
-      }
-
-      res.json({
-        survey,
-        stats: {
-          totalResponses,
-          completedResponses: completedCount,
-          completionRate: Math.round(completionRate * 100) / 100
-        },
-        questionBreakdown
-      });
+      const results = await analyticsService.getSurveyResults(surveyId, userId);
+      res.json(results);
     } catch (error) {
       console.error("Error fetching survey results:", error);
+      if (error instanceof Error) {
+        if (error.message === "Survey not found") {
+          return res.status(404).json({ message: error.message });
+        }
+        if (error.message.includes("Access denied")) {
+          return res.status(403).json({ message: error.message });
+        }
+      }
       res.status(500).json({ message: "Failed to fetch survey results" });
     }
   });
@@ -431,7 +302,7 @@ export function registerSurveyRoutes(app: Express): void {
         return res.status(400).json({ message: "Invalid request data" });
       }
 
-      const result = await storage.bulkUpdateSurveyStatus(surveyIds, status, userId);
+      const result = await surveyService.bulkUpdateStatus(surveyIds, status, userId);
       res.json(result);
     } catch (error) {
       console.error("Error in bulk status update:", error);
@@ -452,7 +323,7 @@ export function registerSurveyRoutes(app: Express): void {
         return res.status(400).json({ message: "Invalid request data" });
       }
 
-      const result = await storage.bulkDeleteSurveys(surveyIds, userId);
+      const result = await surveyService.bulkDeleteSurveys(surveyIds, userId);
       res.json(result);
     } catch (error) {
       console.error("Error in bulk delete:", error);
@@ -478,10 +349,13 @@ export function registerSurveyRoutes(app: Express): void {
         return res.status(400).json({ message: "Title is required" });
       }
 
-      const duplicatedSurvey = await storage.duplicateSurvey(surveyId, title, userId);
+      const duplicatedSurvey = await surveyService.duplicateSurvey(surveyId, userId, title);
       res.json(duplicatedSurvey);
     } catch (error) {
       console.error("Error duplicating survey:", error);
+      if (error instanceof Error && error.message.includes("Access denied")) {
+        return res.status(403).json({ message: error.message });
+      }
       res.status(500).json({ message: "Failed to duplicate survey" });
     }
   });
@@ -495,10 +369,13 @@ export function registerSurveyRoutes(app: Express): void {
       const userId = req.user.claims.sub;
       const surveyId = req.params.id;
 
-      const archivedSurvey = await storage.archiveSurvey(surveyId, userId);
+      const archivedSurvey = await surveyService.archiveSurvey(surveyId, userId);
       res.json(archivedSurvey);
     } catch (error) {
       console.error("Error archiving survey:", error);
+      if (error instanceof Error && error.message.includes("Access denied")) {
+        return res.status(403).json({ message: error.message });
+      }
       res.status(500).json({ message: "Failed to archive survey" });
     }
   });
@@ -516,14 +393,8 @@ export function registerSurveyRoutes(app: Express): void {
       const surveyId = req.params.surveyId;
       const userId = req.user.claims.sub;
 
-      const survey = await storage.getSurvey(surveyId);
-      if (!survey) {
-        return res.status(404).json({ message: "Survey not found" });
-      }
-
-      if (survey.creatorId !== userId) {
-        return res.status(403).json({ message: "Access denied" });
-      }
+      // Verify ownership
+      await surveyService.getSurveyForUser(surveyId, userId);
 
       const exportOptionsSchema = z.object({
         format: z.enum(['csv', 'pdf']),
@@ -534,7 +405,6 @@ export function registerSurveyRoutes(app: Express): void {
       });
 
       const options = exportOptionsSchema.parse(req.body);
-
       const exportedFile = await exportService.exportSurveyData(surveyId, options);
 
       res.json({
@@ -546,6 +416,14 @@ export function registerSurveyRoutes(app: Express): void {
       });
     } catch (error) {
       console.error("Error exporting survey data:", error);
+      if (error instanceof Error) {
+        if (error.message === "Survey not found") {
+          return res.status(404).json({ message: error.message });
+        }
+        if (error.message.includes("Access denied")) {
+          return res.status(403).json({ message: error.message });
+        }
+      }
       res.status(500).json({
         success: false,
         message: "Failed to export survey data",

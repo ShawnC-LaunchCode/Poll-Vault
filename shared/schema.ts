@@ -363,6 +363,7 @@ export const insertGlobalRecipientSchema = createInsertSchema(globalRecipients).
 export const insertResponseSchema = createInsertSchema(responses).omit({ id: true, createdAt: true });
 export const insertAnswerSchema = createInsertSchema(answers).omit({ id: true, createdAt: true });
 export const insertAnonymousResponseTrackingSchema = createInsertSchema(anonymousResponseTracking).omit({ id: true, createdAt: true });
+export const insertFileSchema = createInsertSchema(files).omit({ id: true, uploadedAt: true });
 
 // Analytics event validation schema with strict validation
 export const insertAnalyticsEventSchema = createInsertSchema(analyticsEvents).omit({ 
@@ -399,6 +400,8 @@ export type Response = typeof responses.$inferSelect;
 export type InsertResponse = typeof insertResponseSchema._type;
 export type Answer = typeof answers.$inferSelect;
 export type InsertAnswer = typeof insertAnswerSchema._type;
+export type File = typeof files.$inferSelect;
+export type InsertFile = typeof insertFileSchema._type;
 export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
 export type AnonymousResponseTracking = typeof anonymousResponseTracking.$inferSelect;
 export type InsertAnonymousResponseTracking = typeof insertAnonymousResponseTrackingSchema._type;

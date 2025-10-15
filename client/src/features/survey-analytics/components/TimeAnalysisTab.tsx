@@ -2,6 +2,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
 import { Clock, PieChart as PieChartIcon } from "lucide-react";
+import { ChartEmptyState } from "@/components/shared/ChartEmptyState";
 import type { TimeSpentData, PageAnalytics } from "@shared/schema";
 
 interface TimeAnalysisTabProps {
@@ -38,12 +39,7 @@ export function TimeAnalysisTab({ timeSpentData, pageAnalytics, chartConfig, col
               </BarChart>
             </ChartContainer>
           ) : (
-            <div className="h-64 flex items-center justify-center text-muted-foreground">
-              <div className="text-center">
-                <Clock className="h-16 w-16 mb-4 opacity-50 mx-auto" />
-                <p>No time tracking data available</p>
-              </div>
-            </div>
+            <ChartEmptyState icon={Clock} message="No time tracking data available" />
           )}
         </CardContent>
       </Card>
@@ -79,12 +75,7 @@ export function TimeAnalysisTab({ timeSpentData, pageAnalytics, chartConfig, col
               </PieChart>
             </ChartContainer>
           ) : (
-            <div className="h-64 flex items-center justify-center text-muted-foreground">
-              <div className="text-center">
-                <PieChartIcon className="h-16 w-16 mb-4 opacity-50 mx-auto" />
-                <p>No page time data available</p>
-              </div>
-            </div>
+            <ChartEmptyState icon={PieChartIcon} message="No page time data available" />
           )}
         </CardContent>
       </Card>

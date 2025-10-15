@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import { Activity } from "lucide-react";
+import { ChartEmptyState } from "@/components/shared/ChartEmptyState";
 import type { EngagementMetrics } from "@shared/schema";
 
 interface EngagementTabProps {
@@ -74,12 +75,7 @@ export function EngagementTab({ engagementMetrics, chartConfig }: EngagementTabP
               </LineChart>
             </ChartContainer>
           ) : (
-            <div className="h-64 flex items-center justify-center text-muted-foreground">
-              <div className="text-center">
-                <Activity className="h-16 w-16 mb-4 opacity-50 mx-auto" />
-                <p>No engagement trends available</p>
-              </div>
-            </div>
+            <ChartEmptyState icon={Activity} message="No engagement trends available" />
           )}
         </CardContent>
       </Card>

@@ -2,6 +2,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import { BarChart3, Clock } from "lucide-react";
+import { ChartEmptyState } from "@/components/shared/ChartEmptyState";
 import type { PageAnalytics } from "@shared/schema";
 
 interface OverviewTabProps {
@@ -39,12 +40,7 @@ export function OverviewTab({ pageAnalytics, chartConfig }: OverviewTabProps) {
               </BarChart>
             </ChartContainer>
           ) : (
-            <div className="h-64 flex items-center justify-center text-muted-foreground">
-              <div className="text-center">
-                <BarChart3 className="h-16 w-16 mb-4 opacity-50 mx-auto" />
-                <p>No page analytics data available</p>
-              </div>
-            </div>
+            <ChartEmptyState icon={BarChart3} message="No page analytics data available" />
           )}
         </CardContent>
       </Card>
@@ -78,12 +74,7 @@ export function OverviewTab({ pageAnalytics, chartConfig }: OverviewTabProps) {
               </LineChart>
             </ChartContainer>
           ) : (
-            <div className="h-64 flex items-center justify-center text-muted-foreground">
-              <div className="text-center">
-                <Clock className="h-16 w-16 mb-4 opacity-50 mx-auto" />
-                <p>No time tracking data available</p>
-              </div>
-            </div>
+            <ChartEmptyState icon={Clock} message="No time tracking data available" />
           )}
         </CardContent>
       </Card>

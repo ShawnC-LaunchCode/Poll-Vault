@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { SkeletonList } from "@/components/shared/SkeletonList";
+import { QuickActionButton } from "@/components/shared/QuickActionButton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AnalyticsCharts } from "@/components/dashboard/AnalyticsCharts";
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
@@ -17,7 +18,7 @@ import { SurveyManagement } from "@/components/dashboard/SurveyManagement";
 import { Link } from "wouter";
 import {
   FileText, PlayCircle, TrendingUp, Percent, History,
-  Home, PieChart, Settings, Zap, Plus, ChevronRight,
+  Home, PieChart, Settings, Zap, Plus,
   BarChart3, Download, Clock, ExternalLink
 } from "lucide-react";
 
@@ -169,51 +170,40 @@ export default function Dashboard() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <Link href="/surveys/new">
-                      <Button variant="ghost" className="w-full justify-between" data-testid="button-quick-create-survey">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-                            <Plus className="h-4 w-4 text-primary" />
-                          </div>
-                          <span className="font-medium">Create New Survey</span>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                    </Link>
+                    <QuickActionButton
+                      href="/surveys/new"
+                      icon={Plus}
+                      iconColor="text-primary"
+                      iconBgColor="bg-primary/10"
+                      label="Create New Survey"
+                      testId="button-quick-create-survey"
+                    />
 
-                    <Link href="/surveys">
-                      <Button variant="ghost" className="w-full justify-between" data-testid="button-quick-manage-surveys">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-success/10 rounded-lg flex items-center justify-center">
-                            <Settings className="h-4 w-4 text-success" />
-                          </div>
-                          <span className="font-medium">Manage Surveys</span>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                    </Link>
+                    <QuickActionButton
+                      href="/surveys"
+                      icon={Settings}
+                      iconColor="text-success"
+                      iconBgColor="bg-success/10"
+                      label="Manage Surveys"
+                      testId="button-quick-manage-surveys"
+                    />
 
-                    <Link href="/responses">
-                      <Button variant="ghost" className="w-full justify-between" data-testid="button-quick-view-responses">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
-                            <BarChart3 className="h-4 w-4 text-foreground" />
-                          </div>
-                          <span className="font-medium">View All Responses</span>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                    </Link>
+                    <QuickActionButton
+                      href="/responses"
+                      icon={BarChart3}
+                      iconColor="text-foreground"
+                      iconBgColor="bg-accent"
+                      label="View All Responses"
+                      testId="button-quick-view-responses"
+                    />
 
-                    <Button variant="ghost" className="w-full justify-between" data-testid="button-quick-export-data">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-warning/10 rounded-lg flex items-center justify-center">
-                          <Download className="h-4 w-4 text-warning" />
-                        </div>
-                        <span className="font-medium">Export Data</span>
-                      </div>
-                      <i className="fas fa-chevron-right text-muted-foreground"></i>
-                    </Button>
+                    <QuickActionButton
+                      icon={Download}
+                      iconColor="text-warning"
+                      iconBgColor="bg-warning/10"
+                      label="Export Data"
+                      testId="button-quick-export-data"
+                    />
                   </CardContent>
                 </Card>
 

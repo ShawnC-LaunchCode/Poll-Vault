@@ -1,11 +1,12 @@
 import type { Express } from "express";
 import { isAuthenticated } from "../googleAuth";
-import { storage } from "../storage";
-import { insertResponseSchema, insertAnswerSchema } from "@shared/schema";
+import { responseService } from "../services";
 
 /**
  * Register response-related routes
  * Handles response creation, answer submission, and response completion
+ *
+ * Uses responseService for business logic and authorization
  */
 export function registerResponseRoutes(app: Express): void {
 
@@ -22,50 +23,35 @@ export function registerResponseRoutes(app: Express): void {
       const { surveyId } = req.params;
       const { token } = req.body;
 
-      const survey = await storage.getSurvey(surveyId);
-      if (!survey) {
-        return res.status(404).json({ message: "Survey not found" });
-      }
-
-      if (survey.status !== 'open') {
-        return res.status(400).json({ message: "Survey is not currently open for responses" });
-      }
-
-      let recipientId: string | undefined;
-
-      if (token) {
-        const recipient = await storage.getRecipientByToken(token);
-        if (!recipient || recipient.surveyId !== surveyId) {
-          return res.status(403).json({ message: "Invalid token for this survey" });
-        }
-
-        const existingResponse = await storage.getResponseByRecipient(recipient.id);
-        if (existingResponse) {
-          return res.status(400).json({
-            message: "Response already exists",
-            responseId: existingResponse.id
-          });
-        }
-
-        recipientId = recipient.id;
-      }
-
-      const responseData = insertResponseSchema.parse({
-        surveyId,
-        recipientId: recipientId || null,
-        completed: false,
-        isAnonymous: false
-      });
-
-      const response = await storage.createResponse(responseData);
+      const result = await responseService.createAuthenticatedResponse(surveyId, token);
 
       res.status(201).json({
-        responseId: response.id,
-        surveyId: response.surveyId,
-        message: "Response created successfully"
+        responseId: result.response.id,
+        surveyId: result.response.surveyId,
+        message: result.message
       });
     } catch (error) {
       console.error("Error creating response:", error);
+      if (error instanceof Error) {
+        if (error.message === "Survey not found") {
+          return res.status(404).json({ message: error.message });
+        }
+        if (error.message.includes("not currently open")) {
+          return res.status(400).json({ message: error.message });
+        }
+        if (error.message.includes("Invalid token")) {
+          return res.status(403).json({ message: error.message });
+        }
+        if (error.message.includes("Response already exists")) {
+          // Extract response ID from error message
+          const match = error.message.match(/Response already exists: (.+)$/);
+          const responseId = match ? match[1] : undefined;
+          return res.status(400).json({
+            message: "Response already exists",
+            responseId
+          });
+        }
+      }
       res.status(500).json({ message: "Failed to create response" });
     }
   });
@@ -78,44 +64,17 @@ export function registerResponseRoutes(app: Express): void {
     try {
       const { publicLink } = req.params;
 
-      const survey = await storage.getSurveyByPublicLink(publicLink);
-      if (!survey) {
-        return res.status(404).json({ message: "Survey not found" });
-      }
-
-      if (!survey.allowAnonymous) {
-        return res.status(403).json({ message: "Anonymous responses are not allowed for this survey" });
-      }
-
-      if (survey.status !== 'open') {
-        return res.status(400).json({ message: "Survey is not currently open for responses" });
-      }
-
+      // Gather client information
       const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
                        req.socket.remoteAddress ||
                        'unknown';
       const userAgent = req.get('user-agent') || '';
       const sessionId = req.body.sessionId || `session_${Date.now()}_${Math.random().toString(36)}`;
 
-      if (survey.anonymousAccessType === 'one_per_ip') {
-        const canRespond = await storage.checkAnonymousResponseLimit(survey.id, ipAddress, sessionId);
-        if (!canRespond) {
-          return res.status(429).json({
-            message: "Response limit reached",
-            error: "You have already responded to this survey from this IP address."
-          });
-        }
-      } else if (survey.anonymousAccessType === 'one_per_session') {
-        const canRespond = await storage.checkAnonymousResponseLimit(survey.id, ipAddress, sessionId);
-        if (!canRespond) {
-          return res.status(429).json({
-            message: "Response limit reached",
-            error: "You have already responded to this survey in this session."
-          });
-        }
-      }
-
-      const anonymousMetadata = {
+      const clientInfo = {
+        ipAddress,
+        userAgent,
+        sessionId,
         browserInfo: {
           userAgent,
           language: req.get('accept-language') || 'unknown',
@@ -131,29 +90,33 @@ export function registerResponseRoutes(app: Express): void {
         }
       };
 
-      const response = await storage.createAnonymousResponse({
-        surveyId: survey.id,
-        ipAddress,
-        userAgent,
-        sessionId,
-        anonymousMetadata
-      });
-
-      await storage.createAnonymousResponseTracking({
-        surveyId: survey.id,
-        ipAddress,
-        sessionId,
-        responseId: response.id
-      });
+      const result = await responseService.createAnonymousResponse(publicLink, clientInfo);
 
       res.status(201).json({
-        responseId: response.id,
-        surveyId: response.surveyId,
-        sessionId,
-        message: "Anonymous response created successfully"
+        responseId: result.response.id,
+        surveyId: result.response.surveyId,
+        sessionId: result.sessionId,
+        message: result.message
       });
     } catch (error) {
       console.error("Error creating anonymous response:", error);
+      if (error instanceof Error) {
+        if (error.message === "Survey not found") {
+          return res.status(404).json({ message: error.message });
+        }
+        if (error.message.includes("not allowed")) {
+          return res.status(403).json({ message: error.message });
+        }
+        if (error.message.includes("not currently open")) {
+          return res.status(400).json({ message: error.message });
+        }
+        if (error.message.includes("already responded")) {
+          return res.status(429).json({
+            message: "Response limit reached",
+            error: error.message
+          });
+        }
+      }
       res.status(500).json({ message: "Failed to create anonymous response" });
     }
   });
@@ -177,70 +140,33 @@ export function registerResponseRoutes(app: Express): void {
         });
       }
 
-      const response = await storage.getResponse(responseId);
-      if (!response) {
-        return res.status(404).json({ message: "Response not found" });
-      }
-
-      if (response.completed) {
-        return res.status(400).json({
-          message: "Cannot modify a completed response"
-        });
-      }
-
-      const survey = await storage.getSurvey(response.surveyId);
-      if (!survey) {
-        return res.status(404).json({ message: "Survey not found" });
-      }
-
-      const question = await storage.getQuestion(questionId);
-      if (!question) {
-        return res.status(404).json({ message: "Question not found" });
-      }
-
-      const page = await storage.getSurveyPage(question.pageId);
-      if (!page || page.surveyId !== survey.id) {
-        return res.status(400).json({
-          message: "Question does not belong to this survey"
-        });
-      }
-
-      if (subquestionId) {
-        const subquestion = await storage.getLoopGroupSubquestion(subquestionId);
-        if (!subquestion || subquestion.loopQuestionId !== questionId) {
-          return res.status(400).json({
-            message: "Invalid subquestion for this question"
-          });
-        }
-      }
-
-      const existingAnswers = await storage.getAnswersByResponse(responseId);
-      const existingAnswer = existingAnswers.find(a =>
-        a.questionId === questionId &&
-        a.subquestionId === (subquestionId || null) &&
-        a.loopIndex === (loopIndex || null)
-      );
-
-      let answer;
-      if (existingAnswer) {
-        answer = await storage.updateAnswer(existingAnswer.id, { value });
-      } else {
-        const answerData = insertAnswerSchema.parse({
-          responseId,
-          questionId,
-          subquestionId: subquestionId || null,
-          loopIndex: loopIndex || null,
-          value
-        });
-        answer = await storage.createAnswer(answerData);
-      }
+      const result = await responseService.submitAnswer(responseId, {
+        questionId,
+        subquestionId,
+        loopIndex,
+        value
+      });
 
       res.status(200).json({
-        answer,
-        message: existingAnswer ? "Answer updated successfully" : "Answer created successfully"
+        answer: result.answer,
+        message: result.message
       });
     } catch (error) {
       console.error("Error submitting answer:", error);
+      if (error instanceof Error) {
+        if (error.message === "Response not found") {
+          return res.status(404).json({ message: error.message });
+        }
+        if (error.message.includes("completed response")) {
+          return res.status(400).json({ message: error.message });
+        }
+        if (error.message.includes("Survey not found") || error.message.includes("Question not found")) {
+          return res.status(404).json({ message: error.message });
+        }
+        if (error.message.includes("does not belong") || error.message.includes("Invalid subquestion")) {
+          return res.status(400).json({ message: error.message });
+        }
+      }
       res.status(500).json({ message: "Failed to submit answer" });
     }
   });
@@ -253,69 +179,32 @@ export function registerResponseRoutes(app: Express): void {
     try {
       const { responseId } = req.params;
 
-      const response = await storage.getResponse(responseId);
-      if (!response) {
-        return res.status(404).json({ message: "Response not found" });
-      }
-
-      if (response.completed) {
-        return res.status(400).json({
-          message: "Response is already completed",
-          submittedAt: response.submittedAt
-        });
-      }
-
-      const survey = await storage.getSurvey(response.surveyId);
-      if (!survey) {
-        return res.status(404).json({ message: "Survey not found" });
-      }
-
-      const pages = await storage.getSurveyPages(survey.id);
-      const conditionalRules = await storage.getConditionalRulesBySurvey(survey.id);
-      const answers = await storage.getAnswersByResponse(responseId);
-
-      const answersMap: Record<string, any> = {};
-      answers.forEach(answer => {
-        answersMap[answer.questionId] = answer.value;
-      });
-
-      // Note: Import conditional logic evaluator if available
-      // For now, we'll do basic required field validation
-      const missingRequired: string[] = [];
-
-      for (const page of pages) {
-        const questions = await storage.getQuestionsWithSubquestionsByPage(page.id);
-
-        for (const question of questions) {
-          // Basic required check (conditional logic would go here)
-          if (question.required) {
-            const hasAnswer = answers.some(a => a.questionId === question.id);
-            if (!hasAnswer) {
-              missingRequired.push(question.title);
-            }
-          }
-        }
-      }
-
-      if (missingRequired.length > 0) {
-        return res.status(400).json({
-          message: "Missing required questions",
-          missingQuestions: missingRequired,
-          count: missingRequired.length
-        });
-      }
-
-      const updatedResponse = await storage.updateResponse(responseId, {
-        completed: true,
-        submittedAt: new Date()
-      });
+      const result = await responseService.completeResponse(responseId);
 
       res.status(200).json({
-        response: updatedResponse,
-        message: "Response completed successfully"
+        response: result.response,
+        message: result.message
       });
     } catch (error) {
       console.error("Error completing response:", error);
+      if (error instanceof Error) {
+        if (error.message === "Response not found" || error.message === "Survey not found") {
+          return res.status(404).json({ message: error.message });
+        }
+        if (error.message.includes("already completed")) {
+          return res.status(400).json({ message: error.message });
+        }
+        if (error.message.includes("Missing required questions")) {
+          // Extract missing questions from error message
+          const match = error.message.match(/Missing required questions: (.+)$/);
+          const missingQuestions = match ? match[1].split(', ') : [];
+          return res.status(400).json({
+            message: "Missing required questions",
+            missingQuestions,
+            count: missingQuestions.length
+          });
+        }
+      }
       res.status(500).json({ message: "Failed to complete response" });
     }
   });
@@ -330,15 +219,15 @@ export function registerResponseRoutes(app: Express): void {
    */
   app.get('/api/surveys/:surveyId/responses', isAuthenticated, async (req: any, res) => {
     try {
-      const survey = await storage.getSurvey(req.params.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
-      }
+      const userId = req.user.claims.sub;
+      const responses = await responseService.getResponsesForSurvey(req.params.surveyId, userId);
 
-      const responses = await storage.getResponsesBySurvey(req.params.surveyId);
       res.json(responses);
     } catch (error) {
       console.error("Error fetching responses:", error);
+      if (error instanceof Error && error.message.includes("Access denied")) {
+        return res.status(403).json({ message: error.message });
+      }
       res.status(500).json({ message: "Failed to fetch responses" });
     }
   });
@@ -349,22 +238,20 @@ export function registerResponseRoutes(app: Express): void {
    */
   app.get('/api/responses/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const response = await storage.getResponse(req.params.id);
-      if (!response) {
-        return res.status(404).json({ message: "Response not found" });
-      }
+      const userId = req.user.claims.sub;
+      const result = await responseService.getResponseDetails(req.params.id, userId);
 
-      const survey = await storage.getSurvey(response.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
-      const answersWithQuestions = await storage.getAnswersWithQuestionsByResponse(req.params.id);
-      const recipient = response.recipientId ? await storage.getRecipient(response.recipientId) : null;
-
-      res.json({ response, answers: answersWithQuestions, recipient });
+      res.json(result);
     } catch (error) {
       console.error("Error fetching response:", error);
+      if (error instanceof Error) {
+        if (error.message === "Response not found" || error.message === "Survey not found") {
+          return res.status(404).json({ message: error.message });
+        }
+        if (error.message.includes("Access denied")) {
+          return res.status(403).json({ message: error.message });
+        }
+      }
       res.status(500).json({ message: "Failed to fetch response" });
     }
   });

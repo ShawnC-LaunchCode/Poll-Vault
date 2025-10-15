@@ -3,6 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import { BarChart3, Clock } from "lucide-react";
+import { ChartEmptyState } from "@/components/shared/ChartEmptyState";
+import { DataTable } from "@/components/shared/DataTable";
 import type { QuestionAnalytics } from "@shared/schema";
 
 interface QuestionsTabProps {
@@ -41,12 +43,7 @@ export function QuestionsTab({ questionAnalytics, chartConfig }: QuestionsTabPro
                 </BarChart>
               </ChartContainer>
             ) : (
-              <div className="h-64 flex items-center justify-center text-muted-foreground">
-                <div className="text-center">
-                  <BarChart3 className="h-16 w-16 mb-4 opacity-50 mx-auto" />
-                  <p>No question analytics available</p>
-                </div>
-              </div>
+              <ChartEmptyState icon={BarChart3} message="No question analytics available" />
             )}
           </CardContent>
         </Card>
@@ -80,12 +77,7 @@ export function QuestionsTab({ questionAnalytics, chartConfig }: QuestionsTabPro
                 </LineChart>
               </ChartContainer>
             ) : (
-              <div className="h-64 flex items-center justify-center text-muted-foreground">
-                <div className="text-center">
-                  <Clock className="h-16 w-16 mb-4 opacity-50 mx-auto" />
-                  <p>No time tracking data available</p>
-                </div>
-              </div>
+              <ChartEmptyState icon={Clock} message="No time tracking data available" />
             )}
           </CardContent>
         </Card>
@@ -97,44 +89,52 @@ export function QuestionsTab({ questionAnalytics, chartConfig }: QuestionsTabPro
           <CardTitle>Question Performance Details</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2">Question</th>
-                  <th className="text-left p-2">Type</th>
-                  <th className="text-right p-2">Views</th>
-                  <th className="text-right p-2">Answers</th>
-                  <th className="text-right p-2">Answer Rate</th>
-                  <th className="text-right p-2">Avg Time</th>
-                  <th className="text-right p-2">Drop-offs</th>
-                </tr>
-              </thead>
-              <tbody>
-                {questionAnalytics.map((question) => (
-                  <tr key={question.questionId} className="border-b">
-                    <td className="p-2 font-medium" data-testid={`question-${question.questionId}`}>
-                      {question.questionTitle}
-                    </td>
-                    <td className="p-2">
-                      <Badge variant="outline">{question.questionType}</Badge>
-                    </td>
-                    <td className="p-2 text-right">{question.totalViews}</td>
-                    <td className="p-2 text-right">{question.totalAnswers}</td>
-                    <td className="p-2 text-right">
-                      <Badge variant={question.answerRate > 80 ? "default" : question.answerRate > 60 ? "secondary" : "destructive"}>
-                        {question.answerRate}%
-                      </Badge>
-                    </td>
-                    <td className="p-2 text-right">{question.avgTimeSpent.toFixed(1)}s</td>
-                    <td className="p-2 text-right">
-                      <span className="text-destructive">{question.dropOffCount}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            data={questionAnalytics}
+            columns={[
+              {
+                header: "Question",
+                accessor: "questionTitle",
+                align: "left",
+                className: "font-medium"
+              },
+              {
+                header: "Type",
+                accessor: (row) => <Badge variant="outline">{row.questionType}</Badge>,
+                align: "left"
+              },
+              {
+                header: "Views",
+                accessor: "totalViews",
+                align: "right"
+              },
+              {
+                header: "Answers",
+                accessor: "totalAnswers",
+                align: "right"
+              },
+              {
+                header: "Answer Rate",
+                accessor: (row) => (
+                  <Badge variant={row.answerRate > 80 ? "default" : row.answerRate > 60 ? "secondary" : "destructive"}>
+                    {row.answerRate}%
+                  </Badge>
+                ),
+                align: "right"
+              },
+              {
+                header: "Avg Time",
+                accessor: (row) => `${row.avgTimeSpent.toFixed(1)}s`,
+                align: "right"
+              },
+              {
+                header: "Drop-offs",
+                accessor: (row) => <span className="text-destructive">{row.dropOffCount}</span>,
+                align: "right"
+              }
+            ]}
+            getRowKey={(row) => row.questionId}
+          />
         </CardContent>
       </Card>
     </div>
