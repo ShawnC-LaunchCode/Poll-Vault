@@ -1,4 +1,4 @@
-import { Card, CardContent } from "@/components/ui/card";
+import { StatCard } from "@/components/shared/StatCard";
 import { Users, Mail, Download, Tag, Plus } from "lucide-react";
 import type { Recipient, GlobalRecipient } from "@shared/schema";
 
@@ -19,53 +19,29 @@ export function RecipientStats({ type, recipients, globalRecipients, availableTa
 
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Global Recipients</p>
-                <p className="text-3xl font-bold text-foreground" data-testid="text-total-global-recipients">
-                  {globalRecipients?.length || 0}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                <Users className="text-primary w-6 h-6" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard
+          label="Total Global Recipients"
+          value={globalRecipients?.length || 0}
+          icon={Users}
+          colorVariant="primary"
+          testId="text-total-global-recipients"
+        />
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Unique Tags</p>
-                <p className="text-3xl font-bold text-foreground" data-testid="text-total-tags">
-                  {availableTags?.length || 0}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-secondary/10 rounded-lg flex items-center justify-center">
-                <Tag className="text-secondary w-6 h-6" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard
+          label="Unique Tags"
+          value={availableTags?.length || 0}
+          icon={Tag}
+          colorVariant="secondary"
+          testId="text-total-tags"
+        />
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Recent Additions</p>
-                <p className="text-3xl font-bold text-foreground" data-testid="text-recent-additions">
-                  {recentAdditions}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-success/10 rounded-lg flex items-center justify-center">
-                <Plus className="text-success w-6 h-6" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard
+          label="Recent Additions"
+          value={recentAdditions}
+          icon={Plus}
+          colorVariant="success"
+          testId="text-recent-additions"
+        />
       </div>
     );
   }
@@ -75,53 +51,29 @@ export function RecipientStats({ type, recipients, globalRecipients, availableTa
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Total Recipients</p>
-              <p className="text-3xl font-bold text-foreground" data-testid="text-total-recipients">
-                {recipients?.length || 0}
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-              <Users className="text-primary w-6 h-6" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <StatCard
+        label="Total Recipients"
+        value={recipients?.length || 0}
+        icon={Users}
+        colorVariant="primary"
+        testId="text-total-recipients"
+      />
 
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Invitations Sent</p>
-              <p className="text-3xl font-bold text-foreground" data-testid="text-sent-invitations">
-                {sentInvitations}
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-success/10 rounded-lg flex items-center justify-center">
-              <Mail className="text-success w-6 h-6" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <StatCard
+        label="Invitations Sent"
+        value={sentInvitations}
+        icon={Mail}
+        colorVariant="success"
+        testId="text-sent-invitations"
+      />
 
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Response Rate</p>
-              <p className="text-3xl font-bold text-foreground" data-testid="text-response-rate">
-                0%
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-warning/10 rounded-lg flex items-center justify-center">
-              <Download className="text-warning w-6 h-6" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <StatCard
+        label="Response Rate"
+        value="0%"
+        icon={Download}
+        colorVariant="warning"
+        testId="text-response-rate"
+      />
     </div>
   );
 }

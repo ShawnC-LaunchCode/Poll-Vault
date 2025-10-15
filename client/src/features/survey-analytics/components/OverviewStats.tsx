@@ -1,4 +1,4 @@
-import { Card, CardContent } from "@/components/ui/card";
+import { StatCard } from "@/components/shared/StatCard";
 import { Users, Clock, CheckCircle, Activity } from "lucide-react";
 
 interface OverviewStatsProps {
@@ -16,53 +16,37 @@ export function OverviewStats({
 }: OverviewStatsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      <Card data-testid="stat-total-responses">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Total Responses</p>
-              <p className="text-2xl font-bold">{totalResponses}</p>
-            </div>
-            <Users className="h-8 w-8 text-primary" />
-          </div>
-        </CardContent>
-      </Card>
+      <StatCard
+        label="Total Responses"
+        value={totalResponses}
+        icon={Users}
+        colorVariant="primary"
+        testId="stat-total-responses"
+      />
 
-      <Card data-testid="stat-avg-completion-time">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Avg Completion Time</p>
-              <p className="text-2xl font-bold">{avgCompletionTime.toFixed(1)}m</p>
-            </div>
-            <Clock className="h-8 w-8 text-success" />
-          </div>
-        </CardContent>
-      </Card>
+      <StatCard
+        label="Avg Completion Time"
+        value={`${avgCompletionTime.toFixed(1)}m`}
+        icon={Clock}
+        colorVariant="success"
+        testId="stat-avg-completion-time"
+      />
 
-      <Card data-testid="stat-answer-rate">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Avg Answer Rate</p>
-              <p className="text-2xl font-bold">{avgAnswerRate.toFixed(1)}%</p>
-            </div>
-            <CheckCircle className="h-8 w-8 text-warning" />
-          </div>
-        </CardContent>
-      </Card>
+      <StatCard
+        label="Avg Answer Rate"
+        value={`${avgAnswerRate.toFixed(1)}%`}
+        icon={CheckCircle}
+        colorVariant="warning"
+        testId="stat-answer-rate"
+      />
 
-      <Card data-testid="stat-engagement-score">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Engagement Score</p>
-              <p className="text-2xl font-bold">{engagementScore}</p>
-            </div>
-            <Activity className="h-8 w-8 text-accent" />
-          </div>
-        </CardContent>
-      </Card>
+      <StatCard
+        label="Engagement Score"
+        value={engagementScore}
+        icon={Activity}
+        colorVariant="accent"
+        testId="stat-engagement-score"
+      />
     </div>
   );
 }

@@ -1,4 +1,6 @@
 import QuestionEditor from "@/components/survey/QuestionEditor";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { Edit } from "lucide-react";
 
 interface QuestionEditorPanelProps {
   selectedPageId: string | null;
@@ -26,13 +28,11 @@ export function QuestionEditorPanel({
 
   return (
     <div className="flex items-center justify-center h-full">
-      <div className="text-center">
-        <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-          <i className="fas fa-edit text-muted-foreground text-2xl"></i>
-        </div>
-        <h3 className="text-lg font-medium text-foreground mb-2">Select a Page</h3>
-        <p className="text-muted-foreground">Choose a page from the left panel to start adding questions</p>
-      </div>
+      <EmptyState
+        icon={Edit}
+        title="Select a Page"
+        description="Choose a page from the left panel to start adding questions"
+      />
     </div>
   );
 }
