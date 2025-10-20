@@ -25,9 +25,10 @@ COPY . .
 # This ensures it's available to the shell environment for the build command.
 ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 #
-# 💡 FIX APPLIED 2: Explicitly pass the variable during the run command.
-# This ensures redundancy and availability to cross-env / vite.
-# We are relying on the value being available as a Docker ENV now.
+# 💡 NEW DIAGNOSTIC STEP: Check the variable value and fail the build if it's empty.
+# This forces confirmation whether Railway is injecting the variable.
+RUN echo "VITE_CLIENT_ID_CHECK: ${VITE_GOOGLE_CLIENT_ID}" \
+    && if [ -z "$VITE_GOOGLE_CLIENT_ID" ]; then echo "FATAL: VITE_GOOGLE_CLIENT_ID is blank in build environment!" && exit 1; fi
 # ==============================================================================
 
 # Build the application
