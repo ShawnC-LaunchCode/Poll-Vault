@@ -140,11 +140,11 @@ export const loopGroupSubquestions = pgTable("loop_group_subquestions", {
 export const conditionalRules = pgTable("conditional_rules", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   surveyId: uuid("survey_id").references(() => surveys.id, { onDelete: 'cascade' }).notNull(),
-  conditionQuestionId: uuid("condition_question_id").references(() => questions.id).notNull(),
+  conditionQuestionId: uuid("condition_question_id").references(() => questions.id, { onDelete: 'cascade' }).notNull(),
   operator: conditionOperatorEnum("operator").notNull(),
   conditionValue: jsonb("condition_value").notNull(), // Support complex values for between, contains, etc.
-  targetQuestionId: uuid("target_question_id").references(() => questions.id),
-  targetPageId: uuid("target_page_id").references(() => surveyPages.id),
+  targetQuestionId: uuid("target_question_id").references(() => questions.id, { onDelete: 'cascade' }),
+  targetPageId: uuid("target_page_id").references(() => surveyPages.id, { onDelete: 'cascade' }),
   action: conditionalActionEnum("action").notNull(),
   logicalOperator: varchar("logical_operator").default("AND"), // For multiple conditions: AND, OR
   order: integer("order").notNull().default(1),
