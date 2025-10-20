@@ -25,11 +25,13 @@ COPY . .
 # This ensures it's available to the shell environment for the build command.
 ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 #
-# 💡 REMOVED DIAGNOSTIC: The failing check has been removed.
+# 💡 FINAL FIX: Write the variable directly to a .env.production file 
+# that VITE is guaranteed to load before the build runs.
+RUN echo "VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}" > /app/client/.env.production
 # ==============================================================================
 
 # Build the application
-# We rely on the ENV VITE_GOOGLE_CLIENT_ID set immediately above.
+# We rely on VITE loading the environment variables from the generated file above.
 RUN npm run build
 
 # Stage 2: Production stage with only runtime dependencies
