@@ -6,7 +6,8 @@
       "Edit",
       "Write",
       "Glob",
-      "Grep"
+      "Grep",
+      "mcp__ide__getDiagnostics"
     ],
     "deny": [],
     "ask": []
