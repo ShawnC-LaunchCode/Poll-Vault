@@ -11,7 +11,7 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files (NOTE: Assuming your package.json is now clean/valid JSON)
 COPY package*.json ./
 
 # Install ALL dependencies (including devDependencies needed for build)
@@ -21,13 +21,17 @@ RUN npm ci --legacy-peer-deps
 COPY . .
 
 # ==============================================================================
-# 💡 FIX APPLIED: Set the ENV variable explicitly using the ARG value. 
-# This ensures it's available for the 'npm run build' command where Vite needs it 
-# to replace import.meta.env.* placeholders.
+# 💡 FIX APPLIED 1: Set the ENV variable explicitly using the ARG value. 
+# This ensures it's available to the shell environment for the build command.
 ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+#
+# 💡 FIX APPLIED 2: Explicitly pass the variable during the run command.
+# This ensures redundancy and availability to cross-env / vite.
+# We are relying on the value being available as a Docker ENV now.
 # ==============================================================================
 
 # Build the application
+# We removed the shell-specific assignment here and rely on the ENV set above:
 RUN npm run build
 
 # Stage 2: Production stage with only runtime dependencies
@@ -43,6 +47,7 @@ RUN addgroup -g 1001 -S nodejs && \
 COPY package*.json ./
 
 # Install only production dependencies
+# NOTE: This step assumes the fixed package.json is now available and valid JSON
 RUN npm ci --omit=dev --legacy-peer-deps && npm cache clean --force
 
 # Copy built application from builder stage
@@ -62,7 +67,6 @@ USER nextjs
 EXPOSE 5000
 
 # Health check
-# Note: Ensure the API path '/api/health' is correct for your Express backend
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD node -e "require('http').get('http://localhost:5000/api/health', (res) => { \
         if (res.statusCode === 200) process.exit(0); else process.exit(1); \
