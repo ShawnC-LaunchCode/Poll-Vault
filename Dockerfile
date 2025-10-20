@@ -1,4 +1,11 @@
 # Multi-stage Docker build for Poll Vault
+#
+# ==============================================================================
+# 💡 FIX START: Declare ARG at the top of the file. Railway will pass secrets/vars
+# with matching names (like VITE_...) as build arguments automatically.
+ARG VITE_GOOGLE_CLIENT_ID
+# ==============================================================================
+
 # Stage 1: Build stage with all dependencies
 FROM node:20-alpine AS builder
 
@@ -8,11 +15,17 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install ALL dependencies (including devDependencies needed for build)
-# Using --legacy-peer-deps to avoid peer dependency conflicts between Vite 7 and @tailwindcss/vite
 RUN npm ci --legacy-peer-deps
 
 # Copy source code
 COPY . .
+
+# ==============================================================================
+# 💡 FIX APPLIED: Set the ENV variable explicitly using the ARG value. 
+# This ensures it's available for the 'npm run build' command where Vite needs it 
+# to replace import.meta.env.* placeholders.
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+# ==============================================================================
 
 # Build the application
 RUN npm run build
@@ -30,7 +43,6 @@ RUN addgroup -g 1001 -S nodejs && \
 COPY package*.json ./
 
 # Install only production dependencies
-# Using --legacy-peer-deps to avoid peer dependency conflicts with devDependencies
 RUN npm ci --omit=dev --legacy-peer-deps && npm cache clean --force
 
 # Copy built application from builder stage
@@ -50,10 +62,11 @@ USER nextjs
 EXPOSE 5000
 
 # Health check
+# Note: Ensure the API path '/api/health' is correct for your Express backend
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:5000/api/health', (res) => { \
-    if (res.statusCode === 200) process.exit(0); else process.exit(1); \
-  }).on('error', () => process.exit(1))"
+    CMD node -e "require('http').get('http://localhost:5000/api/health', (res) => { \
+        if (res.statusCode === 200) process.exit(0); else process.exit(1); \
+    }).on('error', () => process.exit(1))"
 
 # Start the application
 CMD ["npm", "start"]
