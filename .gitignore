@@ -9,3 +9,11 @@ vite.config.ts.*
 .env
 .env.local
 .env.production
+.env.docker
+
+# Editor settings
+.vscode/
+.idea/
+
+# Claude Code settings
+.claude/settings.local.json
