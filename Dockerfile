@@ -1,6 +1,6 @@
 # Multi-stage Docker build for Poll Vault
 # Stage 1: Build stage with all dependencies
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -8,7 +8,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install ALL dependencies (including devDependencies needed for build)
-RUN npm ci
+# Using --legacy-peer-deps to avoid peer dependency conflicts between Vite 7 and @tailwindcss/vite
+RUN npm ci --legacy-peer-deps
 
 # Copy source code
 COPY . .
@@ -17,7 +18,7 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Production stage with only runtime dependencies
-FROM node:18-alpine AS production
+FROM node:20-alpine AS production
 
 WORKDIR /app
 
