@@ -11,26 +11,22 @@ dotenv.config();
 const app = express();
 
 // =====================================================================
-// 💡 FIX 1: CORS & COOKIE CONFIGURATION
-// We must explicitly set the `origin` to allow Railway's subdomain format, 
-// and ensure `credentials: true` works.
-
-// We will use a dynamically determined origin for Railway/production.
+// 💡 FIX 1: CORS & COOKIE CONFIGURATION (Previously Implemented)
+// We use a dynamically determined origin for Railway/production.
 const railwayDomain = process.env.RAILWAY_STATIC_URL || `https://${process.env.RAILWAY_STATIC_DOMAIN}`;
 const allowedOrigins = [
     // 1. Production/Railway URL
     railwayDomain, 
     
-    // 2. Local development origins (as defined in your original code)
+    // 2. Local development origins 
     'http://localhost:3000', 
     'http://127.0.0.1:3000', 
     'http://0.0.0.0:3000',
-    // We remove the complex wildcard logic and rely on the railway domain or localhost
 ];
 
 // Determine the final origin to use for the CORS middleware
 const dynamicOrigin = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    // Allow requests with no origin (like mobile apps, curl requests)
+    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
     // Check if the request origin matches any allowed domain/hostname
@@ -42,8 +38,8 @@ const dynamicOrigin = (origin: string | undefined, callback: (err: Error | null,
     
     // Fallback for allowing subdomains if the full domain is complex (like the Railway default)
     try {
-        const originHostname = new URL(origin).hostname;
-        const isRailwaySubdomain = originHostname.endsWith('.up.railway.app');
+        const originUrl = new URL(origin);
+        const isRailwaySubdomain = originUrl.hostname.endsWith('.up.railway.app');
         if (isRailwaySubdomain) {
             return callback(null, true);
         }
@@ -67,7 +63,8 @@ app.use(express.urlencoded({ extended: false }));
 
 // =====================================================================
 // 💡 FIX 2: OAUTH POP-UP COMMUNICATION FIX (COOP/COEP Headers)
-// This resolves the Cross-Origin-Opener-Policy policy would block... error
+// MOVED TO THE TOP: This middleware MUST run early to apply headers 
+// to all static files and the initial page loads.
 app.use((req, res, next) => {
     // Set headers necessary for Google OAuth pop-up communication
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
@@ -80,8 +77,9 @@ app.use((req, res, next) => {
     const originalResJson = res.json;
     res.json = function (bodyJson, ...args) {
         capturedJsonResponse = bodyJson;
+        // Use assertion to silence TypeScript error about spread arguments in apply
         return originalResJson.apply(res, [bodyJson, ...args] as any);
-    } as any;
+    } as any; // Cast back to any after definition
 
     res.on("finish", () => {
         const duration = Date.now() - start;
