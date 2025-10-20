@@ -198,8 +198,8 @@ export const responses = pgTable("responses", {
 export const answers = pgTable("answers", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   responseId: uuid("response_id").references(() => responses.id, { onDelete: 'cascade' }).notNull(),
-  questionId: uuid("question_id").references(() => questions.id).notNull(),
-  subquestionId: uuid("subquestion_id").references(() => loopGroupSubquestions.id), // For loop group subquestion answers
+  questionId: uuid("question_id").references(() => questions.id, { onDelete: 'cascade' }).notNull(),
+  subquestionId: uuid("subquestion_id").references(() => loopGroupSubquestions.id, { onDelete: 'cascade' }), // For loop group subquestion answers
   loopIndex: integer("loop_index"), // For loop group answers
   value: jsonb("value").notNull(), // Stores answer data as JSON
   createdAt: timestamp("created_at").defaultNow(),

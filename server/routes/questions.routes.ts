@@ -126,26 +126,53 @@ export function registerQuestionRoutes(app: Express): void {
    */
   app.delete('/api/questions/:id', isAuthenticated, async (req: any, res) => {
     try {
+      console.log('[DELETE Question] Attempting to delete question:', req.params.id);
+
       const question = await storage.getQuestion(req.params.id);
       if (!question) {
+        console.log('[DELETE Question] Question not found:', req.params.id);
         return res.status(404).json({ message: "Question not found" });
       }
 
+      console.log('[DELETE Question] Found question:', {
+        id: question.id,
+        title: question.title,
+        pageId: question.pageId,
+        type: question.type
+      });
+
       const page = await storage.getSurveyPage(question.pageId);
       if (!page) {
+        console.log('[DELETE Question] Page not found:', question.pageId);
         return res.status(404).json({ message: "Page not found" });
       }
 
       const survey = await storage.getSurvey(page.surveyId);
       if (!survey || survey.creatorId !== req.user.claims.sub) {
+        console.log('[DELETE Question] Access denied. Survey creator:', survey?.creatorId, 'User:', req.user.claims.sub);
         return res.status(403).json({ message: "Access denied" });
       }
 
+      console.log('[DELETE Question] Authorization passed. Deleting question...');
       await storage.deleteQuestion(req.params.id);
+      console.log('[DELETE Question] Question deleted successfully');
+
       res.json({ message: "Question deleted successfully" });
     } catch (error) {
-      console.error("Error deleting question:", error);
-      res.status(500).json({ message: "Failed to delete question" });
+      console.error("[DELETE Question] Error deleting question:", error);
+      console.error("[DELETE Question] Error stack:", error instanceof Error ? error.stack : 'No stack trace');
+      console.error("[DELETE Question] Error details:", {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        code: (error as any)?.code,
+        detail: (error as any)?.detail,
+        constraint: (error as any)?.constraint
+      });
+
+      res.status(500).json({
+        message: "Failed to delete question",
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 
