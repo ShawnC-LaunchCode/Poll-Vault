@@ -3,42 +3,45 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
+// =======================================================================
+// 💡 FINAL FIX: HARDCODE THE CLIENT ID
+// This bypasses the failing Docker/Railway variable injection mechanism.
+// YOU MUST REPLACE THE STRING BELOW WITH YOUR ACTUAL CLIENT ID.
+const GOOGLE_CLIENT_ID_STRING = "853635559991-m8u2032kghq3nhcgaak27dpnh1uru4tu.apps.googleusercontent.com";
+// =======================================================================
+
 // Define a placeholder for the plugins that require dynamic import to avoid 
 // breaking the defineConfig function structure. 
-// We use 'await import' outside of the export default function.
 const cartographer = import("@replit/vite-plugin-cartographer").then((m) => m.cartographer());
 const devBanner = import("@replit/vite-plugin-dev-banner").then((m) => m.devBanner());
 
 // Use a simple array for the conditional plugins
 const conditionalPlugins = (async () => {
     if (process.env.NODE_ENV !== "production" && process.env.REPL_ID !== undefined) {
+        // These are imported asynchronously to match your original pattern
         return [await cartographer, await devBanner];
     }
     return [];
 })();
 
 
-// Use defineConfig with a function to ensure we get the correct mode,
-// and implement the explicit environment variable injection fix.
+// Use defineConfig with an async function (as you defined it)
 export default defineConfig(async ({ mode }) => {
     
-    // 1. Explicitly load environment variables. 
-    // This attempts to pick up local .env files, but the shell's variables (from Railway)
-    // take precedence, which is what we want.
+    // loadEnv is now redundant for the Client ID but kept for MODE/other variables
     const env = loadEnv(mode, process.cwd(), '');
 
-    // 2. Determine the final client ID value:
-    //    - First, check the value loaded by Vite's loadEnv helper (which checks the shell).
-    //    - Second, use a fallback to directly check the Node environment (process.env) 
-    //      as a redundant safety measure.
-    const googleClientId = env.VITE_GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
+    // 1. Determine the final client ID value:
+    // We prioritize the hardcoded string over the potentially blank value from env.
+    const finalClientId = GOOGLE_CLIENT_ID_STRING;
 
-    // 3. Define the explicit replacement for the client-side bundle.
+    // 2. Define the explicit replacement for the client-side bundle.
     // The value MUST be stringified to be baked into the client JS code.
     const clientEnvDefine = {
-        'import.meta.env.VITE_GOOGLE_CLIENT_ID': JSON.stringify(googleClientId),
-        // 💡 OPTIONAL: You can also explicitly define the MODE here to silence the
-        // "running in development mode" warning if you are certain you are building for production.
+        // This forces the hardcoded string into the client bundle at build time.
+        'import.meta.env.VITE_GOOGLE_CLIENT_ID': JSON.stringify(finalClientId),
+        
+        // This ensures the mode is correctly set for other logic
         'import.meta.env.MODE': JSON.stringify(mode),
     };
 
@@ -61,7 +64,6 @@ export default defineConfig(async ({ mode }) => {
         },
         root: path.resolve(import.meta.dirname, "client"),
         build: {
-            // Your build configuration is correct: it relies on the 'root' setting above
             outDir: path.resolve(import.meta.dirname, "dist/public"),
             emptyOutDir: true,
         },
