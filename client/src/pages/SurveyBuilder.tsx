@@ -1,33 +1,67 @@
-import { useEffect } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useParams } from "wouter";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useSurveyBuilder } from "@/hooks/useSurveyBuilder";
-import Sidebar from "@/components/layout/Sidebar";
-import Header from "@/components/layout/Header";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useBlockOperations } from "@/hooks/useBlockOperations";
+import { useReorderPages, useReorderQuestions } from "@/hooks/useReordering";
+import { useKeyboardShortcuts, type KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
+import { useAutoSave } from "@/hooks/useAutoSave";
+import { useSaveCoordinator } from "@/hooks/useSaveCoordinator";
 import { PublishChecklistModal } from "@/components/survey/PublishChecklistModal";
 import {
-  BuilderHeader,
+  TopNavBar,
+  BlocksToolbar,
   SurveySettingsPanel,
-  PagesPanel,
-  QuestionEditorPanel
+  PageBlock,
+  KeyboardShortcutsHelp,
 } from "@/features/survey-builder/components";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
+import type { SurveyPage, Question } from "@shared/schema";
 
 export default function SurveyBuilder() {
-  const { id } = useParams();
+  const { surveyId } = useParams();
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState("blocks");
+
+  // Blocks view state
+  const [collapsedPageIds, setCollapsedPageIds] = useState<Set<string>>(new Set());
+  const [filterText, setFilterText] = useState("");
+
+  // Local state for drag-and-drop
+  const [localPages, setLocalPages] = useState<SurveyPage[]>([]);
+
+  // Keyboard shortcuts modal state
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+
+  // Filter input ref for keyboard shortcut
+  const filterInputRef = useRef<HTMLInputElement>(null);
 
   const {
     // State
     surveyData,
     setSurveyData,
     anonymousSettings,
-    selectedPage,
-    setSelectedPage,
-    selectedQuestion,
-    setSelectedQuestion,
     currentSurveyId,
     publishModalOpen,
     setPublishModalOpen,
@@ -35,7 +69,6 @@ export default function SurveyBuilder() {
     // Data
     survey,
     pages,
-    pagesLoading,
 
     // Mutations
     surveyMutation,
@@ -43,16 +76,38 @@ export default function SurveyBuilder() {
     disableAnonymousMutation,
 
     // Handlers
-    handleSave,
-    handlePublish,
     handlePublishSuccess,
-    handlePreview,
     handleAddPage,
     handleDeletePage,
     handlePagesReordered,
     handleToggleAnonymous,
     handleAccessTypeChange,
-  } = useSurveyBuilder(id);
+  } = useSurveyBuilder(surveyId);
+
+  // Block operations hook
+  const effectiveSurveyId = surveyId || currentSurveyId || "";
+  const {
+    handleUpdatePage,
+    handleCopyPage,
+    handleAddQuestion,
+    handleUpdateQuestion,
+    handleCopyQuestion,
+    handleDeleteQuestion,
+  } = useBlockOperations(effectiveSurveyId);
+
+  // Reordering hooks
+  const reorderPagesMutation = useReorderPages(effectiveSurveyId);
+  const reorderQuestionsMutation = useReorderQuestions(effectiveSurveyId);
+
+  // Save coordinator for flushing pending changes
+  const { registerFlush, flushAll } = useSaveCoordinator();
+
+  // Update local pages when data changes
+  useEffect(() => {
+    if (pages) {
+      setLocalPages(pages);
+    }
+  }, [pages]);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -69,89 +124,491 @@ export default function SurveyBuilder() {
     }
   }, [isAuthenticated, authLoading, toast]);
 
+  // Auto-save for survey data
+  const { saveStatus, lastSavedAt, saveNow: autoSaveNow, hasUnsavedChanges } = useAutoSave({
+    data: surveyData,
+    onSave: async (data) => {
+      await surveyMutation.mutateAsync({
+        title: data.title,
+        description: data.description,
+        status: data.status,
+      });
+    },
+    delay: 2000, // 2 seconds after user stops typing
+    enabled: !!surveyId || !!currentSurveyId,
+  });
+
+  // Comprehensive save function that flushes all pending changes
+  const saveNow = () => {
+    // First, flush all pending question option saves
+    flushAll();
+    // Then, trigger the auto-save
+    autoSaveNow();
+  };
+
+  // Handler for saving survey title
+  const handleTitleSave = (title: string) => {
+    setSurveyData({ ...surveyData, title });
+  };
+
+  // Handler for toggling active/inactive status
+  const handleActivateToggle = (checked: boolean) => {
+    const newStatus = checked ? "open" : "draft";
+    setSurveyData({ ...surveyData, status: newStatus });
+  };
+
+  // Preview handler (for keyboard shortcut)
+  const handlePreview = () => {
+    window.open(`/surveys/${effectiveSurveyId}/preview`, "_blank");
+    toast({
+      title: "Opening preview",
+      description: "Preview opened in new tab",
+    });
+  };
+
+  // Collapse/expand all handler
+  const handleToggleCollapseAll = () => {
+    if (collapsedPageIds.size === localPages.length) {
+      // Expand all
+      setCollapsedPageIds(new Set());
+    } else {
+      // Collapse all
+      setCollapsedPageIds(new Set(localPages.map((p) => p.id)));
+    }
+  };
+
+  // Toggle single page collapse
+  const handleTogglePageCollapse = (pageId: string) => {
+    setCollapsedPageIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(pageId)) {
+        newSet.delete(pageId);
+      } else {
+        newSet.add(pageId);
+      }
+      return newSet;
+    });
+  };
+
+  // Drag-and-drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // 8px movement required before drag starts
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Page drag end handler
+  const handlePageDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    const oldIndex = localPages.findIndex((p) => p.id === active.id);
+    const newIndex = localPages.findIndex((p) => p.id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) {
+      return;
+    }
+
+    // Optimistic update
+    const reorderedPages = arrayMove(localPages, oldIndex, newIndex);
+    const pagesWithNewOrder = reorderedPages.map((page, index) => ({
+      ...page,
+      order: index + 1,
+    }));
+
+    setLocalPages(pagesWithNewOrder);
+    handlePagesReordered(pagesWithNewOrder);
+
+    // Send to server
+    try {
+      await reorderPagesMutation.mutateAsync(
+        pagesWithNewOrder.map((page) => ({
+          id: page.id,
+          order: page.order,
+        }))
+      );
+    } catch (error) {
+      // Revert on error
+      setLocalPages(pages || []);
+      handlePagesReordered(pages || []);
+      console.error("Failed to reorder pages:", error);
+    }
+  };
+
+  // Question drag end handler (within pages)
+  const handleQuestionDragEnd = async (
+    event: DragEndEvent,
+    pageId: string,
+    questions: Question[]
+  ) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    const oldIndex = questions.findIndex((q) => q.id === active.id);
+    const newIndex = questions.findIndex((q) => q.id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) {
+      return;
+    }
+
+    // Optimistic update
+    const reorderedQuestions = arrayMove(questions, oldIndex, newIndex);
+    const questionsWithNewOrder = reorderedQuestions.map((question, index) => ({
+      ...question,
+      order: index + 1,
+    }));
+
+    // Send to server
+    try {
+      await reorderQuestionsMutation.mutateAsync(
+        questionsWithNewOrder.map((question) => ({
+          id: question.id,
+          pageId: question.pageId,
+          order: question.order,
+        }))
+      );
+    } catch (error) {
+      console.error("Failed to reorder questions:", error);
+    }
+  };
+
+  // Get questions for a specific page
+  const getQuestionsForPage = (pageId: string): Question[] => {
+    // Find the page in localPages and get its questions
+    const page = localPages.find((p) => p.id === pageId);
+    if (!page) return [];
+
+    // Questions are now nested in the page object from the API
+    return (page as any).questions || [];
+  };
+
+  // Filter pages and questions
+  const filteredPages = useMemo(() => {
+    if (!filterText.trim()) {
+      return localPages;
+    }
+
+    const searchTerm = filterText.toLowerCase();
+    return localPages.filter((page) => {
+      // Check if page title matches
+      if (page.title.toLowerCase().includes(searchTerm)) {
+        return true;
+      }
+
+      // Check if any question in the page matches
+      const pageQuestions = getQuestionsForPage(page.id);
+      return pageQuestions.some((q) =>
+        q.title.toLowerCase().includes(searchTerm)
+      );
+    });
+  }, [localPages, filterText]);
+
   if (authLoading || !isAuthenticated) {
     return null;
   }
 
+  const isActive = surveyData.status === "open";
+  const allCollapsed = collapsedPageIds.size === localPages.length && localPages.length > 0;
+
+  // Define keyboard shortcuts
+  const shortcuts: KeyboardShortcut[] = [
+    {
+      key: "s",
+      ctrl: true,
+      description: "Save survey",
+      action: () => {
+        saveNow();
+        toast({ title: "Saved", description: "Survey saved manually" });
+      },
+    },
+    {
+      key: "p",
+      ctrl: true,
+      description: "Preview survey",
+      action: handlePreview,
+    },
+    {
+      key: "k",
+      ctrl: true,
+      description: "Show keyboard shortcuts",
+      action: () => setShowShortcutsHelp(true),
+    },
+    {
+      key: "n",
+      ctrl: true,
+      description: "Add new page",
+      action: handleAddPage,
+    },
+    {
+      key: "f",
+      ctrl: true,
+      description: "Focus filter",
+      action: () => {
+        if (activeTab === "blocks" && filterInputRef.current) {
+          filterInputRef.current.focus();
+        }
+      },
+    },
+    {
+      key: "1",
+      ctrl: true,
+      description: "Switch to Blocks tab",
+      action: () => setActiveTab("blocks"),
+    },
+    {
+      key: "2",
+      ctrl: true,
+      description: "Switch to Templates tab",
+      action: () => setActiveTab("templates"),
+    },
+    {
+      key: "3",
+      ctrl: true,
+      description: "Switch to Publish tab",
+      action: () => setActiveTab("publish"),
+    },
+    {
+      key: "4",
+      ctrl: true,
+      description: "Switch to Settings tab",
+      action: () => setActiveTab("settings"),
+    },
+    {
+      key: "[",
+      ctrl: true,
+      description: "Collapse all pages",
+      action: () => {
+        if (localPages.length > 0) {
+          setCollapsedPageIds(new Set(localPages.map((p) => p.id)));
+          toast({ title: "Collapsed all pages" });
+        }
+      },
+    },
+    {
+      key: "]",
+      ctrl: true,
+      description: "Expand all pages",
+      action: () => {
+        setCollapsedPageIds(new Set());
+        toast({ title: "Expanded all pages" });
+      },
+    },
+    {
+      key: "Escape",
+      description: "Close modals",
+      action: () => {
+        setShowShortcutsHelp(false);
+      },
+    },
+  ];
+
+  // Enable keyboard shortcuts
+  useKeyboardShortcuts({ shortcuts, enabled: !authLoading && isAuthenticated });
+
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
+    <div className="flex flex-col h-screen bg-gray-50">
+      {/* Top Navigation Bar */}
+      <TopNavBar
+        surveyId={effectiveSurveyId}
+        surveyTitle={surveyData.title}
+        isActive={isActive}
+        activeTab={activeTab}
+        saveStatus={saveStatus}
+        lastSavedAt={lastSavedAt}
+        hasUnsavedChanges={hasUnsavedChanges}
+        onTitleSave={handleTitleSave}
+        onActivateToggle={handleActivateToggle}
+        onTabChange={setActiveTab}
+        onManualSave={saveNow}
+      />
 
-      <main className="flex-1 flex flex-col overflow-hidden">
-        <Header
-          title="Survey Builder"
-          description="Create and design your survey"
-          actions={
-            <BuilderHeader
-              survey={survey}
-              surveyTitle={surveyData.title}
-              currentSurveyId={currentSurveyId}
-              isSaving={surveyMutation.isPending}
-              onSave={handleSave}
-              onPublish={handlePublish}
-              onPreview={handlePreview}
-            />
-          }
-        />
+      {/* Blocks Toolbar - Only visible on Blocks tab */}
+      {activeTab === "blocks" && (
+        <div className="border-b bg-gray-50 px-6 py-3">
+          <div className="flex items-center justify-between">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleToggleCollapseAll}
+              className="gap-2"
+            >
+              {allCollapsed ? "Expand All Blocks" : "Collapse All Blocks"}
+            </Button>
 
-        <div className="flex-1 flex overflow-hidden">
-          {/* Left Panel - Survey Structure */}
-          <div className="w-80 border-r border-border bg-muted/30 p-4 overflow-y-auto">
-            <Tabs defaultValue="settings" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="settings" data-testid="tab-settings">Settings</TabsTrigger>
-                <TabsTrigger value="pages" data-testid="tab-pages">Pages</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="settings" className="space-y-4">
-                <SurveySettingsPanel
-                  surveyData={surveyData}
-                  anonymousSettings={anonymousSettings}
-                  surveyId={id || currentSurveyId}
-                  isEnabling={enableAnonymousMutation.isPending}
-                  isDisabling={disableAnonymousMutation.isPending}
-                  onSurveyDataChange={setSurveyData}
-                  onToggleAnonymous={handleToggleAnonymous}
-                  onAccessTypeChange={handleAccessTypeChange}
-                />
-              </TabsContent>
-
-              <TabsContent value="pages" className="space-y-4">
-                <PagesPanel
-                  pages={pages}
-                  pagesLoading={pagesLoading}
-                  surveyId={id || currentSurveyId}
-                  selectedPageId={selectedPage}
-                  onSelectPage={setSelectedPage}
-                  onAddPage={handleAddPage}
-                  onDeletePage={handleDeletePage}
-                  onPagesReordered={handlePagesReordered}
-                />
-              </TabsContent>
-            </Tabs>
-          </div>
-
-          {/* Right Panel - Question Editor */}
-          <div className="flex-1 p-6 overflow-y-auto">
-            <QuestionEditorPanel
-              selectedPageId={selectedPage}
-              selectedQuestion={selectedQuestion}
-              surveyId={id || ""}
-              onQuestionSelect={setSelectedQuestion}
+            <input
+              ref={filterInputRef}
+              type="text"
+              placeholder="Filter blocks by page or question... (Ctrl+F)"
+              value={filterText}
+              onChange={(e) => setFilterText(e.target.value)}
+              className="max-w-md px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+        </div>
+      )}
+
+      {/* Main Content Area */}
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-6xl mx-auto p-6">
+          {/* Blocks Tab */}
+          {activeTab === "blocks" && (
+            <div className="space-y-4">
+              {filteredPages.length === 0 && !filterText ? (
+                // Empty state - no pages
+                <Card>
+                  <CardContent className="text-center py-12">
+                    <p className="text-gray-500 mb-4">
+                      No pages yet. Add your first page to get started.
+                    </p>
+                    <Button onClick={handleAddPage} className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Add First Page
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : filteredPages.length === 0 && filterText ? (
+                // Empty state - filter results
+                <Card>
+                  <CardContent className="text-center py-12">
+                    <p className="text-gray-500">
+                      No pages or questions match your filter "{filterText}"
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                // Pages with drag-and-drop
+                <>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handlePageDragEnd}
+                  >
+                    <SortableContext
+                      items={filteredPages.map((p) => p.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {filteredPages.map((page) => {
+                        const pageQuestions = getQuestionsForPage(page.id);
+
+                        return (
+                          <DndContext
+                            key={page.id}
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={(event) => handleQuestionDragEnd(event, page.id, pageQuestions)}
+                          >
+                            <PageBlock
+                              page={page}
+                              questions={pageQuestions}
+                              isCollapsed={collapsedPageIds.has(page.id)}
+                              onToggleCollapse={handleTogglePageCollapse}
+                              onUpdatePage={handleUpdatePage}
+                              onCopyPage={handleCopyPage}
+                              onDeletePage={handleDeletePage}
+                              onAddQuestion={handleAddQuestion}
+                              onUpdateQuestion={handleUpdateQuestion}
+                              onCopyQuestion={handleCopyQuestion}
+                              onDeleteQuestion={handleDeleteQuestion}
+                              registerFlush={registerFlush}
+                            />
+                          </DndContext>
+                        );
+                      })}
+                    </SortableContext>
+                  </DndContext>
+
+                  {/* Add Page Button */}
+                  <Button
+                    onClick={handleAddPage}
+                    variant="outline"
+                    className="w-full border-dashed border-2 h-16 gap-2"
+                  >
+                    <Plus className="h-5 w-5" />
+                    Add Another Page
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Templates Tab - Placeholder */}
+          {activeTab === "templates" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Survey Templates</CardTitle>
+                <CardDescription>
+                  Choose from pre-built templates or save your own.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-500 text-center py-12">
+                  Templates feature coming soon...
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Publish Tab */}
+          {activeTab === "publish" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Publish Survey</CardTitle>
+                <CardDescription>
+                  Configure and publish your survey to start collecting responses.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-500 text-center py-12">
+                  Publish checklist will appear here...
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Settings Tab */}
+          {activeTab === "settings" && (
+            <div className="space-y-4">
+              <SurveySettingsPanel
+                surveyData={surveyData}
+                anonymousSettings={anonymousSettings}
+                surveyId={effectiveSurveyId}
+                isEnabling={enableAnonymousMutation.isPending}
+                isDisabling={disableAnonymousMutation.isPending}
+                onSurveyDataChange={setSurveyData}
+                onToggleAnonymous={handleToggleAnonymous}
+                onAccessTypeChange={handleAccessTypeChange}
+              />
+            </div>
+          )}
         </div>
       </main>
 
       {/* Publish Checklist Modal */}
-      {(id || currentSurveyId) && (
+      {effectiveSurveyId && (
         <PublishChecklistModal
-          surveyId={id || currentSurveyId!}
+          surveyId={effectiveSurveyId}
           open={publishModalOpen}
           onOpenChange={setPublishModalOpen}
           onSuccess={handlePublishSuccess}
         />
       )}
+
+      {/* Keyboard Shortcuts Help Modal */}
+      <KeyboardShortcutsHelp
+        open={showShortcutsHelp}
+        onClose={() => setShowShortcutsHelp(false)}
+      />
     </div>
   );
 }

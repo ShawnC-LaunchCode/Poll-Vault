@@ -10,12 +10,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { InlineEditableTitle } from "@/components/shared/InlineEditableTitle";
 import type { Question } from "@shared/schema";
+import type { FlushFunction } from "@/hooks/useSaveCoordinator";
 
 interface QuestionCardProps {
   question: Question;
   onUpdateQuestion: (questionId: string, data: Partial<Question>) => void;
   onCopyQuestion: (questionId: string) => void;
   onDeleteQuestion: (questionId: string) => void;
+  registerFlush?: (id: string, flushFn: FlushFunction) => () => void;
 }
 
 const questionTypeLabels: Record<string, string> = {
@@ -34,6 +36,7 @@ export function QuestionCard({
   onUpdateQuestion,
   onCopyQuestion,
   onDeleteQuestion,
+  registerFlush,
 }: QuestionCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [localOptions, setLocalOptions] = useState<string[]>(
@@ -43,10 +46,50 @@ export function QuestionCard({
   // Debounce timer ref for option updates
   const optionsDebounceTimer = useRef<NodeJS.Timeout | null>(null);
 
+  // Flush function to immediately save any pending changes
+  const flushPendingSaves = useRef<FlushFunction>(() => {
+    if (optionsDebounceTimer.current) {
+      clearTimeout(optionsDebounceTimer.current);
+      optionsDebounceTimer.current = null;
+
+      const currentOptions = localOptions;
+      const questionOptions = (question.options as string[]) || [];
+      if (JSON.stringify(currentOptions) !== JSON.stringify(questionOptions)) {
+        onUpdateQuestion(question.id, { options: currentOptions as any });
+      }
+    }
+  });
+
   // Sync localOptions when question.options changes from external source
   useEffect(() => {
     setLocalOptions((question.options as string[]) || []);
   }, [question.options]);
+
+  // Register flush function with coordinator
+  useEffect(() => {
+    if (registerFlush) {
+      const cleanup = registerFlush(question.id, () => {
+        flushPendingSaves.current();
+      });
+      return cleanup;
+    }
+  }, [question.id, registerFlush]);
+
+  // Update flush function ref when dependencies change
+  useEffect(() => {
+    flushPendingSaves.current = () => {
+      if (optionsDebounceTimer.current) {
+        clearTimeout(optionsDebounceTimer.current);
+        optionsDebounceTimer.current = null;
+
+        const currentOptions = localOptions;
+        const questionOptions = (question.options as string[]) || [];
+        if (JSON.stringify(currentOptions) !== JSON.stringify(questionOptions)) {
+          onUpdateQuestion(question.id, { options: currentOptions as any });
+        }
+      }
+    };
+  }, [localOptions, question.id, question.options, onUpdateQuestion]);
 
   const {
     attributes,
@@ -64,6 +107,11 @@ export function QuestionCard({
   };
 
   const handleTitleSave = (title: string) => {
+    console.log('[QuestionCard] handleTitleSave called', {
+      questionId: question.id,
+      newTitle: title,
+      currentTitle: question.title
+    });
     onUpdateQuestion(question.id, { title });
   };
 

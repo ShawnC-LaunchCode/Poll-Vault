@@ -71,6 +71,85 @@ export function registerQuestionRoutes(app: Express): void {
   });
 
   /**
+   * PUT /api/questions/:id
+   * Update a question
+   */
+  app.put('/api/questions/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      console.log('[Question Update] Request received for question:', req.params.id);
+      console.log('[Question Update] Request body:', JSON.stringify(req.body, null, 2));
+
+      const question = await storage.getQuestion(req.params.id);
+      if (!question) {
+        return res.status(404).json({ message: "Question not found" });
+      }
+
+      console.log('[Question Update] Current question data:', {
+        id: question.id,
+        title: question.title,
+        description: question.description,
+        type: question.type
+      });
+
+      const page = await storage.getSurveyPage(question.pageId);
+      if (!page) {
+        return res.status(404).json({ message: "Page not found" });
+      }
+
+      const survey = await storage.getSurvey(page.surveyId);
+      if (!survey || survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const updates = insertQuestionSchema.partial().parse(req.body);
+      console.log('[Question Update] Parsed updates:', JSON.stringify(updates, null, 2));
+
+      const updatedQuestion = await storage.updateQuestion(req.params.id, updates);
+
+      console.log('[Question Update] Updated question data:', {
+        id: updatedQuestion.id,
+        title: updatedQuestion.title,
+        description: updatedQuestion.description,
+        type: updatedQuestion.type
+      });
+
+      res.json(updatedQuestion);
+    } catch (error) {
+      console.error("Error updating question:", error);
+      res.status(500).json({ message: "Failed to update question" });
+    }
+  });
+
+  /**
+   * DELETE /api/questions/:id
+   * Delete a question
+   */
+  app.delete('/api/questions/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const question = await storage.getQuestion(req.params.id);
+      if (!question) {
+        return res.status(404).json({ message: "Question not found" });
+      }
+
+      const page = await storage.getSurveyPage(question.pageId);
+      if (!page) {
+        return res.status(404).json({ message: "Page not found" });
+      }
+
+      const survey = await storage.getSurvey(page.surveyId);
+      if (!survey || survey.creatorId !== req.user.claims.sub) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      await storage.deleteQuestion(req.params.id);
+      res.json({ message: "Question deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting question:", error);
+      res.status(500).json({ message: "Failed to delete question" });
+    }
+  });
+
+  /**
    * PUT /api/surveys/:surveyId/questions/reorder
    * Bulk reorder questions across pages
    */

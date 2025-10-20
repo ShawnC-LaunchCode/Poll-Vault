@@ -250,6 +250,10 @@ export function useBlockOperations(surveyId: string) {
   };
 
   const handleUpdateQuestion = (questionId: string, data: Partial<Question>) => {
+    console.log('[useBlockOperations] handleUpdateQuestion called', {
+      questionId,
+      data
+    });
     updateQuestionMutation.mutate({ questionId, data });
   };
 

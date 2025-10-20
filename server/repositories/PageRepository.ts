@@ -1,5 +1,5 @@
 import { BaseRepository, type DbTransaction } from "./BaseRepository";
-import { surveyPages, type SurveyPage, type InsertSurveyPage } from "@shared/schema";
+import { surveyPages, questions, type SurveyPage, type InsertSurveyPage, type Question } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
 /**
@@ -21,6 +21,38 @@ export class PageRepository extends BaseRepository<typeof surveyPages, SurveyPag
       .from(surveyPages)
       .where(eq(surveyPages.surveyId, surveyId))
       .orderBy(surveyPages.order);
+  }
+
+  /**
+   * Find pages by survey ID with nested questions (ordered)
+   */
+  async findBySurveyWithQuestions(surveyId: string, tx?: DbTransaction): Promise<(SurveyPage & { questions: Question[] })[]> {
+    const database = this.getDb(tx);
+
+    // Get all pages
+    const pages = await database
+      .select()
+      .from(surveyPages)
+      .where(eq(surveyPages.surveyId, surveyId))
+      .orderBy(surveyPages.order);
+
+    // Fetch questions for all pages
+    const pagesWithQuestions = await Promise.all(
+      pages.map(async (page: SurveyPage) => {
+        const pageQuestions = await database
+          .select()
+          .from(questions)
+          .where(eq(questions.pageId, page.id))
+          .orderBy(questions.order);
+
+        return {
+          ...page,
+          questions: pageQuestions as Question[]
+        };
+      })
+    );
+
+    return pagesWithQuestions;
   }
 
   /**

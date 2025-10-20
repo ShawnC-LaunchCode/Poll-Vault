@@ -134,7 +134,7 @@ export default function SurveysList() {
                       </div>
                       
                       <div className="flex flex-wrap gap-2 pt-2">
-                        <Link href={`/surveys/${survey.id}/edit`}>
+                        <Link href={`/builder/${survey.id}`}>
                           <Button variant="outline" size="sm" data-testid={`button-edit-survey-${survey.id}`}>
                             <Edit className="w-4 h-4 mr-1" />
                             Edit

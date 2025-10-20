@@ -30,21 +30,33 @@ export function useSurveyPlayer(identifier: string | undefined) {
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [surveyStartTime, setSurveyStartTime] = useState<number | null>(null);
 
-  // Load survey data
+  // Load survey data (works with both recipient tokens and public links)
   const { data: surveyData, isLoading, error } = useQuery<SurveyData>({
     queryKey: ["/api/survey-by-identifier", identifier],
     queryFn: async () => {
-      const isPublicLink = identifier?.length === 36 && identifier.includes('-');
-
-      const endpoint = isPublicLink
-        ? `/api/anonymous-survey/${identifier}`
-        : `/api/survey/${identifier}`;
+      // Use the unified endpoint that auto-detects token vs public link
+      const endpoint = `/api/survey/${identifier}`;
 
       const response = await fetch(endpoint);
       if (!response.ok) {
-        throw new Error(`Survey not found: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Survey not found: ${response.status}`);
       }
-      return await response.json();
+      const data = await response.json();
+
+      // Debug logging
+      console.log('[SurveyPlayer] Survey data received:', {
+        surveyTitle: data.survey?.title,
+        pagesCount: data.pages?.length,
+        firstPage: data.pages?.[0],
+        firstPageQuestions: data.pages?.[0]?.questions?.map((q: any) => ({
+          id: q.id,
+          title: q.title,
+          type: q.type
+        }))
+      });
+
+      return data;
     },
     retry: false,
   });
@@ -56,17 +68,31 @@ export function useSurveyPlayer(identifier: string | undefined) {
     retry: false,
   });
 
-  // Set anonymous state
+  // Set anonymous state and create response when survey loads
   useEffect(() => {
     if (surveyData) {
       setIsAnonymous(!!surveyData.anonymous);
+
+      // Create response immediately when survey loads (don't wait for first answer)
+      // This ensures we always have a responseId before submission
+      if (!responseId && !isSubmitted) {
+        createResponseMutation.mutate();
+      }
     }
   }, [surveyData]);
 
   // Create response mutation
   const createResponseMutation = useMutation({
     mutationFn: async () => {
-      if (isAnonymous) {
+      if (!surveyData?.survey?.id) {
+        throw new Error("Survey data not loaded");
+      }
+
+      // Check surveyData.anonymous directly (not isAnonymous state which may not be updated yet)
+      const isAnonymousSurvey = !!surveyData.anonymous;
+
+      if (isAnonymousSurvey) {
+        // Anonymous response (using public link)
         const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         setSessionId(newSessionId);
 
@@ -76,7 +102,8 @@ export function useSurveyPlayer(identifier: string | undefined) {
           screenResolution: `${screen.width}x${screen.height}`
         });
       } else {
-        return await apiRequest("POST", `/api/surveys/${surveyData?.survey?.id}/responses`, {
+        // Authenticated response (using recipient token)
+        return await apiRequest("POST", `/api/surveys/${surveyData.survey.id}/responses`, {
           token: identifier
         });
       }
@@ -195,8 +222,9 @@ export function useSurveyPlayer(identifier: string | undefined) {
 
     // Mutations
     createResponse: createResponseMutation.mutate,
+    isCreatingResponse: createResponseMutation.isPending,
     createAnswer: createAnswerMutation.mutate,
-    submitResponse: submitMutation.mutate,
+    submitResponse: submitMutation.mutateAsync,
     submitPending: submitMutation.isPending,
 
     // Helpers

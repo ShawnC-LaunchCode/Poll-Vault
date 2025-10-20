@@ -229,9 +229,72 @@ export class SurveyService {
 
   /**
    * Get survey by public link (for anonymous access)
+   * Returns survey with pages and questions, validates anonymous access is enabled
    */
-  async getSurveyByPublicLink(publicLink: string): Promise<Survey | undefined> {
-    return await surveyRepository.findByPublicLink(publicLink);
+  async getSurveyByPublicLink(publicLink: string): Promise<{
+    survey: Survey;
+    pages: any[];
+  }> {
+    console.log('[SurveyService] getSurveyByPublicLink called with:', publicLink);
+
+    // Look up survey by public link
+    const survey = await surveyRepository.findByPublicLink(publicLink);
+
+    if (!survey) {
+      console.log('[SurveyService] Survey not found for public link:', publicLink);
+      throw new Error("Survey not found");
+    }
+
+    console.log('[SurveyService] Survey found:', {
+      id: survey.id,
+      title: survey.title,
+      status: survey.status,
+      allowAnonymous: survey.allowAnonymous,
+      publicLink: survey.publicLink
+    });
+
+    // Verify survey is open and allows anonymous access
+    if (survey.status !== 'open') {
+      console.log('[SurveyService] Survey not open. Status:', survey.status);
+      throw new Error("Survey not available");
+    }
+
+    if (!survey.allowAnonymous) {
+      console.log('[SurveyService] Anonymous access not allowed:', survey.allowAnonymous);
+      throw new Error("Survey not available");
+    }
+
+    console.log('[SurveyService] Survey validation passed, fetching pages...');
+
+    // Fetch pages with questions
+    const pages = await pageRepository.findBySurvey(survey.id);
+
+    console.log('[SurveyService] Pages fetched:', pages.length);
+
+    // Fetch questions for each page
+    const pagesWithQuestions = await Promise.all(
+      pages.map(async (page) => {
+        const pageQuestions = await questionRepository.findByPage(page.id);
+        console.log('[SurveyService] Questions for page', page.id, ':', pageQuestions.map(q => ({
+          id: q.id,
+          title: q.title,
+          type: q.type,
+          description: q.description
+        })));
+        return {
+          ...page,
+          questions: pageQuestions
+        };
+      })
+    );
+
+    console.log('[SurveyService] Returning survey data with', pagesWithQuestions.length, 'pages');
+    console.log('[SurveyService] Total questions across all pages:', pagesWithQuestions.reduce((sum, p: any) => sum + (p.questions?.length || 0), 0));
+
+    return {
+      survey,
+      pages: pagesWithQuestions
+    };
   }
 }
 

@@ -18,6 +18,7 @@ interface TopNavBarProps {
   onTitleSave: (title: string) => void;
   onActivateToggle: (active: boolean) => void;
   onTabChange: (tab: string) => void;
+  onManualSave?: () => void;
 }
 
 export function TopNavBar({
@@ -31,6 +32,7 @@ export function TopNavBar({
   onTitleSave,
   onActivateToggle,
   onTabChange,
+  onManualSave,
 }: TopNavBarProps) {
   const [, navigate] = useLocation();
 
@@ -105,6 +107,18 @@ export function TopNavBar({
           placeholder="Untitled Survey"
         />
         {renderSaveStatus()}
+        {onManualSave && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onManualSave}
+            disabled={saveStatus === "saving"}
+            className="h-8 w-8 p-0"
+            title="Save now (Ctrl+S)"
+          >
+            <Save className="w-4 h-4" />
+          </Button>
+        )}
       </div>
 
       {/* CENTER - Navigation Tabs */}

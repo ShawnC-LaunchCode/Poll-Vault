@@ -35,7 +35,7 @@ export default function SurveyPlayer() {
     conditionalRules,
     isLoading,
     error,
-    createResponse,
+    isCreatingResponse,
     createAnswer,
     submitResponse,
     submitPending,
@@ -134,12 +134,8 @@ export default function SurveyPlayer() {
       [questionId]: value
     }));
 
-    // Create response if it doesn't exist
-    if (!responseId && surveyData?.survey) {
-      createResponse();
-    }
-
     // Create answer if response exists and we don't have an answer ID yet
+    // Note: Response is now created automatically when survey loads
     if (responseId && !answerIds[questionId]) {
       createAnswer({ questionId, value });
 
@@ -229,17 +225,20 @@ export default function SurveyPlayer() {
       // Save any pending answers before completing
       await savePendingAnswers();
 
-      // Complete the response
-      submitResponse();
+      // Wait a brief moment to ensure all in-flight requests complete
+      await new Promise(resolve => setTimeout(resolve, 200));
 
-      // Track survey completion
+      // Complete the response - this MUST be awaited to prevent race conditions
+      await submitResponse();
+
+      // Track survey completion after successful submission
       const totalTime = surveyStartTime ? Date.now() - surveyStartTime : 0;
       const totalQuestions = surveyData?.pages?.reduce((sum, page) => sum + (page.questions?.length || 0), 0) || 0;
       trackSurveyComplete(totalQuestions, Object.keys(answers).length, totalTime);
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to save answers. Please try again.",
+        description: error.message || "Failed to submit survey. Please try again.",
         variant: "destructive",
       });
     }
@@ -298,7 +297,7 @@ export default function SurveyPlayer() {
             currentPageIndex={currentPageIndex}
             totalPages={totalPages}
             canProceed={canProceed()}
-            isSubmitting={submitPending}
+            isSubmitting={submitPending || isCreatingResponse}
             onPrevious={handlePrevious}
             onNext={handleNext}
           />

@@ -86,6 +86,7 @@ export interface IStorage {
   createSurveyPage(page: InsertSurveyPage): Promise<SurveyPage>;
   getSurveyPage(id: string): Promise<SurveyPage | undefined>;
   getSurveyPages(surveyId: string): Promise<SurveyPage[]>;
+  getSurveyPagesWithQuestions(surveyId: string): Promise<(SurveyPage & { questions: Question[] })[]>;
   updateSurveyPage(id: string, updates: Partial<InsertSurveyPage>): Promise<SurveyPage>;
   deleteSurveyPage(id: string): Promise<void>;
   bulkReorderPages(surveyId: string, pageOrders: Array<{ id: string; order: number }>): Promise<SurveyPage[]>;
@@ -254,6 +255,10 @@ export class DatabaseStorage implements IStorage {
 
   async getSurveyPages(surveyId: string): Promise<SurveyPage[]> {
     return await pageRepository.findBySurvey(surveyId);
+  }
+
+  async getSurveyPagesWithQuestions(surveyId: string): Promise<(SurveyPage & { questions: Question[] })[]> {
+    return await pageRepository.findBySurveyWithQuestions(surveyId);
   }
 
   async updateSurveyPage(id: string, updates: Partial<InsertSurveyPage>): Promise<SurveyPage> {

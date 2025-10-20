@@ -38,7 +38,8 @@ function Router() {
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/surveys" component={SurveysList} />
           <Route path="/surveys/new" component={SurveyBuilder} />
-          <Route path="/surveys/:id/edit" component={SurveyBuilder} />
+          <Route path="/builder/:surveyId" component={SurveyBuilder} />
+          <Route path="/builder/:surveyId/preview" component={SurveyPreview} />
           <Route path="/surveys/:id/preview" component={SurveyPreview} />
           <Route path="/surveys/:surveyId/results" component={SurveyResults} />
           <Route path="/surveys/:id/responses" component={Responses} />

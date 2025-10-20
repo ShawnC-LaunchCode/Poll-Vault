@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { evaluatePageConditionalLogic } from "@shared/conditionalLogic";
 import type { ConditionalRule, QuestionWithSubquestions } from "@shared/schema";
 
@@ -8,12 +8,28 @@ export function useConditionalLogic(
   currentPageQuestions: QuestionWithSubquestions[] | undefined
 ) {
   const [visibleQuestions, setVisibleQuestions] = useState<Record<string, boolean>>({});
+  const previousQuestionsRef = useRef<string>("");
 
   useEffect(() => {
-    if (!conditionalRules.length || !currentPageQuestions) {
+    // Create a stable key from current questions to detect actual changes
+    const currentQuestionsKey = currentPageQuestions?.map(q => q.id).sort().join(',') || '';
+
+    // If questions haven't changed and we already have visibility data, skip
+    if (currentQuestionsKey === previousQuestionsRef.current && Object.keys(visibleQuestions).length > 0) {
+      return;
+    }
+
+    previousQuestionsRef.current = currentQuestionsKey;
+
+    if (!currentPageQuestions || currentPageQuestions.length === 0) {
+      setVisibleQuestions({});
+      return;
+    }
+
+    if (!conditionalRules.length) {
       // If no rules, all questions are visible
       const allVisible: Record<string, boolean> = {};
-      currentPageQuestions?.forEach(q => {
+      currentPageQuestions.forEach(q => {
         allVisible[q.id] = true;
       });
       setVisibleQuestions(allVisible);
@@ -34,8 +50,12 @@ export function useConditionalLogic(
       newVisibility[result.questionId] = result.visible;
     });
 
-    setVisibleQuestions(newVisibility);
-  }, [answers, conditionalRules, currentPageQuestions]);
+    // Only update if visibility actually changed
+    const hasChanged = JSON.stringify(newVisibility) !== JSON.stringify(visibleQuestions);
+    if (hasChanged) {
+      setVisibleQuestions(newVisibility);
+    }
+  }, [answers, conditionalRules, currentPageQuestions, visibleQuestions]);
 
   return { visibleQuestions };
 }

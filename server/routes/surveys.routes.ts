@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { isAuthenticated } from "../googleAuth";
 import { insertSurveySchema } from "@shared/schema";
 import { surveyService, analyticsService } from "../services";
+import { recipientRepository, surveyRepository, pageRepository, questionRepository } from "../repositories";
 import { z } from "zod";
 import { exportService } from "../services/exportService";
 
@@ -61,6 +62,38 @@ export function registerSurveyRoutes(app: Express): void {
     } catch (error) {
       console.error("Error fetching surveys:", error);
       res.status(500).json({ message: "Failed to fetch surveys" });
+    }
+  });
+
+  /**
+   * GET /api/surveys/check/:publicLink
+   * TEMPORARY: Check survey status by public link for debugging
+   */
+  app.get('/api/surveys/check/:publicLink', async (req, res) => {
+    try {
+      const { publicLink } = req.params;
+      const { surveyRepository } = require('../repositories');
+      const survey = await surveyRepository.findByPublicLink(publicLink);
+
+      if (!survey) {
+        return res.json({ found: false, publicLink });
+      }
+
+      res.json({
+        found: true,
+        title: survey.title,
+        status: survey.status,
+        allowAnonymous: survey.allowAnonymous,
+        anonymousAccessType: survey.anonymousAccessType,
+        publicLink: survey.publicLink,
+        diagnosis: {
+          statusOk: survey.status === 'open',
+          anonymousOk: survey.allowAnonymous === true,
+          ready: survey.status === 'open' && survey.allowAnonymous === true
+        }
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -196,6 +229,131 @@ export function registerSurveyRoutes(app: Express): void {
   // ============================================================================
   // Anonymous Access Management
   // ============================================================================
+
+  /**
+   * GET /api/survey/:identifier
+   * Get survey data by identifier (auto-detects recipient token or public link)
+   */
+  app.get('/api/survey/:identifier', async (req, res) => {
+    try {
+      const { identifier } = req.params;
+      console.log('[Survey] Request received for identifier:', identifier);
+
+      // First, try to find recipient by token
+      const recipient = await recipientRepository.findByToken(identifier);
+
+      if (recipient) {
+        // This is a recipient token
+        console.log('[Survey] Recipient found:', {
+          id: recipient.id,
+          surveyId: recipient.surveyId,
+          name: recipient.name
+        });
+
+        // Get survey data
+        const survey = await surveyRepository.findById(recipient.surveyId);
+        if (!survey) {
+          console.log('[Survey] Survey not found');
+          return res.status(404).json({ message: "Survey not found" });
+        }
+
+        // Check if survey is open
+        if (survey.status !== 'open') {
+          console.log('[Survey] Survey not open, status:', survey.status);
+          return res.status(400).json({ message: "Survey is not currently open" });
+        }
+
+        // Get pages with questions
+        const pages = await pageRepository.findBySurvey(survey.id);
+        const pagesWithQuestions = await Promise.all(
+          pages.map(async (page: any) => ({
+            ...page,
+            questions: await questionRepository.findByPage(page.id)
+          }))
+        );
+
+        console.log('[Survey] Survey found via token:', {
+          id: survey.id,
+          title: survey.title,
+          status: survey.status,
+          pageCount: pagesWithQuestions.length
+        });
+
+        return res.json({
+          survey,
+          pages: pagesWithQuestions,
+          recipient,
+          anonymous: false
+        });
+      }
+
+      // Not a recipient token, try as public link
+      console.log('[Survey] Not a recipient token, trying as public link');
+
+      const surveyData = await surveyService.getSurveyByPublicLink(identifier);
+
+      console.log('[Survey] Survey found via public link:', {
+        id: surveyData.survey.id,
+        title: surveyData.survey.title,
+        status: surveyData.survey.status,
+        allowAnonymous: surveyData.survey.allowAnonymous,
+        pageCount: surveyData.pages.length
+      });
+
+      return res.json({
+        survey: surveyData.survey,
+        pages: surveyData.pages,
+        anonymous: true
+      });
+    } catch (error) {
+      console.error("[Survey] Error:", error);
+      if (error instanceof Error) {
+        console.error("[Survey] Error message:", error.message);
+        console.error("[Survey] Error stack:", error.stack);
+        if (error.message === "Survey not found" || error.message === "Survey not available") {
+          return res.status(404).json({ message: error.message });
+        }
+      }
+      res.status(500).json({ message: "Failed to fetch survey" });
+    }
+  });
+
+  /**
+   * GET /api/anonymous-survey/:publicLink
+   * Get survey data for anonymous respondents using public link
+   */
+  app.get('/api/anonymous-survey/:publicLink', async (req, res) => {
+    try {
+      const { publicLink } = req.params;
+      console.log('[Anonymous Survey] Request received for public link:', publicLink);
+
+      const surveyData = await surveyService.getSurveyByPublicLink(publicLink);
+
+      console.log('[Anonymous Survey] Survey found:', {
+        id: surveyData.survey.id,
+        title: surveyData.survey.title,
+        status: surveyData.survey.status,
+        allowAnonymous: surveyData.survey.allowAnonymous,
+        pageCount: surveyData.pages.length
+      });
+
+      res.json({
+        survey: surveyData.survey,
+        pages: surveyData.pages,
+        anonymous: true
+      });
+    } catch (error) {
+      console.error("[Anonymous Survey] Error:", error);
+      if (error instanceof Error) {
+        console.error("[Anonymous Survey] Error message:", error.message);
+        console.error("[Anonymous Survey] Error stack:", error.stack);
+        if (error.message === "Survey not found" || error.message === "Survey not available") {
+          return res.status(404).json({ message: error.message });
+        }
+      }
+      res.status(500).json({ message: "Failed to fetch survey" });
+    }
+  });
 
   /**
    * POST /api/surveys/:id/anonymous

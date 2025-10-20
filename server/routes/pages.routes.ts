@@ -31,7 +31,7 @@ export function registerPageRoutes(app: Express): void {
 
   /**
    * GET /api/surveys/:surveyId/pages
-   * Get all pages for a survey
+   * Get all pages for a survey (with optional nested questions)
    */
   app.get('/api/surveys/:surveyId/pages', isAuthenticated, async (req: any, res) => {
     try {
@@ -40,7 +40,13 @@ export function registerPageRoutes(app: Express): void {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const pages = await storage.getSurveyPages(req.params.surveyId);
+      // Check if client wants questions included
+      const includeQuestions = req.query.includeQuestions === 'true';
+
+      const pages = includeQuestions
+        ? await storage.getSurveyPagesWithQuestions(req.params.surveyId)
+        : await storage.getSurveyPages(req.params.surveyId);
+
       res.json(pages);
     } catch (error) {
       console.error("Error fetching pages:", error);

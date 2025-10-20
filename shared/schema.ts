@@ -89,7 +89,7 @@ export const surveys = pgTable("surveys", {
   status: surveyStatusEnum("status").default('draft').notNull(),
   // Anonymous survey configuration
   allowAnonymous: boolean("allow_anonymous").default(false),
-  anonymousAccessType: anonymousAccessTypeEnum("anonymous_access_type").default('disabled'),
+  anonymousAccessType: anonymousAccessTypeEnum("anonymous_access_type").default('unlimited'),
   publicLink: varchar("public_link").unique(), // Generated public UUID for anonymous access
   anonymousConfig: jsonb("anonymous_config"), // Additional anonymous survey settings
   createdAt: timestamp("created_at").defaultNow(),

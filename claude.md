@@ -1,12 +1,62 @@
 # Poll-Vault: Developer Reference Guide
 
-**Last Updated:** 2025-10-13
+**Last Updated:** 2025-10-15
 **Project Type:** Survey/Polling Platform (formerly DevPulse)
 **Tech Stack:** Node.js/Express, React, PostgreSQL, Drizzle ORM
 
 ---
 
 ## Recent Fixes & Updates
+
+### 2025-10-15: Phase 2 Refactoring - Repository & Service Layer Architecture
+**Achievement:** Implemented 3-tier architecture with Repository and Service layers for clean separation of concerns
+
+**Changes:**
+- **Repository Layer** (`server/repositories/`): Data access abstraction
+  - `BaseRepository.ts` - Base class with transaction support
+  - `UserRepository.ts` - User data access
+  - `SurveyRepository.ts` - Survey CRUD, duplication, anonymous access
+  - `PageRepository.ts` - Survey page operations
+  - `QuestionRepository.ts` - Questions, subquestions, conditional rules
+  - `RecipientRepository.ts` - Recipients and global recipients
+  - `ResponseRepository.ts` - Responses, answers, anonymous tracking
+  - `AnalyticsRepository.ts` - Analytics event tracking
+  - `FileRepository.ts` - File metadata operations
+
+- **Service Layer** (`server/services/`): Business logic and orchestration
+  - `SurveyService.ts` - Survey business logic with ownership checks
+  - `ResponseService.ts` - Response creation, validation, completion
+  - `RecipientService.ts` - Recipient management, email invitations
+  - `AnalyticsService.ts` - Analytics aggregation and reporting
+
+- **Refactored Storage** (`server/storage.ts`):
+  - Reduced from ~2,500 lines to ~1,480 lines (41% reduction)
+  - Now delegates to repositories instead of direct database calls
+  - Maintains IStorage interface for backward compatibility
+
+- **Updated Routes**: All route modules now use service layer for clean separation
+
+**Architecture Pattern:**
+```
+Routes → Services → Repositories → Database
+  ↓         ↓           ↓
+Auth     Business    Data Access
+Logic    Logic       Layer
+```
+
+**Benefits:**
+- **Separation of Concerns:** Clear boundaries between routes, business logic, and data access
+- **Testability:** Services and repositories can be unit tested independently
+- **Reusability:** Business logic can be shared across different routes
+- **Maintainability:** Changes to database queries don't affect business logic
+- **Transaction Support:** Built-in transaction handling in BaseRepository
+- **Type Safety:** Full TypeScript support with proper type exports
+
+**Code Metrics:**
+- Repository Layer: 10 files, ~50KB
+- Service Layer: 4 files, ~35KB
+- Storage reduction: -1,020 lines (from 2,500 to 1,480)
+- Total new architecture: ~85KB of well-organized, testable code
 
 ### 2025-10-13: Phase 1 Refactoring - Modular Route Architecture
 **Achievement:** Successfully refactored monolithic routes file into modular, domain-specific modules
@@ -72,6 +122,7 @@ Poll-Vault/
 ├── server/               # Express backend
 │   ├── index.ts          # Entry point & CORS config
 │   ├── routes.ts         # Main route registration
+│   ├── storage.ts        # Storage layer (delegates to repositories)
 │   ├── db.ts             # Database connection
 │   ├── googleAuth.ts     # OAuth2 authentication
 │   ├── routes/           # Modular route handlers (Phase 1 refactor)
@@ -84,12 +135,28 @@ Poll-Vault/
 │   │   ├── responses.routes.ts  # Response collection
 │   │   ├── analytics.routes.ts  # Analytics & reporting
 │   │   └── files.routes.ts      # File upload & management
-│   ├── services/         # Business logic services
+│   ├── services/         # Business logic services (Phase 2 refactor)
+│   │   ├── index.ts             # Service exports
+│   │   ├── SurveyService.ts     # Survey business logic
+│   │   ├── ResponseService.ts   # Response operations
+│   │   ├── RecipientService.ts  # Recipient management
+│   │   ├── AnalyticsService.ts  # Analytics aggregation
 │   │   ├── emailService.ts      # Email operations
 │   │   ├── exportService.ts     # CSV/PDF export
 │   │   ├── fileService.ts       # File handling
 │   │   ├── sendgrid.ts          # SendGrid integration
 │   │   └── surveyValidation.ts  # Survey validation
+│   ├── repositories/     # Data access layer (Phase 2 refactor)
+│   │   ├── index.ts             # Repository exports
+│   │   ├── BaseRepository.ts    # Base class with transactions
+│   │   ├── UserRepository.ts    # User data access
+│   │   ├── SurveyRepository.ts  # Survey data access
+│   │   ├── PageRepository.ts    # Page data access
+│   │   ├── QuestionRepository.ts # Question data access
+│   │   ├── RecipientRepository.ts # Recipient data access
+│   │   ├── ResponseRepository.ts # Response data access
+│   │   ├── AnalyticsRepository.ts # Analytics data access
+│   │   └── FileRepository.ts    # File data access
 │   └── types/            # TypeScript declarations
 │       └── express.d.ts  # Express type augmentation
 ├── shared/               # Shared types & schemas
@@ -808,7 +875,7 @@ docker-compose ps        # List running services
 
 ---
 
-**Document Version:** 2.0
-**Last Updated:** 2025-10-12
+**Document Version:** 3.0
+**Last Updated:** 2025-10-15
 
 This document serves as a comprehensive reference for the Poll-Vault platform. For detailed implementation examples, see the actual codebase files referenced throughout this document.
