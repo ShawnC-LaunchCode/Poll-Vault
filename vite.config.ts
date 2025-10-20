@@ -3,41 +3,54 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
-// 💡 Vite configuration can receive a function that provides mode and command.
-export default defineConfig(({ mode }) => {
+// Define a placeholder for the plugins that require dynamic import to avoid 
+// breaking the defineConfig function structure. 
+// We use 'await import' outside of the export default function.
+const cartographer = import("@replit/vite-plugin-cartographer").then((m) => m.cartographer());
+const devBanner = import("@replit/vite-plugin-dev-banner").then((m) => m.devBanner());
+
+// Use a simple array for the conditional plugins
+const conditionalPlugins = (async () => {
+    if (process.env.NODE_ENV !== "production" && process.env.REPL_ID !== undefined) {
+        return [await cartographer, await devBanner];
+    }
+    return [];
+})();
+
+
+// Use defineConfig with a function to ensure we get the correct mode,
+// and implement the explicit environment variable injection fix.
+export default defineConfig(async ({ mode }) => {
     
-    // 1. Explicitly load environment variables from the current working directory.
-    // The third argument '' allows loading variables without the VITE_ prefix (optional, but harmless).
+    // 1. Explicitly load environment variables. 
+    // This attempts to pick up local .env files, but the shell's variables (from Railway)
+    // take precedence, which is what we want.
     const env = loadEnv(mode, process.cwd(), '');
-    
-    // 2. Define the VITE_GOOGLE_CLIENT_ID to be explicitly injected into the bundle.
-    // We use JSON.stringify() to ensure the value is baked in as a string literal.
-    const clientEnv = {
-        'import.meta.env.VITE_GOOGLE_CLIENT_ID': JSON.stringify(env.VITE_GOOGLE_CLIENT_ID),
+
+    // 2. Determine the final client ID value:
+    //    - First, check the value loaded by Vite's loadEnv helper (which checks the shell).
+    //    - Second, use a fallback to directly check the Node environment (process.env) 
+    //      as a redundant safety measure.
+    const googleClientId = env.VITE_GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
+
+    // 3. Define the explicit replacement for the client-side bundle.
+    // The value MUST be stringified to be baked into the client JS code.
+    const clientEnvDefine = {
+        'import.meta.env.VITE_GOOGLE_CLIENT_ID': JSON.stringify(googleClientId),
+        // 💡 OPTIONAL: You can also explicitly define the MODE here to silence the
+        // "running in development mode" warning if you are certain you are building for production.
+        'import.meta.env.MODE': JSON.stringify(mode),
     };
 
     return {
-        // 🛠️ FIX APPLIED HERE: Explicitly inject the variable into the client bundle
-        define: clientEnv,
-
+        // FIX APPLIED HERE:
+        define: clientEnvDefine,
+        
         plugins: [
             react(),
             runtimeErrorOverlay(),
-            ...(process.env.NODE_ENV !== "production" &&
-            process.env.REPL_ID !== undefined
-                ? [
-                    // Note: If 'await' is inside defineConfig, you must use a top-level async function 
-                    // or handle promises correctly. I'll assume your original code handles this 
-                    // 'await import(...)' correctly outside the immediate scope for now.
-                    // If deployment fails here, you should remove the 'await' and simplify these imports.
-                    import("@replit/vite-plugin-cartographer").then((m) =>
-                        m.cartographer(),
-                    ),
-                    import("@replit/vite-plugin-dev-banner").then((m) =>
-                        m.devBanner(),
-                    ),
-                  ]
-                : []),
+            // Await the conditional plugins array and spread it
+            ...(await conditionalPlugins),
         ],
         resolve: {
             alias: {
@@ -48,6 +61,7 @@ export default defineConfig(({ mode }) => {
         },
         root: path.resolve(import.meta.dirname, "client"),
         build: {
+            // Your build configuration is correct: it relies on the 'root' setting above
             outDir: path.resolve(import.meta.dirname, "dist/public"),
             emptyOutDir: true,
         },
