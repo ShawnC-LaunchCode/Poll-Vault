@@ -1,12 +1,51 @@
 # Poll-Vault: Developer Reference Guide
 
-**Last Updated:** 2025-10-15
+**Last Updated:** 2025-10-20
 **Project Type:** Survey/Polling Platform (formerly DevPulse)
 **Tech Stack:** Node.js/Express, React, PostgreSQL, Drizzle ORM
 
 ---
 
 ## Recent Fixes & Updates
+
+### 2025-10-20: Railway Deployment Preparation
+**Achievement:** Verified and documented Railway deployment readiness with minimal configuration updates
+
+**Changes:**
+- **Updated .env.example**: Added comprehensive production configuration section with Railway-specific examples
+  - Clear separation between development and production settings
+  - Google OAuth setup instructions for production domains
+  - Environment variable reference for Railway deployment
+
+- **Created .dockerignore**: Build optimization file to reduce deployment size
+  - Excludes development files, test files, and documentation
+  - Reduces Docker image size for faster deployments
+
+- **Added Railway Deployment Guide** to CLAUDE.md:
+  - Step-by-step deployment instructions
+  - Google OAuth configuration for production
+  - Database setup with Neon PostgreSQL
+  - Environment variable configuration
+  - Troubleshooting guide for common issues
+  - Custom domain setup instructions
+
+**Verification:**
+- ✅ Production serving already configured (`server/vite.ts:70`)
+- ✅ Build output correctly set to `dist/public` (`vite.config.ts:31`)
+- ✅ API calls use relative paths (no hardcoded URLs)
+- ✅ PORT binding uses `process.env.PORT || 5000`
+- ✅ CORS properly configured with `ALLOWED_ORIGIN` env variable
+- ✅ Build scripts ready: `npm run build` → `npm start`
+
+**Architecture Notes:**
+- App is a **monolithic full-stack deployment** (not serverless functions)
+- Single Node.js process serves both frontend (static) and backend (API)
+- Production mode: Express serves built Vite output from `dist/public`
+- Development mode: Vite dev server with HMR via middleware
+- Railway automatically detects build/start commands from `package.json`
+
+**No Code Changes Required:**
+The existing architecture was already production-ready. Only documentation and configuration examples were added.
 
 ### 2025-10-15: Phase 2 Refactoring - Repository & Service Layer Architecture
 **Achievement:** Implemented 3-tier architecture with Repository and Service layers for clean separation of concerns
@@ -683,7 +722,131 @@ const { visible, required } = evaluateConditionalLogic(question.id, context);
 - [ ] Implement database query caching
 - [ ] Optimize bundle size (code splitting)
 
+### Railway Deployment (Recommended)
+
+**Prerequisites:**
+- GitHub repository with Poll-Vault code
+- Railway account (free tier available)
+- Google Cloud Console project for OAuth
+- Neon or Railway PostgreSQL database
+
+**Step-by-Step Guide:**
+
+**1. Database Setup (Neon - Recommended)**
+```bash
+# Create a Neon database at https://neon.tech
+# Copy the DATABASE_URL (PostgreSQL connection string)
+```
+
+**2. Google OAuth Configuration**
+- Go to [Google Cloud Console](https://console.cloud.google.com) → Credentials
+- Create OAuth 2.0 Client ID (Web Application)
+- Add authorized JavaScript origins:
+  - Development: `http://localhost:5000`
+  - Production: `https://your-app.up.railway.app` (add after Railway deployment)
+- Add authorized redirect URIs:
+  - `https://your-app.up.railway.app/auth/google/callback`
+- Note down both client IDs (you need TWO - one for server, one for client)
+
+**3. Deploy to Railway**
+
+**Option A: Using Railway CLI**
+```bash
+# Install Railway CLI
+npm install -g @railway/cli
+
+# Login to Railway
+railway login
+
+# Initialize project
+railway init
+
+# Add environment variables (see below)
+
+# Deploy
+railway up
+```
+
+**Option B: Using Railway Dashboard (Easier)**
+1. Go to [Railway](https://railway.app)
+2. Click "New Project" → "Deploy from GitHub repo"
+3. Select your Poll-Vault repository
+4. Railway will auto-detect Node.js and configure build settings
+
+**4. Configure Environment Variables**
+
+In Railway Dashboard → Your Project → Variables, add:
+
+```bash
+NODE_ENV=production
+DATABASE_URL=<your-neon-postgres-url>
+GOOGLE_CLIENT_ID=<your-server-oauth-client-id>
+VITE_GOOGLE_CLIENT_ID=<your-client-web-oauth-client-id>
+SESSION_SECRET=<generate-strong-32-char-secret>
+ALLOWED_ORIGIN=your-app.up.railway.app
+SENDGRID_API_KEY=<optional>
+SENDGRID_FROM_EMAIL=noreply@yourdomain.com
+```
+
+**Generate strong SESSION_SECRET:**
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+**5. Run Database Migration**
+
+After first deployment, run migrations via Railway CLI:
+```bash
+railway run npm run db:push
+```
+
+Or connect to your Railway project and run:
+```bash
+# In Railway dashboard → your-project → Settings → set up a one-off command
+npm run db:push
+```
+
+**6. Verify Deployment**
+- Visit `https://your-app.up.railway.app`
+- Test Google OAuth login
+- Create a test survey
+- Verify database connectivity
+
+**7. Update Google OAuth URLs**
+- Go back to Google Cloud Console → Credentials
+- Update authorized JavaScript origins with your Railway URL
+- Update redirect URIs with production URL
+- This enables production OAuth to work
+
+**Railway Build Configuration:**
+Railway auto-detects the following from `package.json`:
+- Build Command: `npm run build` (builds Vite + esbuild server bundle)
+- Start Command: `npm start` (runs production server)
+- Port: Auto-assigned by Railway (app uses `process.env.PORT`)
+
+**Troubleshooting:**
+- **OAuth errors**: Verify Google OAuth URLs match your Railway domain exactly
+- **Database connection errors**: Check DATABASE_URL format and Neon database status
+- **CORS errors**: Ensure ALLOWED_ORIGIN matches your Railway domain (no https://)
+- **Build failures**: Check Railway build logs for missing dependencies
+- **Session issues**: Verify SESSION_SECRET is set and at least 32 characters
+
+**Monitoring & Logs:**
+```bash
+# View logs via CLI
+railway logs
+
+# Or view in Railway dashboard → Deployments → Logs
+```
+
+**Custom Domain (Optional):**
+1. Railway Dashboard → Settings → Domains
+2. Add custom domain
+3. Update DNS records as instructed
+4. Update ALLOWED_ORIGIN and Google OAuth URLs
+
 ### Docker Deployment
+
 ```bash
 # Build production image
 docker build -t poll-vault:latest --target production .
