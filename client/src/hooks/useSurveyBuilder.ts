@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -39,6 +39,7 @@ export function useSurveyBuilder(surveyId: string | undefined) {
   const [selectedQuestion, setSelectedQuestion] = useState<string | null>(null);
   const [currentSurveyId, setCurrentSurveyId] = useState<string | null>(surveyId || null);
   const [publishModalOpen, setPublishModalOpen] = useState(false);
+  const autoCreateInitiated = useRef(false);
 
   // Queries
   const { data: survey, isLoading: surveyLoading } = useQuery<Survey>({
@@ -47,8 +48,16 @@ export function useSurveyBuilder(surveyId: string | undefined) {
     retry: false,
   });
 
-  const { data: pages, isLoading: pagesLoading } = useQuery<SurveyPage[]>({
+  // Fetch pages with nested questions for the new block-based UI
+  const { data: pages, isLoading: pagesLoading } = useQuery<(SurveyPage & { questions: Question[] })[]>({
     queryKey: ["/api/surveys", surveyId, "pages"],
+    queryFn: async () => {
+      const response = await fetch(`/api/surveys/${surveyId}/pages?includeQuestions=true`, {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch pages');
+      return response.json();
+    },
     enabled: !!surveyId,
     retry: false,
   });
@@ -99,10 +108,16 @@ export function useSurveyBuilder(surveyId: string | undefined) {
         setCurrentSurveyId(newSurveyId);
       }
 
-      queryClient.invalidateQueries({ queryKey: ["/api/surveys"] });
+      // Only invalidate the survey list and the specific survey, NOT the pages query
+      // This prevents question edits from being overwritten when the survey auto-saves
+      queryClient.invalidateQueries({ queryKey: ["/api/surveys"], exact: true });
+      if (surveyId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/surveys", surveyId], exact: true });
+      }
 
       if (!surveyId) {
-        navigate(`/surveys/${newSurveyId}/edit`);
+        // Navigate to the new builder UI
+        navigate(`/builder/${newSurveyId}`);
       }
 
       toast({
@@ -322,6 +337,19 @@ export function useSurveyBuilder(surveyId: string | undefined) {
       enableAnonymousMutation.mutate({ accessType });
     }
   };
+
+  // Auto-create survey when landing on /surveys/new
+  useEffect(() => {
+    if (!surveyId && !currentSurveyId && !autoCreateInitiated.current) {
+      autoCreateInitiated.current = true;
+      // Create a new survey automatically
+      surveyMutation.mutate({
+        title: "Untitled Survey",
+        description: "",
+        status: "draft"
+      });
+    }
+  }, [surveyId, currentSurveyId, surveyMutation]);
 
   return {
     // State

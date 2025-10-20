@@ -38,18 +38,24 @@ export default function SurveyPreview() {
     enabled: !!id && isAuthenticated,
   });
 
-  // Load survey pages
-  const { data: pages, isLoading: pagesLoading } = useQuery<SurveyPage[]>({
+  // Load survey pages with questions (same pattern as builder)
+  const { data: pages, isLoading: pagesLoading } = useQuery<(SurveyPage & { questions: Question[] })[]>({
     queryKey: ["/api/surveys", id, "pages"],
+    queryFn: async () => {
+      const response = await fetch(`/api/surveys/${id}/pages?includeQuestions=true`, {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch pages');
+      return response.json();
+    },
     enabled: !!id && isAuthenticated,
+    // Don't use staleTime: 0 as it bypasses cache and overwrites optimistic updates
+    // Let React Query handle caching normally
   });
 
-  // Load questions for current page
+  // Get current page and its questions
   const currentPage = pages?.[currentPageIndex];
-  const { data: questions } = useQuery<Question[]>({
-    queryKey: ["/api/pages", currentPage?.id, "questions"],
-    enabled: !!currentPage?.id && isAuthenticated,
-  });
+  const questions = currentPage?.questions || [];
 
   if (authLoading || surveyLoading || pagesLoading) {
     return (
@@ -104,7 +110,7 @@ export default function SurveyPreview() {
   };
 
   const handleBackToBuilder = () => {
-    navigate(`/surveys/${id}/edit`);
+    navigate(`/builder/${id}`);
   };
 
   return (
