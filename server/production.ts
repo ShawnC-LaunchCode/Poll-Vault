@@ -29,14 +29,12 @@ const corsOptions = {
       return callback(new Error("Invalid origin URL"), false);
     }
 
-    // In development, allow all localhost/Replit origins
+    // In development, allow localhost origins
     if (isDevelopment) {
       const allowedPatterns = [
         /^localhost$/,
         /^127\.0\.0\.1$/,
         /^0\.0\.0\.0$/,
-        /.*\.replit\.dev$/,
-        /.*\.repl\.co$/,
       ];
 
       if (allowedPatterns.some((pattern) => pattern.test(hostname))) {

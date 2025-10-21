@@ -8,6 +8,39 @@
 
 ## Recent Fixes & Updates
 
+### 2025-10-20: Post-Deployment Cleanup
+**Achievement:** Removed legacy Replit and Docker configurations after successful Railway migration
+
+**Changes:**
+- **Removed Replit Dependencies:**
+  - Deleted `.replit` configuration file
+  - Removed `@replit/vite-plugin-cartographer`, `@replit/vite-plugin-dev-banner`, and `@replit/vite-plugin-runtime-error-modal` from package.json
+  - Cleaned up `vite.config.ts` to remove Replit plugin imports and async logic
+  - Removed Replit domain patterns from `server/production.ts` CORS configuration
+
+- **Simplified CORS Configuration:**
+  - Removed outdated Railway environment variables (`RAILWAY_STATIC_URL`, `RAILWAY_STATIC_DOMAIN`)
+  - Unified CORS logic in `server/index.ts` to match the cleaner approach in `server/production.ts`
+  - Now uses only `ALLOWED_ORIGIN` environment variable for production
+
+- **Removed Docker Configuration:**
+  - Deleted `Dockerfile`, `docker-compose.yml`, `.dockerignore`, and `.env.docker`
+  - Railway deployment doesn't require Docker configuration
+
+**Current State:**
+- Codebase is now Railway-specific with no legacy platform dependencies
+- CORS configuration is simplified and consistent across files
+- Google Client ID remains hardcoded temporarily (TODO: migrate to proper env injection)
+
+**Files Modified:**
+- `package.json` - Removed 3 Replit dependencies
+- `vite.config.ts` - Simplified from async to sync config, removed Replit plugins
+- `server/production.ts` - Removed Replit CORS patterns
+- `server/index.ts` - Simplified CORS to use ALLOWED_ORIGIN only
+
+**Files Deleted:**
+- `.replit`, `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `.env.docker`
+
 ### 2025-10-20: Railway Deployment Preparation
 **Achievement:** Verified and documented Railway deployment readiness with minimal configuration updates
 
@@ -585,20 +618,6 @@ npm run dev
 # Server runs on: http://localhost:5000
 ```
 
-### Docker Development
-```bash
-# 1. Copy environment file
-cp .env.example .env.docker
-
-# 2. Edit .env.docker (set POSTGRES_PASSWORD and SESSION_SECRET)
-
-# 3. Start services
-docker-compose up -d
-
-# 4. View logs
-docker-compose logs -f app
-```
-
 ---
 
 ## Conditional Logic Implementation
@@ -845,21 +864,6 @@ railway logs
 3. Update DNS records as instructed
 4. Update ALLOWED_ORIGIN and Google OAuth URLs
 
-### Docker Deployment
-
-```bash
-# Build production image
-docker build -t poll-vault:latest --target production .
-
-# Run container
-docker run -d -p 5000:5000 \
-  -e DATABASE_URL="..." \
-  -e GOOGLE_CLIENT_ID="..." \
-  -e SESSION_SECRET="..." \
-  -e NODE_ENV="production" \
-  --name poll-vault poll-vault:latest
-```
-
 ### Supported Platforms
 - **Railway:** Auto-deploy from GitHub, managed PostgreSQL
 - **Heroku:** Heroku Postgres, automatic PORT binding
@@ -963,12 +967,6 @@ npm run test:watch       # Run tests in watch mode
 npm run test:coverage    # Generate coverage report
 npm run test:integration # Run integration tests
 npm run test:e2e         # Run end-to-end tests
-
-# Docker
-docker-compose up -d     # Start all services
-docker-compose down      # Stop all services
-docker-compose logs -f   # Follow logs
-docker-compose ps        # List running services
 ```
 
 ---

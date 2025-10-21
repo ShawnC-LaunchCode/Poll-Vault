@@ -46,48 +46,56 @@ app.use(passport.session());
 // =====================================================================
 
 // =====================================================================
-// 💡 FIX 1: CORS & COOKIE CONFIGURATION (Previously Implemented)
-// We use a dynamically determined origin for Railway/production.
-const railwayDomain = process.env.RAILWAY_STATIC_URL || `https://${process.env.RAILWAY_STATIC_DOMAIN}`;
-const allowedOrigins = [
-    // 1. Production/Railway URL
-    railwayDomain, 
-    
-    // 2. Local development origins 
-    'http://localhost:3000', 
-    'http://127.0.0.1:3000', 
-    'http://0.0.0.0:3000',
-];
+// 💡 CORS CONFIGURATION
+// Dynamically determines allowed origins based on environment
+const corsOptions = {
+    origin: function (
+        origin: string | undefined,
+        callback: (err: Error | null, allow?: boolean) => void,
+    ) {
+        const isDevelopment = process.env.NODE_ENV === "development";
 
-// Determine the final origin to use for the CORS middleware
-const dynamicOrigin = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Check if the request origin matches any allowed domain/hostname
-    const isAllowed = allowedOrigins.some(allowedOrigin => origin.startsWith(allowedOrigin));
-
-    if (isAllowed) {
-        return callback(null, true);
-    }
-    
-    // Fallback for allowing subdomains if the full domain is complex (like the Railway default)
-    try {
-        const originUrl = new URL(origin);
-        const isRailwaySubdomain = originUrl.hostname.endsWith('.up.railway.app');
-        if (isRailwaySubdomain) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) {
             return callback(null, true);
         }
-    } catch {
-        // Ignore URL parsing errors
-    }
-    
-    callback(new Error('Not allowed by CORS'), false);
-};
 
-const corsOptions = {
-    origin: dynamicOrigin,
-    credentials: true, // MUST BE TRUE for session cookies to be sent
+        // Extract hostname from origin
+        let hostname: string;
+        try {
+            hostname = new URL(origin).hostname;
+        } catch (e) {
+            return callback(new Error("Invalid origin URL"), false);
+        }
+
+        // In development, allow localhost origins
+        if (isDevelopment) {
+            const allowedPatterns = [
+                /^localhost$/,
+                /^127\.0\.0\.1$/,
+                /^0\.0\.0\.0$/,
+            ];
+
+            if (allowedPatterns.some((pattern) => pattern.test(hostname))) {
+                return callback(null, true);
+            }
+        }
+
+        // In production, check against ALLOWED_ORIGIN environment variable
+        const allowedOrigin = process.env.ALLOWED_ORIGIN;
+        if (allowedOrigin) {
+            // Split by comma to support multiple origins
+            const allowedHosts = allowedOrigin.split(",").map((h) => h.trim());
+
+            if (allowedHosts.some((host) => hostname === host || hostname.endsWith(`.${host}`))) {
+                return callback(null, true);
+            }
+        }
+
+        // Default: deny
+        callback(new Error("Not allowed by CORS"), false);
+    },
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 };
