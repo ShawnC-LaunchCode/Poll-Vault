@@ -22,7 +22,7 @@ function getGoogleClient(): OAuth2Client {
 }
 
 export function getSession() {
-  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
+  const sessionTtl = 365 * 24 * 60 * 60 * 1000; // 1 year (maximum lifespan)
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
     conString: process.env.DATABASE_URL,
@@ -357,19 +357,22 @@ export async function setupAuth(app: Express) {
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const user = (req.session as any)?.user || req.user;
 
-  if (!user?.expires_at) {
+  if (!user) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  const now = Math.floor(Date.now() / 1000);
-  if (now <= user.expires_at) {
-    // Set user on request for backward compatibility
-    (req as any).user = user;
-    return next();
-  }
+  // Note: Google OAuth tokens expire after ~1 hour, but we allow sessions to persist
+  // for the full session TTL (365 days). The session itself is the authentication proof.
+  // If stricter security is needed, uncomment the expiration check below:
+  //
+  // const now = Math.floor(Date.now() / 1000);
+  // if (user.expires_at && now > user.expires_at) {
+  //   return res.status(401).json({ message: "Token expired" });
+  // }
 
-  // Token has expired
-  res.status(401).json({ message: "Token expired" });
+  // Set user on request for backward compatibility
+  (req as any).user = user;
+  next();
 };
 
 // Helper function to get authenticated user from request

@@ -539,7 +539,8 @@ Poll-Vault/
 - **Storage:** PostgreSQL (sessions table)
 - **Library:** express-session
 - **Cookie:** httpOnly, secure (production), sameSite='lax'
-- **Expiration:** 7 days (configurable)
+- **Expiration:** 365 days (1 year - maximum lifespan)
+- **Token Validation:** Session-based authentication (Google OAuth token not re-validated after initial login)
 - **Cleanup:** Automatic via expire column index
 
 ### CORS Configuration (server/index.ts:9-65)

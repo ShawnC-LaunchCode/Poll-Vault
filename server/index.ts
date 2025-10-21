@@ -31,7 +31,7 @@ const sessionConfig = {
         createTableIfMissing: true,
     }),
     cookie: {
-        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+        maxAge: 1000 * 60 * 60 * 24 * 365, // 365 days (1 year - maximum lifespan)
         secure: true, // ⬅️ MUST BE TRUE for HTTPS (Railway)
         httpOnly: true,
         sameSite: 'Lax' as 'lax', // For production/cross-origin flows
