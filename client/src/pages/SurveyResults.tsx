@@ -11,13 +11,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { IndividualResponses } from "@/components/results/IndividualResponses";
 import { OverallSummary } from "@/components/results/OverallSummary";
-import { ArrowLeft, Users, BarChart3, Download, XCircle } from "lucide-react";
+import { QuestionDetails } from "@/components/results/QuestionDetails";
+import { ArrowLeft, Users, BarChart3, Download, XCircle, ListChecks } from "lucide-react";
 
 export default function SurveyResults() {
   const { surveyId } = useParams();
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState("individual");
+  const [activeTab, setActiveTab] = useState("questions");
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -110,7 +111,12 @@ export default function SurveyResults() {
 
         <div className="flex-1 overflow-auto p-4 sm:p-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-            <TabsList className="grid w-full grid-cols-2 h-auto">
+            <TabsList className="grid w-full grid-cols-3 h-auto">
+              <TabsTrigger value="questions" className="text-xs sm:text-sm px-2 sm:px-4 py-2">
+                <ListChecks className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Question Details</span>
+                <span className="sm:hidden">Questions</span>
+              </TabsTrigger>
               <TabsTrigger value="individual" className="text-xs sm:text-sm px-2 sm:px-4 py-2">
                 <Users className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="hidden sm:inline">Individual Responses</span>
@@ -122,6 +128,10 @@ export default function SurveyResults() {
                 <span className="sm:hidden">Summary</span>
               </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="questions" className="space-y-4 sm:space-y-6">
+              <QuestionDetails surveyId={surveyId!} />
+            </TabsContent>
 
             <TabsContent value="individual" className="space-y-4 sm:space-y-6">
               <IndividualResponses surveyId={surveyId!} />
