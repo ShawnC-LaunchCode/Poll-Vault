@@ -8,7 +8,7 @@ interface OverallSummaryProps {
 }
 
 export function OverallSummary({ surveyId }: OverallSummaryProps) {
-  const { data: analytics, isLoading } = useQuery({
+  const { data: analytics, isLoading } = useQuery<any[]>({
     queryKey: [`/api/surveys/${surveyId}/analytics/questions`],
     enabled: !!surveyId,
     retry: false,

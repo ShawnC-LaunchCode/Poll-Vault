@@ -23,22 +23,22 @@ export function useSurveyAnalytics(responseId: string | null, surveyId: string |
 
       // Invalidate analytics queries
       queryClient.invalidateQueries({
-        queryKey: ["/api/analytics/survey", eventData.surveyId]
+        queryKey: [`/api/surveys/${eventData.surveyId}/analytics`]
       });
       queryClient.invalidateQueries({
-        queryKey: ["/api/analytics/questions", eventData.surveyId]
+        queryKey: [`/api/surveys/${eventData.surveyId}/analytics/questions`]
       });
       queryClient.invalidateQueries({
-        queryKey: ["/api/analytics/pages", eventData.surveyId]
+        queryKey: [`/api/surveys/${eventData.surveyId}/analytics/pages`]
       });
       queryClient.invalidateQueries({
-        queryKey: ["/api/analytics/funnel", eventData.surveyId]
+        queryKey: [`/api/surveys/${eventData.surveyId}/analytics/funnel`]
       });
       queryClient.invalidateQueries({
-        queryKey: ["/api/analytics/time", eventData.surveyId]
+        queryKey: [`/api/surveys/${eventData.surveyId}/analytics/time-spent`]
       });
       queryClient.invalidateQueries({
-        queryKey: ["/api/analytics/engagement", eventData.surveyId]
+        queryKey: [`/api/surveys/${eventData.surveyId}/analytics/engagement`]
       });
     } catch (error) {
       console.error("Failed to track analytics event:", error);

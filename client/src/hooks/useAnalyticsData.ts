@@ -48,35 +48,35 @@ export function useAnalyticsData(surveyId: string | undefined, isAuthenticated: 
 
   // Fetch question analytics
   const { data: questionAnalytics = [], isLoading: questionAnalyticsLoading } = useQuery<QuestionAnalytics[]>({
-    queryKey: ["/api/analytics/questions", surveyId],
+    queryKey: [`/api/surveys/${surveyId}/analytics/questions`],
     enabled: !!surveyId && isAuthenticated,
     retry: false,
   });
 
   // Fetch page analytics
   const { data: pageAnalytics = [], isLoading: pageAnalyticsLoading } = useQuery<PageAnalytics[]>({
-    queryKey: ["/api/analytics/pages", surveyId],
+    queryKey: [`/api/surveys/${surveyId}/analytics/pages`],
     enabled: !!surveyId && isAuthenticated,
     retry: false,
   });
 
   // Fetch funnel data
   const { data: funnelData = [], isLoading: funnelDataLoading } = useQuery<CompletionFunnelData[]>({
-    queryKey: ["/api/analytics/funnel", surveyId],
+    queryKey: [`/api/surveys/${surveyId}/analytics/funnel`],
     enabled: !!surveyId && isAuthenticated,
     retry: false,
   });
 
   // Fetch time spent data
   const { data: timeSpentData = [], isLoading: timeSpentDataLoading } = useQuery<TimeSpentData[]>({
-    queryKey: ["/api/analytics/time-spent", surveyId],
+    queryKey: [`/api/surveys/${surveyId}/analytics/time-spent`],
     enabled: !!surveyId && isAuthenticated,
     retry: false,
   });
 
   // Fetch engagement metrics
   const { data: engagementMetrics, isLoading: engagementMetricsLoading } = useQuery<EngagementMetrics>({
-    queryKey: ["/api/analytics/engagement", surveyId],
+    queryKey: [`/api/surveys/${surveyId}/analytics/engagement`],
     enabled: !!surveyId && isAuthenticated,
     retry: false,
   });

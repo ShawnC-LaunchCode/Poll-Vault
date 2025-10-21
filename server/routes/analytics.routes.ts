@@ -123,10 +123,10 @@ export function registerAnalyticsRoutes(app: Express): void {
   // ============================================================================
 
   /**
-   * GET /api/analytics/questions/:surveyId
+   * GET /api/surveys/:surveyId/analytics/questions
    * Get question-level analytics
    */
-  app.get('/api/analytics/questions/:surveyId', isAuthenticated, async (req: any, res) => {
+  app.get('/api/surveys/:surveyId/analytics/questions', isAuthenticated, async (req: any, res) => {
     try {
       const survey = await storage.getSurvey(req.params.surveyId);
       if (!survey || survey.creatorId !== req.user.claims.sub) {
@@ -142,10 +142,10 @@ export function registerAnalyticsRoutes(app: Express): void {
   });
 
   /**
-   * GET /api/analytics/pages/:surveyId
+   * GET /api/surveys/:surveyId/analytics/pages
    * Get page-level analytics
    */
-  app.get('/api/analytics/pages/:surveyId', isAuthenticated, async (req: any, res) => {
+  app.get('/api/surveys/:surveyId/analytics/pages', isAuthenticated, async (req: any, res) => {
     try {
       const survey = await storage.getSurvey(req.params.surveyId);
       if (!survey || survey.creatorId !== req.user.claims.sub) {
@@ -161,10 +161,10 @@ export function registerAnalyticsRoutes(app: Express): void {
   });
 
   /**
-   * GET /api/analytics/funnel/:surveyId
+   * GET /api/surveys/:surveyId/analytics/funnel
    * Get completion funnel data
    */
-  app.get('/api/analytics/funnel/:surveyId', isAuthenticated, async (req: any, res) => {
+  app.get('/api/surveys/:surveyId/analytics/funnel', isAuthenticated, async (req: any, res) => {
     try {
       const survey = await storage.getSurvey(req.params.surveyId);
       if (!survey || survey.creatorId !== req.user.claims.sub) {
@@ -180,10 +180,10 @@ export function registerAnalyticsRoutes(app: Express): void {
   });
 
   /**
-   * GET /api/analytics/time-spent/:surveyId
+   * GET /api/surveys/:surveyId/analytics/time-spent
    * Get time spent data
    */
-  app.get('/api/analytics/time-spent/:surveyId', isAuthenticated, async (req: any, res) => {
+  app.get('/api/surveys/:surveyId/analytics/time-spent', isAuthenticated, async (req: any, res) => {
     try {
       const survey = await storage.getSurvey(req.params.surveyId);
       if (!survey || survey.creatorId !== req.user.claims.sub) {
@@ -199,10 +199,10 @@ export function registerAnalyticsRoutes(app: Express): void {
   });
 
   /**
-   * GET /api/analytics/engagement/:surveyId
+   * GET /api/surveys/:surveyId/analytics/engagement
    * Get engagement metrics
    */
-  app.get('/api/analytics/engagement/:surveyId', isAuthenticated, async (req: any, res) => {
+  app.get('/api/surveys/:surveyId/analytics/engagement', isAuthenticated, async (req: any, res) => {
     try {
       const survey = await storage.getSurvey(req.params.surveyId);
       if (!survey || survey.creatorId !== req.user.claims.sub) {
@@ -218,10 +218,10 @@ export function registerAnalyticsRoutes(app: Express): void {
   });
 
   /**
-   * GET /api/analytics/survey/:surveyId
+   * GET /api/surveys/:surveyId/analytics
    * Get overall survey analytics
    */
-  app.get('/api/analytics/survey/:surveyId', isAuthenticated, async (req: any, res) => {
+  app.get('/api/surveys/:surveyId/analytics', isAuthenticated, async (req: any, res) => {
     try {
       const survey = await storage.getSurvey(req.params.surveyId);
       if (!survey || survey.creatorId !== req.user.claims.sub) {

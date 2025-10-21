@@ -116,7 +116,7 @@ app.use((req, res, next) => {
     let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
     const originalResJson = res.json;
-    res.json = function (bodyJson, ...args) {
+    res.json = function (bodyJson: any, ...args: any[]) {
         capturedJsonResponse = bodyJson;
         // Use assertion to silence TypeScript error about spread arguments in apply
         return originalResJson.apply(res, [bodyJson, ...args] as any);
