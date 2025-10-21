@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@shared/schema";
+import logo from "@/assets/images/logo.jpg";
 
 export default function Sidebar() {
   const [location] = useLocation();
@@ -52,9 +53,11 @@ export default function Sidebar() {
       {/* Logo and Brand */}
       <div className="flex items-center justify-between p-4 sm:p-6 border-b border-border">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <i className="fas fa-poll text-primary-foreground text-sm"></i>
-          </div>
+          <img
+            src={logo}
+            alt="Poll Vault Logo"
+            className="w-8 h-8 rounded-lg object-cover"
+          />
           <span className="text-lg sm:text-xl font-bold text-foreground">Poll Vault</span>
         </div>
       </div>

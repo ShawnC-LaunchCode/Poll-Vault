@@ -6,6 +6,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Menu } from "lucide-react";
 import { ReactNode, useState } from "react";
+import logo from "@/assets/images/logo.jpg";
 
 interface HeaderProps {
   title: string;
@@ -68,9 +69,11 @@ export default function Header({ title, description, actions }: HeaderProps) {
             <div className="flex flex-col h-full">
               <SheetHeader className="p-6 border-b border-border">
                 <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                    <i className="fas fa-poll text-primary-foreground text-sm"></i>
-                  </div>
+                  <img
+                    src={logo}
+                    alt="Poll Vault Logo"
+                    className="w-8 h-8 rounded-lg object-cover"
+                  />
                   <SheetTitle className="text-xl font-bold">Poll Vault</SheetTitle>
                 </div>
               </SheetHeader>
