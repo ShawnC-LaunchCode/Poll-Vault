@@ -312,7 +312,7 @@ export function SurveyManagement({ surveys, isLoading, onSurveyUpdate }: SurveyM
                   {getStatusBadge(survey.status)}
                   
                   <div className="flex items-center space-x-1">
-                    <Link href={`/surveys/${survey.id}`}>
+                    <Link href={`/builder/${survey.id}`}>
                       <Button variant="ghost" size="sm" data-testid={`button-edit-survey-${survey.id}`}>
                         <i className="fas fa-edit"></i>
                       </Button>

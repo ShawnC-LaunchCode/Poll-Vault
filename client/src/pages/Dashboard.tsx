@@ -226,7 +226,7 @@ export default function Dashboard() {
                     ) : surveys && surveys.length > 0 ? (
                       <div className="space-y-3">
                         {surveys.slice(0, 4).map((survey) => (
-                          <Link key={survey.id} href={`/surveys/${survey.id}/edit`}>
+                          <Link key={survey.id} href={`/builder/${survey.id}`}>
                             <div className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer" data-testid={`card-recent-survey-${survey.id}`}>
                               <div className="flex items-center space-x-3">
                                 <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">

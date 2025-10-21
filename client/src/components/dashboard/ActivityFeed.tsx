@@ -113,7 +113,7 @@ export function ActivityFeed({ activities, isLoading }: ActivityFeedProps) {
                             </Button>
                           </Link>
                         )}
-                        <Link href={`/surveys/${activity.surveyId}`}>
+                        <Link href={`/builder/${activity.surveyId}`}>
                           <Button variant="ghost" size="sm" data-testid={`button-view-survey-${activity.id}`}>
                             <i className="fas fa-external-link-alt text-xs"></i>
                           </Button>
