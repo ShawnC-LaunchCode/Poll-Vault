@@ -10,12 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, User, Calendar, CheckCircle, Clock } from "lucide-react";
+import { ArrowLeft, User, Calendar, CheckCircle, Clock, Globe } from "lucide-react";
 
 interface ResponseDetailsData {
   response: Response;
   answers: (Answer & { question: Question })[];
-  recipient: Recipient;
+  recipient: Recipient | null;
 }
 
 export default function ResponseDetails() {
@@ -128,20 +128,44 @@ export default function ResponseDetails() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-3">
-                    <User className="h-5 w-5" />
+                    {responseData.response.isAnonymous ? (
+                      <Globe className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <User className="h-5 w-5" />
+                    )}
                     Response Overview
+                    {responseData.response.isAnonymous && (
+                      <Badge variant="outline" className="ml-auto text-xs bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700">
+                        Anonymous
+                      </Badge>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     <div className="space-y-2">
                       <p className="text-sm font-medium text-muted-foreground">Respondent</p>
-                      <p className="text-foreground font-medium" data-testid="text-respondent-name">
-                        {responseData.recipient.name}
-                      </p>
-                      <p className="text-sm text-muted-foreground" data-testid="text-respondent-email">
-                        {responseData.recipient.email}
-                      </p>
+                      {responseData.recipient ? (
+                        <>
+                          <p className="text-foreground font-medium" data-testid="text-respondent-name">
+                            {responseData.recipient.name}
+                          </p>
+                          <p className="text-sm text-muted-foreground" data-testid="text-respondent-email">
+                            {responseData.recipient.email}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-foreground font-medium" data-testid="text-respondent-name">
+                            Anonymous Respondent
+                          </p>
+                          {responseData.response.ipAddress && (
+                            <p className="text-sm text-muted-foreground" data-testid="text-respondent-ip">
+                              IP: {responseData.response.ipAddress.replace(/\d+$/, 'xxx')}
+                            </p>
+                          )}
+                        </>
+                      )}
                     </div>
                     
                     <div className="space-y-2">

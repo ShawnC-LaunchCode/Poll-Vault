@@ -7,6 +7,7 @@ import { registerRecipientRoutes } from "./recipients.routes";
 import { registerResponseRoutes } from "./responses.routes";
 import { registerAnalyticsRoutes } from "./analytics.routes";
 import { registerFileRoutes } from "./files.routes";
+import { registerDashboardRoutes } from "./dashboard.routes";
 
 /**
  * Register all modular routes
@@ -15,6 +16,9 @@ import { registerFileRoutes } from "./files.routes";
 export function registerAllRoutes(app: Express): void {
   // Authentication routes
   registerAuthRoutes(app);
+
+  // Dashboard routes
+  registerDashboardRoutes(app);
 
   // Survey management routes
   registerSurveyRoutes(app);
