@@ -2,18 +2,12 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
-// =======================================================================
-// 💡 TEMPORARY FIX: HARDCODE THE CLIENT ID
-// This bypasses the failing Docker/Railway variable injection mechanism.
-// TODO: Move to proper environment variable injection
-const GOOGLE_CLIENT_ID_STRING = "853635559991-m8u2032kghq3nhcgaak27dpnh1uru4tu.apps.googleusercontent.com";
-// =======================================================================
-
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), '');
 
-    // Use hardcoded client ID for now
-    const finalClientId = GOOGLE_CLIENT_ID_STRING;
+    // Use VITE_GOOGLE_CLIENT_ID from environment variables
+    // Falls back to undefined if not set (dev mode will handle this gracefully)
+    const finalClientId = env.VITE_GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
 
     // Define environment variables for client-side bundle
     const clientEnvDefine = {
