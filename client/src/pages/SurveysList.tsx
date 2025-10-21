@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { SkeletonCard } from "@/components/shared/SkeletonCard";
 import { Link } from "wouter";
-import { Plus, Edit, BarChart, Users, Trash2, FileText } from "lucide-react";
+import { Plus, Edit, BarChart, Users, Trash2, FileText, Copy } from "lucide-react";
 
 export default function SurveysList() {
   const { toast } = useToast();
@@ -79,6 +79,23 @@ export default function SurveysList() {
   const handleDeleteSurvey = (surveyId: string) => {
     setDeletingSurveyId(surveyId);
     deleteSurveyMutation.mutate(surveyId);
+  };
+
+  const handleCopyLink = async (survey: Survey) => {
+    try {
+      const surveyUrl = `${window.location.origin}/survey/${survey.publicLink}`;
+      await navigator.clipboard.writeText(surveyUrl);
+      toast({
+        title: "Link Copied!",
+        description: "Survey link has been copied to clipboard",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to copy link to clipboard",
+        variant: "destructive",
+      });
+    }
   };
 
   if (isLoading || !isAuthenticated) {
@@ -152,6 +169,15 @@ export default function SurveysList() {
                             Recipients
                           </Button>
                         </Link>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleCopyLink(survey)}
+                          data-testid={`button-copy-link-${survey.id}`}
+                        >
+                          <Copy className="w-4 h-4 mr-1" />
+                          Copy Link
+                        </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button 
