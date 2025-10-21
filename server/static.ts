@@ -3,7 +3,9 @@ import fs from "fs";
 import path from "path";
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "public");
+  // Use process.cwd() instead of import.meta.dirname for bundled code compatibility
+  // In production (Railway), cwd is /app and dist/public is the build output
+  const distPath = path.resolve(process.cwd(), "dist", "public");
 
   if (!fs.existsSync(distPath)) {
     throw new Error(
