@@ -63,13 +63,8 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Set security headers for Google OAuth compatibility
-app.use((req, res, next) => {
-  // Allow popups for Google OAuth
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
-  // Don't set COEP header as it's too restrictive for OAuth
-  next();
-});
+// Note: COOP header removed - it blocks Google OAuth window.postMessage communication
+// Google OAuth works fine with the default COOP policy (unsafe-none)
 
 // Create HTTP server
 const server = createServer(app);

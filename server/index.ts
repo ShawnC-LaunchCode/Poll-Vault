@@ -105,12 +105,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // =====================================================================
-// 💡 FIX 2: OAUTH POP-UP COMMUNICATION FIX (COOP Header)
-// This middleware MUST run early to apply headers to all static files.
+// 💡 REQUEST LOGGING MIDDLEWARE
+// Logs API requests and responses with timing information
 app.use((req, res, next) => {
-    // Set headers necessary for Google OAuth pop-up communication
-    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
-    // Note: COEP header removed - it's too restrictive for OAuth
+    // Note: COOP header removed - it blocks Google OAuth window.postMessage communication
+    // Google OAuth works fine with the default COOP policy (unsafe-none)
 
     const start = Date.now();
     const path = req.path;
