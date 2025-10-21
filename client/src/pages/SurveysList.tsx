@@ -140,7 +140,7 @@ export default function SurveysList() {
                             Edit
                           </Button>
                         </Link>
-                        <Link href={`/surveys/${survey.id}/responses`}>
+                        <Link href={`/surveys/${survey.id}/results`}>
                           <Button variant="outline" size="sm" data-testid={`button-view-responses-${survey.id}`}>
                             <BarChart className="w-4 h-4 mr-1" />
                             Responses
