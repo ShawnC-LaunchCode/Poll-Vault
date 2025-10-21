@@ -80,16 +80,16 @@ export default function Dashboard() {
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
-      
+
       <main className="flex-1 flex flex-col overflow-hidden">
-        <Header 
-          title="Dashboard" 
+        <Header
+          title="Dashboard"
           description="Comprehensive survey analytics and management"
         />
-        
-        <div className="flex-1 overflow-auto p-6 space-y-6">
+
+        <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
           {/* Enhanced Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6">
             <StatsCard
               title="Total Surveys"
               value={stats?.totalSurveys ?? 0}
@@ -142,25 +142,27 @@ export default function Dashboard() {
           </div>
 
           {/* Comprehensive Dashboard Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="overview" data-testid="tab-overview">
-                <Home className="mr-2 h-4 w-4" />
-                Overview
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+            <TabsList className="grid w-full grid-cols-3 h-auto">
+              <TabsTrigger value="overview" data-testid="tab-overview" className="text-xs sm:text-sm px-2 sm:px-4 py-2">
+                <Home className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Overview</span>
+                <span className="sm:hidden">Home</span>
               </TabsTrigger>
-              <TabsTrigger value="management" data-testid="tab-management">
-                <Settings className="mr-2 h-4 w-4" />
-                Management
+              <TabsTrigger value="management" data-testid="tab-management" className="text-xs sm:text-sm px-2 sm:px-4 py-2">
+                <Settings className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Management</span>
+                <span className="sm:hidden">Manage</span>
               </TabsTrigger>
-              <TabsTrigger value="activity" data-testid="tab-activity">
-                <History className="mr-2 h-4 w-4" />
+              <TabsTrigger value="activity" data-testid="tab-activity" className="text-xs sm:text-sm px-2 sm:px-4 py-2">
+                <History className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                 Activity
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="overview" className="space-y-6">
+            <TabsContent value="overview" className="space-y-4 sm:space-y-6">
               {/* Quick Actions & Recent Surveys */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 {/* Quick Actions */}
                 <Card>
                   <CardHeader>
@@ -169,7 +171,7 @@ export default function Dashboard() {
                       Quick Actions
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3">
+                  <CardContent className="space-y-2 sm:space-y-3">
                     <QuickActionButton
                       href="/surveys/new"
                       icon={Plus}
@@ -224,16 +226,16 @@ export default function Dashboard() {
                     {surveysLoading ? (
                       <SkeletonList count={3} showAvatar />
                     ) : surveys && surveys.length > 0 ? (
-                      <div className="space-y-3">
+                      <div className="space-y-2 sm:space-y-3">
                         {surveys.slice(0, 4).map((survey) => (
                           <Link key={survey.id} href={`/builder/${survey.id}`}>
-                            <div className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer" data-testid={`card-recent-survey-${survey.id}`}>
-                              <div className="flex items-center space-x-3">
-                                <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                            <div className="flex items-center justify-between p-2 sm:p-3 border border-border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer" data-testid={`card-recent-survey-${survey.id}`}>
+                              <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+                                <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
                                   <FileText className="h-4 w-4 text-primary" />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <h4 className="font-medium text-foreground line-clamp-1" data-testid={`text-recent-survey-title-${survey.id}`}>
+                                  <h4 className="font-medium text-sm sm:text-base text-foreground line-clamp-1" data-testid={`text-recent-survey-title-${survey.id}`}>
                                     {survey.title}
                                   </h4>
                                   <p className="text-xs text-muted-foreground">
@@ -241,9 +243,9 @@ export default function Dashboard() {
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex items-center space-x-2">
+                              <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
                                 <StatusBadge status={survey.status} />
-                                <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                                <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground hidden sm:block" />
                               </div>
                             </div>
                           </Link>
@@ -270,16 +272,16 @@ export default function Dashboard() {
             </TabsContent>
 
 
-            <TabsContent value="management" className="space-y-6">
-              <SurveyManagement 
+            <TabsContent value="management" className="space-y-4 sm:space-y-6">
+              <SurveyManagement
                 surveys={surveys || []}
                 isLoading={surveysLoading}
                 onSurveyUpdate={handleDataUpdate}
               />
             </TabsContent>
 
-            <TabsContent value="activity" className="space-y-6">
-              <ActivityFeed 
+            <TabsContent value="activity" className="space-y-4 sm:space-y-6">
+              <ActivityFeed
                 activities={activity || []}
                 isLoading={activityLoading}
               />

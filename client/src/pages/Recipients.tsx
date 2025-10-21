@@ -312,20 +312,22 @@ export default function Recipients() {
           )}
         />
 
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto p-4 sm:p-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2" data-testid="tabs-recipients">
-              <TabsTrigger value="global" data-testid="tab-global-recipients">
-                <Users className="w-4 h-4 mr-2" />
-                Global Recipients
+            <TabsList className="grid w-full grid-cols-2 h-auto" data-testid="tabs-recipients">
+              <TabsTrigger value="global" data-testid="tab-global-recipients" className="text-xs sm:text-sm px-2 sm:px-4 py-2">
+                <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Global Recipients</span>
+                <span className="sm:hidden">Global</span>
               </TabsTrigger>
-              <TabsTrigger value="survey" data-testid="tab-survey-recipients">
-                <Mail className="w-4 h-4 mr-2" />
-                Survey Recipients
+              <TabsTrigger value="survey" data-testid="tab-survey-recipients" className="text-xs sm:text-sm px-2 sm:px-4 py-2">
+                <Mail className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Survey Recipients</span>
+                <span className="sm:hidden">Survey</span>
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="global" className="space-y-6 mt-6">
+            <TabsContent value="global" className="space-y-4 sm:space-y-6 mt-4 sm:mt-6">
               <RecipientStats
                 type="global"
                 globalRecipients={globalRecipients}
@@ -370,7 +372,7 @@ export default function Recipients() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="survey" className="space-y-6 mt-6">
+            <TabsContent value="survey" className="space-y-4 sm:space-y-6 mt-4 sm:mt-6">
               {showSurveySelector && (
                 <Card>
                   <CardHeader>

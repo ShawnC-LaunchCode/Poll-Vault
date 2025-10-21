@@ -435,13 +435,13 @@ export default function SurveyBuilder() {
 
       {/* Blocks Toolbar - Only visible on Blocks tab */}
       {activeTab === "blocks" && (
-        <div className="border-b bg-gray-50 px-6 py-3">
-          <div className="flex items-center justify-between">
+        <div className="border-b bg-gray-50 px-4 sm:px-6 py-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <Button
               variant="ghost"
               size="sm"
               onClick={handleToggleCollapseAll}
-              className="gap-2"
+              className="gap-2 w-full sm:w-auto"
             >
               {allCollapsed ? "Expand All Blocks" : "Collapse All Blocks"}
             </Button>
@@ -449,10 +449,10 @@ export default function SurveyBuilder() {
             <input
               ref={filterInputRef}
               type="text"
-              placeholder="Filter blocks by page or question... (Ctrl+F)"
+              placeholder="Filter blocks... (Ctrl+F)"
               value={filterText}
               onChange={(e) => setFilterText(e.target.value)}
-              className="max-w-md px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full sm:max-w-md px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
@@ -460,7 +460,7 @@ export default function SurveyBuilder() {
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto">
-        <div className="max-w-6xl mx-auto p-6">
+        <div className="max-w-full sm:max-w-6xl mx-auto p-4 sm:p-6">
           {/* Blocks Tab */}
           {activeTab === "blocks" && (
             <div className="space-y-4">
@@ -532,10 +532,11 @@ export default function SurveyBuilder() {
                   <Button
                     onClick={handleAddPage}
                     variant="outline"
-                    className="w-full border-dashed border-2 h-16 gap-2"
+                    className="w-full border-dashed border-2 h-12 sm:h-16 gap-2 text-sm sm:text-base"
                   >
-                    <Plus className="h-5 w-5" />
-                    Add Another Page
+                    <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span className="hidden sm:inline">Add Another Page</span>
+                    <span className="sm:hidden">Add Page</span>
                   </Button>
                 </>
               )}
@@ -546,13 +547,13 @@ export default function SurveyBuilder() {
           {activeTab === "templates" && (
             <Card>
               <CardHeader>
-                <CardTitle>Survey Templates</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-lg sm:text-xl">Survey Templates</CardTitle>
+                <CardDescription className="text-sm">
                   Choose from pre-built templates or save your own.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-500 text-center py-12">
+                <p className="text-gray-500 text-center py-8 sm:py-12 text-sm sm:text-base">
                   Templates feature coming soon...
                 </p>
               </CardContent>
@@ -563,13 +564,13 @@ export default function SurveyBuilder() {
           {activeTab === "publish" && (
             <Card>
               <CardHeader>
-                <CardTitle>Publish Survey</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-lg sm:text-xl">Publish Survey</CardTitle>
+                <CardDescription className="text-sm">
                   Configure and publish your survey to start collecting responses.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-500 text-center py-12">
+                <p className="text-gray-500 text-center py-8 sm:py-12 text-sm sm:text-base">
                   Publish checklist will appear here...
                 </p>
               </CardContent>

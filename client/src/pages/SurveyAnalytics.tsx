@@ -100,7 +100,7 @@ export default function SurveyAnalytics() {
           description="Comprehensive survey analytics and insights"
         />
 
-        <div className="flex-1 overflow-auto p-6 space-y-6">
+        <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
           {/* Overview Stats */}
           <OverviewStats
             totalResponses={metrics.totalResponses}
@@ -110,43 +110,50 @@ export default function SurveyAnalytics() {
           />
 
           {/* Analytics Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="overview" data-testid="tab-overview">
-                <TrendingUp className="mr-2 h-4 w-4" />
-                Overview
-              </TabsTrigger>
-              <TabsTrigger value="funnel" data-testid="tab-funnel">
-                <Target className="mr-2 h-4 w-4" />
-                Funnel
-              </TabsTrigger>
-              <TabsTrigger value="questions" data-testid="tab-questions">
-                <BarChart3 className="mr-2 h-4 w-4" />
-                Questions
-              </TabsTrigger>
-              <TabsTrigger value="time" data-testid="tab-time">
-                <Clock className="mr-2 h-4 w-4" />
-                Time Analysis
-              </TabsTrigger>
-              <TabsTrigger value="engagement" data-testid="tab-engagement">
-                <Activity className="mr-2 h-4 w-4" />
-                Engagement
-              </TabsTrigger>
-            </TabsList>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+            <div className="relative">
+              <div className="overflow-x-auto scrollbar-hide">
+                <TabsList className="inline-flex w-full min-w-max md:grid md:w-full md:grid-cols-5 h-auto">
+                  <TabsTrigger value="overview" data-testid="tab-overview" className="text-xs sm:text-sm px-3 sm:px-4 py-2 whitespace-nowrap">
+                    <TrendingUp className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                    <span className="hidden sm:inline">Overview</span>
+                    <span className="sm:hidden">Over</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="funnel" data-testid="tab-funnel" className="text-xs sm:text-sm px-3 sm:px-4 py-2 whitespace-nowrap">
+                    <Target className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                    Funnel
+                  </TabsTrigger>
+                  <TabsTrigger value="questions" data-testid="tab-questions" className="text-xs sm:text-sm px-3 sm:px-4 py-2 whitespace-nowrap">
+                    <BarChart3 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                    <span className="hidden sm:inline">Questions</span>
+                    <span className="sm:hidden">Quest</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="time" data-testid="tab-time" className="text-xs sm:text-sm px-3 sm:px-4 py-2 whitespace-nowrap">
+                    <Clock className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                    Time
+                  </TabsTrigger>
+                  <TabsTrigger value="engagement" data-testid="tab-engagement" className="text-xs sm:text-sm px-3 sm:px-4 py-2 whitespace-nowrap">
+                    <Activity className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                    <span className="hidden sm:inline">Engagement</span>
+                    <span className="sm:hidden">Engage</span>
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+            </div>
 
-            <TabsContent value="overview" className="space-y-6">
+            <TabsContent value="overview" className="space-y-4 sm:space-y-6">
               <OverviewTab pageAnalytics={pageAnalytics} chartConfig={chartConfig} />
             </TabsContent>
 
-            <TabsContent value="funnel" className="space-y-6">
+            <TabsContent value="funnel" className="space-y-4 sm:space-y-6">
               <FunnelTab funnelData={funnelData} />
             </TabsContent>
 
-            <TabsContent value="questions" className="space-y-6">
+            <TabsContent value="questions" className="space-y-4 sm:space-y-6">
               <QuestionsTab questionAnalytics={questionAnalytics} chartConfig={chartConfig} />
             </TabsContent>
 
-            <TabsContent value="time" className="space-y-6">
+            <TabsContent value="time" className="space-y-4 sm:space-y-6">
               <TimeAnalysisTab
                 timeSpentData={timeSpentData}
                 pageAnalytics={pageAnalytics}
@@ -155,26 +162,27 @@ export default function SurveyAnalytics() {
               />
             </TabsContent>
 
-            <TabsContent value="engagement" className="space-y-6">
+            <TabsContent value="engagement" className="space-y-4 sm:space-y-6">
               <EngagementTab engagementMetrics={engagementMetrics} chartConfig={chartConfig} />
             </TabsContent>
           </Tabs>
 
           {/* Action Buttons */}
-          <div className="flex justify-between items-center">
-            <Link href="/dashboard">
-              <Button variant="outline">
+          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
+            <Link href="/dashboard" className="w-full sm:w-auto">
+              <Button variant="outline" className="w-full sm:w-auto">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Dashboard
               </Button>
             </Link>
 
-            <div className="flex space-x-2">
-              <Button variant="outline" data-testid="button-export-analytics">
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+              <Button variant="outline" data-testid="button-export-analytics" className="w-full sm:w-auto">
                 <Download className="mr-2 h-4 w-4" />
-                Export Data
+                <span className="hidden sm:inline">Export Data</span>
+                <span className="sm:hidden">Export</span>
               </Button>
-              <Button variant="outline" data-testid="button-filter-analytics">
+              <Button variant="outline" data-testid="button-filter-analytics" className="w-full sm:w-auto">
                 <Filter className="mr-2 h-4 w-4" />
                 Filter
               </Button>

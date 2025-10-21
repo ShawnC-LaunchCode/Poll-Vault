@@ -25,10 +25,10 @@ export function PageContent({
 }: PageContentProps) {
   return (
     <Card>
-      <CardContent className="p-6">
-        <div className="space-y-6">
+      <CardContent className="p-4 sm:p-6">
+        <div className="space-y-4 sm:space-y-6">
           {pageTitle && (
-            <h2 className="text-lg font-semibold text-foreground" data-testid="text-page-title">
+            <h2 className="text-base sm:text-lg font-semibold text-foreground" data-testid="text-page-title">
               {pageTitle}
             </h2>
           )}
