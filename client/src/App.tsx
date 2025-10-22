@@ -20,6 +20,7 @@ import SurveyResults from "@/pages/SurveyResults";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminUserSurveys from "@/pages/AdminUserSurveys";
+import AdminSurveys from "@/pages/AdminSurveys";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -56,6 +57,7 @@ function Router() {
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/admin/users" component={AdminUsers} />
           <Route path="/admin/users/:userId/surveys" component={AdminUserSurveys} />
+          <Route path="/admin/surveys" component={AdminSurveys} />
           {/* 404 for authenticated users only */}
           <Route component={NotFound} />
         </>
