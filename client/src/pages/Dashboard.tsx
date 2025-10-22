@@ -227,29 +227,36 @@ export default function Dashboard() {
                       <SkeletonList count={3} showAvatar />
                     ) : surveys && surveys.length > 0 ? (
                       <div className="space-y-2 sm:space-y-3">
-                        {surveys.slice(0, 4).map((survey) => (
-                          <Link key={survey.id} href={`/builder/${survey.id}`}>
-                            <div className="flex items-center justify-between p-2 sm:p-3 border border-border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer" data-testid={`card-recent-survey-${survey.id}`}>
-                              <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
-                                <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                                  <FileText className="h-4 w-4 text-primary" />
+                        {surveys.slice(0, 4).map((survey) => {
+                          // Determine target URL based on survey status
+                          const targetUrl = survey.status === 'draft'
+                            ? `/builder/${survey.id}`
+                            : `/surveys/${survey.id}/results`;
+
+                          return (
+                            <Link key={survey.id} href={targetUrl}>
+                              <div className="flex items-center justify-between p-2 sm:p-3 border border-border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer" data-testid={`card-recent-survey-${survey.id}`}>
+                                <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+                                  <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <FileText className="h-4 w-4 text-primary" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <h4 className="font-medium text-sm sm:text-base text-foreground line-clamp-1" data-testid={`text-recent-survey-title-${survey.id}`}>
+                                      {survey.title}
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground">
+                                      {survey.updatedAt ? new Date(survey.updatedAt).toLocaleDateString() : 'N/A'}
+                                    </p>
+                                  </div>
                                 </div>
-                                <div className="min-w-0 flex-1">
-                                  <h4 className="font-medium text-sm sm:text-base text-foreground line-clamp-1" data-testid={`text-recent-survey-title-${survey.id}`}>
-                                    {survey.title}
-                                  </h4>
-                                  <p className="text-xs text-muted-foreground">
-                                    {survey.updatedAt ? new Date(survey.updatedAt).toLocaleDateString() : 'N/A'}
-                                  </p>
+                                <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+                                  <StatusBadge status={survey.status} />
+                                  <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground hidden sm:block" />
                                 </div>
                               </div>
-                              <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-                                <StatusBadge status={survey.status} />
-                                <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground hidden sm:block" />
-                              </div>
-                            </div>
-                          </Link>
-                        ))}
+                            </Link>
+                          );
+                        })}
                       </div>
                     ) : (
                       <div className="text-center py-6">
