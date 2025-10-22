@@ -772,8 +772,8 @@ export class DatabaseStorage implements IStorage {
           )
         );
 
-      // Count answers
-      const [answersResult] = await db
+      // Count answers from analytics events
+      const [analyticsAnswersResult] = await db
         .select({ count: count() })
         .from(analyticsEvents)
         .where(
@@ -781,6 +781,18 @@ export class DatabaseStorage implements IStorage {
             eq(analyticsEvents.surveyId, surveyId),
             eq(analyticsEvents.questionId, question.questionId),
             eq(analyticsEvents.event, 'question_answer')
+          )
+        );
+
+      // Count actual answers from answers table (fallback if analytics events don't exist)
+      const [actualAnswersResult] = await db
+        .select({ count: count() })
+        .from(answers)
+        .innerJoin(responses, eq(answers.responseId, responses.id))
+        .where(
+          and(
+            eq(responses.surveyId, surveyId),
+            eq(answers.questionId, question.questionId)
           )
         );
 
@@ -808,9 +820,11 @@ export class DatabaseStorage implements IStorage {
           )
         );
 
-      const totalViews = viewsResult.count;
-      const totalAnswers = answersResult.count;
+      // Use actual answers from database if analytics events don't exist
+      const totalAnswers = Math.max(analyticsAnswersResult.count, actualAnswersResult.count);
+      const totalViews = viewsResult.count || totalAnswers; // Use answer count as views if no focus events
       const totalSkips = skipsResult.count;
+
       const avgTimeSpent = timeEvents.length > 0
         ? timeEvents.reduce((sum: number, event: any) => sum + (event.duration || 0), 0) / timeEvents.length / 1000
         : 0;
