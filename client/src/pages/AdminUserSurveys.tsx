@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -8,7 +8,9 @@ import Header from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { ArrowLeft, FileText, BarChart, Edit } from "lucide-react";
+import { ArrowLeft, FileText, BarChart, Edit, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { apiRequest } from "@/lib/queryClient";
 import type { Survey } from "@shared/schema";
 
 interface UserSurveysData {
@@ -25,11 +27,34 @@ export default function AdminUserSurveys() {
   const { userId } = useParams();
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useQuery<UserSurveysData>({
     queryKey: [`/api/admin/users/${userId}/surveys`],
     enabled: !!isAuthenticated && !!userId,
     retry: false,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (surveyId: string) => {
+      await apiRequest('DELETE', `/api/admin/surveys/${surveyId}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Survey deleted",
+        description: "The survey has been permanently deleted",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/users/${userId}/surveys`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/surveys'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/stats'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to delete survey",
+        variant: "destructive",
+      });
+    },
   });
 
   // Redirect if not authenticated
@@ -130,6 +155,38 @@ export default function AdminUserSurveys() {
                             Results
                           </Button>
                         </Link>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm">
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Delete
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Survey</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete "{survey.title}"? This action cannot be undone and will permanently delete all responses and data associated with this survey.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteMutation.mutate(survey.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                {deleteMutation.isPending ? (
+                                  <>
+                                    <i className="fas fa-spinner fa-spin mr-2"></i>
+                                    Deleting...
+                                  </>
+                                ) : (
+                                  "Delete Survey"
+                                )}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </div>
                   </CardContent>
