@@ -94,6 +94,15 @@ export class SurveyService {
     // Verify ownership
     await this.verifyOwnership(surveyId, userId);
 
+    // If enabling anonymous access and publicLink doesn't exist, generate one
+    if (updates.allowAnonymous) {
+      const existingSurvey = await surveyRepository.findById(surveyId);
+      if (existingSurvey && !existingSurvey.publicLink) {
+        const { randomUUID } = await import('crypto');
+        updates.publicLink = randomUUID();
+      }
+    }
+
     // Update survey
     return await surveyRepository.update(surveyId, updates);
   }
