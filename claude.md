@@ -1,12 +1,105 @@
 # Poll-Vault: Developer Reference Guide
 
-**Last Updated:** 2025-10-20
+**Last Updated:** 2025-10-22
 **Project Type:** Survey/Polling Platform (formerly DevPulse)
 **Tech Stack:** Node.js/Express, React, PostgreSQL, Drizzle ORM
 
 ---
 
 ## Recent Fixes & Updates
+
+### 2025-10-22: Historical Statistics Tracking System
+**Achievement:** Implemented comprehensive historical metrics to track all-time system usage
+
+**Changes:**
+- **New Database Table:** `systemStats` - Single-row table tracking lifetime totals
+  - `totalSurveysCreated` - All surveys ever created
+  - `totalSurveysDeleted` - Surveys that have been permanently deleted
+  - `totalResponsesCollected` - All responses ever submitted
+  - `totalResponsesDeleted` - Responses deleted via survey cascade
+
+- **New Repository:** `SystemStatsRepository.ts`
+  - `incrementSurveysCreated()` - Called on survey creation
+  - `incrementSurveysDeleted()` - Called on survey deletion
+  - `incrementResponsesCollected()` - Called on response submission
+  - Automatically tracks cascade-deleted responses
+
+- **Backend Updates:**
+  - Survey creation endpoint increments creation counter
+  - Response creation (authenticated & anonymous) increments response counter
+  - Survey deletion endpoint counts and tracks deleted responses
+  - Admin stats endpoint returns historical totals
+
+- **Admin Dashboard UI:**
+  - New "Historical Statistics (All Time)" section
+  - 4 new metric cards: Total Surveys Created, Surveys Deleted, Total Responses Collected, Responses Deleted
+  - Color-coded cards with visual indicators
+  - Clear labeling: "Including deleted items" and "Via survey deletions"
+
+**Benefits:**
+- Complete visibility into system usage over time
+- Track deleted data for audit and reporting purposes
+- Better understanding of user engagement and data lifecycle
+
+**Commits:**
+- `c0741fb` - "feat(admin): Add historical statistics tracking for surveys and responses"
+
+### 2025-10-22: Admin Panel Enhancements
+**Achievement:** Enhanced admin capabilities for survey management and user oversight
+
+**Changes:**
+- **Survey Deletion from Admin Views:**
+  - Added delete button with confirmation dialog to AdminSurveys page (`/admin/surveys`)
+  - Added delete button with confirmation dialog to AdminUserSurveys page (`/admin/users/:id/surveys`)
+  - Delete buttons include trash icon, loading states, and toast notifications
+  - Automatic cache invalidation after deletion
+
+- **Sidebar Navigation Cleanup:**
+  - Removed Analytics link from main sidebar navigation
+  - Simplified to: Dashboard, My Surveys, Recipients
+
+**Files Modified:**
+- `client/src/components/layout/Sidebar.tsx` - Removed Analytics navigation
+- `client/src/pages/AdminSurveys.tsx` - Added delete functionality
+- `client/src/pages/AdminUserSurveys.tsx` - Added delete functionality
+- `server/routes/admin.routes.ts` - Added response counting before deletion
+
+**Commits:**
+- `744eb8b` - "feat(admin): Add survey deletion and remove Analytics navigation"
+- `926e4c8` - "feat(admin): Add survey deletion to user-specific surveys page"
+
+### 2025-10-22: UX Improvements & Bug Fixes
+**Achievement:** Enhanced user experience with smart navigation and critical bug fixes
+
+**Changes:**
+- **Status-Based Dashboard Navigation:**
+  - Recent surveys now route based on status
+  - Draft surveys → `/builder/:id` (edit mode)
+  - Active/Closed surveys → `/surveys/:id/results` (results page)
+  - Improves workflow by directing users to most relevant page
+
+- **Anonymous Response Fix:**
+  - Auto-generate `publicLink` when `allowAnonymous` is enabled
+  - Fixes issue where anonymous responses couldn't be created
+  - Modified `SurveyService.updateSurvey()` to generate UUID publicLink if missing
+  - Resolves problem where survey results didn't include anonymous responses
+
+- **Question Analytics Fix:**
+  - Modified `getQuestionAnalytics()` to use actual answer data as fallback
+  - Queries both `analyticsEvents` table AND `answers` table
+  - Uses `Math.max()` to pick higher count (handles missing event tracking)
+  - Falls back to answer count for views when focus events don't exist
+  - Fixes issue where analytics showed no results despite having responses
+
+**Files Modified:**
+- `client/src/pages/Dashboard.tsx` - Status-based navigation
+- `server/services/SurveyService.ts` - publicLink auto-generation
+- `server/storage.ts` - Analytics fallback logic
+
+**Commits:**
+- `c7249b5` - "feat(ui): Add status-based navigation for recent surveys on dashboard"
+- `6e833cd` - "fix(survey): Auto-generate publicLink when enabling anonymous responses"
+- `6b987db` - "fix(analytics): Use actual answer data when analytics events are missing"
 
 ### 2025-10-20: Post-Deployment Cleanup
 **Achievement:** Removed legacy Replit and Docker configurations after successful Railway migration
@@ -228,7 +321,8 @@ Poll-Vault/
 │   │   ├── RecipientRepository.ts # Recipient data access
 │   │   ├── ResponseRepository.ts # Response data access
 │   │   ├── AnalyticsRepository.ts # Analytics data access
-│   │   └── FileRepository.ts    # File data access
+│   │   ├── FileRepository.ts    # File data access
+│   │   └── SystemStatsRepository.ts # Historical stats tracking
 │   └── types/            # TypeScript declarations
 │       └── express.d.ts  # Express type augmentation
 ├── shared/               # Shared types & schemas
@@ -317,6 +411,12 @@ Poll-Vault/
 
 **14. sessions** - Session Storage
 - sid (PK), sess (jsonb), expire
+
+**15. systemStats** - Historical System Statistics
+- id (PK, default: 1) - Single-row table
+- totalSurveysCreated (default: 0), totalSurveysDeleted (default: 0)
+- totalResponsesCollected (default: 0), totalResponsesDeleted (default: 0)
+- timestamp: updatedAt
 
 ### Key Indices
 - surveys.publicLink (unique)
