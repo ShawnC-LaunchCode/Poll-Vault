@@ -534,6 +534,7 @@ export interface QuestionAnalytics {
   questionTitle: string;
   questionType: string;
   pageId: string;
+  totalResponses: number; // total survey responses
   totalViews: number;
   totalAnswers: number;
   totalSkips: number;
@@ -581,6 +582,36 @@ export interface EngagementMetrics {
   engagementScore: number; // calculated based on time spent vs expected time
   peakEngagementHour: number; // hour of day with most engagement
   completionTrends: { hour: number; completions: number }[];
+}
+
+// Question aggregates types
+export interface YesNoAggregation {
+  yes: number;
+  no: number;
+}
+
+export interface ChoiceAggregation {
+  option: string;
+  count: number;
+  percent: number;
+}
+
+export interface TextAggregation {
+  topKeywords: Array<{ word: string; count: number }>;
+  totalWords: number;
+}
+
+export interface QuestionAggregate {
+  questionId: string;
+  questionTitle: string;
+  questionType: string;
+  totalAnswers: number;
+  aggregation: YesNoAggregation | ChoiceAggregation[] | TextAggregation;
+}
+
+export interface QuestionAggregatesResponse {
+  surveyId: string;
+  questions: QuestionAggregate[];
 }
 
 // File metadata type

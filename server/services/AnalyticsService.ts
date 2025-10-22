@@ -225,6 +225,28 @@ export class AnalyticsService {
     // Use storage for now (could be moved to analyticsRepository)
     return await storage.getEngagementMetrics(surveyId);
   }
+
+  /**
+   * Get aggregated question analytics for visualization
+   * Returns per-question aggregates ready for charts and summaries
+   */
+  async getQuestionAggregates(surveyId: string, userId: string) {
+    // Verify ownership
+    const survey = await surveyRepository.findById(surveyId);
+    if (!survey) {
+      throw new Error("Survey not found");
+    }
+
+    if (survey.creatorId !== userId) {
+      throw new Error("Access denied - you do not own this survey");
+    }
+
+    // Get aggregates from repository
+    const aggregates = await analyticsRepository.getQuestionAggregates(surveyId);
+
+    // Convert Record to Array for easier frontend consumption
+    return Object.values(aggregates);
+  }
 }
 
 // Export singleton instance

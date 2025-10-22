@@ -1,5 +1,8 @@
+import { useAnalyticsData } from "@/hooks/useAnalyticsData";
+import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
-import { QuestionSummaryCard } from "./QuestionSummaryCard";
+import type { Response } from "@shared/schema";
+import { ResultsCard } from "@/components/charts";
 import { Card, CardContent } from "@/components/ui/card";
 import { BarChart3 } from "lucide-react";
 
@@ -8,9 +11,13 @@ interface OverallSummaryProps {
 }
 
 export function OverallSummary({ surveyId }: OverallSummaryProps) {
-  const { data: analytics, isLoading } = useQuery<any[]>({
-    queryKey: [`/api/surveys/${surveyId}/analytics/questions`],
-    enabled: !!surveyId,
+  const { isAuthenticated } = useAuth();
+  const { questionAggregates, isLoading } = useAnalyticsData(surveyId, isAuthenticated);
+
+  // Fetch actual response count
+  const { data: responses } = useQuery<Response[]>({
+    queryKey: [`/api/surveys/${surveyId}/responses`],
+    enabled: !!surveyId && isAuthenticated,
     retry: false,
   });
 
@@ -29,7 +36,7 @@ export function OverallSummary({ surveyId }: OverallSummaryProps) {
     );
   }
 
-  if (!analytics || analytics.length === 0) {
+  if (!questionAggregates || questionAggregates.length === 0) {
     return (
       <Card>
         <CardContent className="p-12">
@@ -51,14 +58,14 @@ export function OverallSummary({ surveyId }: OverallSummaryProps) {
         <div>
           <h2 className="text-lg sm:text-xl font-semibold text-foreground">Question Analytics</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Aggregated responses across {analytics.length} questions
+            {responses?.length || 0} responses across {questionAggregates.length} questions
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        {analytics.map((question: any) => (
-          <QuestionSummaryCard key={question.questionId} question={question} />
+        {questionAggregates.map((question) => (
+          <ResultsCard key={question.questionId} question={question} />
         ))}
       </div>
     </div>

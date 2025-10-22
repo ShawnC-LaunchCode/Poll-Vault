@@ -1,25 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
+import type { QuestionAnalytics } from "@shared/schema";
 import { QuestionResultsBlock } from "./QuestionResultsBlock";
 import { Card, CardContent } from "@/components/ui/card";
 import { BarChart3, Loader2 } from "lucide-react";
 
 interface QuestionDetailsProps {
   surveyId: string;
-}
-
-interface QuestionAnalytics {
-  questionId: string;
-  questionTitle: string;
-  questionType: string;
-  totalResponses: number;
-  answerRate: number;
-  avgTimeSpent: number | null;
-  aggregates?: {
-    option: string;
-    count: number;
-    percentage: number;
-  }[];
-  textAnswers?: string[];
 }
 
 interface Response {
