@@ -99,7 +99,7 @@ export class SurveyService {
       const existingSurvey = await surveyRepository.findById(surveyId);
       if (existingSurvey && !existingSurvey.publicLink) {
         const { randomUUID } = await import('crypto');
-        updates.publicLink = randomUUID();
+        (updates as any).publicLink = randomUUID();
       }
     }
 
