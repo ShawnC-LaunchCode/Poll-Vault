@@ -52,6 +52,11 @@ export default function Sidebar() {
     if (href === "/") {
       return location === "/";
     }
+    // For admin routes, check for exact match to avoid highlighting both
+    // "/admin" and "/admin/users" at the same time
+    if (href === "/admin") {
+      return location === "/admin";
+    }
     return location.startsWith(href);
   };
 
