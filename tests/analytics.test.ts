@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createTestSurvey, insertResponses, createEmptySurvey } from "./factories/testHelpers";
 import { testSqlite } from "./setup/setup";
+import { randomUUID } from "crypto";
 
 /**
  * Analytics Reliability Testing Suite
@@ -8,12 +9,12 @@ import { testSqlite } from "./setup/setup";
  */
 describe("Analytics Data Integrity", () => {
   describe("Data Persistence", () => {
-    it("should persist all submitted answers correctly", async () => {
+    it("should persist all submitted answers correctly", () => {
       // Create survey with questions
-      const survey = await createTestSurvey();
+      const survey = createTestSurvey();
 
       // Insert 3 responses
-      const responseIds = await insertResponses(survey, 3);
+      const responseIds = insertResponses(survey, 3);
 
       // Verify all responses exist
       expect(responseIds).toHaveLength(3);
@@ -28,70 +29,66 @@ describe("Analytics Data Integrity", () => {
       }
     });
 
-    it("should correctly store yes/no answer values", async () => {
-      const survey = await createTestSurvey();
-      await insertResponses(survey, 2);
+    it("should correctly store yes/no answer values", () => {
+      const survey = createTestSurvey();
+      insertResponses(survey, 2);
 
-      const yesNoAnswers = await testDb
-        .select()
-        .from(answers)
-        .where(eq(answers.questionId, survey.questions.yesNo.id));
+      const yesNoAnswers = testSqlite.prepare(`
+        SELECT * FROM answers WHERE question_id = ?
+      `).all(survey.questions.yesNo.id);
 
       expect(yesNoAnswers).toHaveLength(2);
 
       // Verify values are stored as JSON
-      const values = yesNoAnswers.map(a => JSON.parse(a.value));
+      const values = yesNoAnswers.map((a: any) => JSON.parse(a.value));
       expect(values).toContain(true);
       expect(values).toContain(false);
     });
 
-    it("should correctly store multiple choice answer values", async () => {
-      const survey = await createTestSurvey();
-      await insertResponses(survey, 3);
+    it("should correctly store multiple choice answer values", () => {
+      const survey = createTestSurvey();
+      insertResponses(survey, 3);
 
-      const mcAnswers = await testDb
-        .select()
-        .from(answers)
-        .where(eq(answers.questionId, survey.questions.multipleChoice.id));
+      const mcAnswers = testSqlite.prepare(`
+        SELECT * FROM answers WHERE question_id = ?
+      `).all(survey.questions.multipleChoice.id);
 
       expect(mcAnswers).toHaveLength(3);
 
-      const values = mcAnswers.map(a => JSON.parse(a.value));
+      const values = mcAnswers.map((a: any) => JSON.parse(a.value));
       expect(values).toContain("Blue");
       expect(values).toContain("Red");
     });
 
-    it("should correctly store text answer values", async () => {
-      const survey = await createTestSurvey();
-      await insertResponses(survey, 2);
+    it("should correctly store text answer values", () => {
+      const survey = createTestSurvey();
+      insertResponses(survey, 2);
 
-      const textAnswers = await testDb
-        .select()
-        .from(answers)
-        .where(eq(answers.questionId, survey.questions.shortText.id));
+      const textAnswers = testSqlite.prepare(`
+        SELECT * FROM answers WHERE question_id = ?
+      `).all(survey.questions.shortText.id);
 
       expect(textAnswers).toHaveLength(2);
 
-      const values = textAnswers.map(a => JSON.parse(a.value));
+      const values = textAnswers.map((a: any) => JSON.parse(a.value));
       expect(values.every((v: any) => typeof v === "string")).toBe(true);
     });
   });
 
   describe("Analytics Aggregation - Yes/No Questions", () => {
-    it("should aggregate yes/no responses correctly", async () => {
-      const survey = await createTestSurvey();
-      await insertResponses(survey, 5); // Will have 3 yes, 2 no based on our factory
+    it("should aggregate yes/no responses correctly", () => {
+      const survey = createTestSurvey();
+      insertResponses(survey, 5); // Will have 3 yes, 2 no based on our factory
 
       // Query answers
-      const yesNoAnswers = await testDb
-        .select()
-        .from(answers)
-        .where(eq(answers.questionId, survey.questions.yesNo.id));
+      const yesNoAnswers = testSqlite.prepare(`
+        SELECT * FROM answers WHERE question_id = ?
+      `).all(survey.questions.yesNo.id);
 
       // Manually aggregate (mimicking AnalyticsRepository logic)
       const aggregation = { yes: 0, no: 0 };
       for (const answer of yesNoAnswers) {
-        const value = JSON.parse(answer.value);
+        const value = JSON.parse((answer as any).value);
         if (value === true || value === "true" || value === "Yes") {
           aggregation.yes++;
         } else {
@@ -104,45 +101,29 @@ describe("Analytics Data Integrity", () => {
       expect(aggregation.yes + aggregation.no).toBe(5);
     });
 
-    it("should handle boolean values stored in different formats", async () => {
-      const survey = await createTestSurvey();
-      const responseId = (await insertResponses(survey, 1))[0];
-      const now = Date.now();
+    it("should handle boolean values stored in different formats", () => {
+      const survey = createTestSurvey();
+      const responseId = insertResponses(survey, 1)[0];
+      const now = new Date().toISOString();
 
       // Manually insert answers with different boolean formats
-      await testDb.insert(answers).values([
-        {
-          id: "test-1",
-          responseId,
-          questionId: survey.questions.yesNo.id,
-          value: JSON.stringify(true), // boolean
-          createdAt: now as any,
-        },
-        {
-          id: "test-2",
-          responseId,
-          questionId: survey.questions.yesNo.id,
-          value: JSON.stringify("Yes"), // string
-          createdAt: now as any,
-        },
-        {
-          id: "test-3",
-          responseId,
-          questionId: survey.questions.yesNo.id,
-          value: JSON.stringify("true"), // string boolean
-          createdAt: now as any,
-        },
-      ]);
+      const insertAnswer = testSqlite.prepare(`
+        INSERT INTO answers (id, response_id, question_id, value, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `);
 
-      const allAnswers = await testDb
-        .select()
-        .from(answers)
-        .where(eq(answers.questionId, survey.questions.yesNo.id));
+      insertAnswer.run("test-1", responseId, survey.questions.yesNo.id, JSON.stringify(true), now);
+      insertAnswer.run("test-2", responseId, survey.questions.yesNo.id, JSON.stringify("Yes"), now);
+      insertAnswer.run("test-3", responseId, survey.questions.yesNo.id, JSON.stringify("true"), now);
+
+      const allAnswers = testSqlite.prepare(`
+        SELECT * FROM answers WHERE question_id = ?
+      `).all(survey.questions.yesNo.id);
 
       // Aggregate with robust parsing
       let yesCount = 0;
       for (const answer of allAnswers) {
-        const value = JSON.parse(answer.value);
+        const value = JSON.parse((answer as any).value);
         if (value === true || value === "true" || value === "Yes" || value === "yes") {
           yesCount++;
         }
@@ -153,19 +134,18 @@ describe("Analytics Data Integrity", () => {
   });
 
   describe("Analytics Aggregation - Multiple Choice Questions", () => {
-    it("should aggregate multiple choice options correctly", async () => {
-      const survey = await createTestSurvey();
-      await insertResponses(survey, 5);
+    it("should aggregate multiple choice options correctly", () => {
+      const survey = createTestSurvey();
+      insertResponses(survey, 5);
 
-      const mcAnswers = await testDb
-        .select()
-        .from(answers)
-        .where(eq(answers.questionId, survey.questions.multipleChoice.id));
+      const mcAnswers = testSqlite.prepare(`
+        SELECT * FROM answers WHERE question_id = ?
+      `).all(survey.questions.multipleChoice.id);
 
       // Aggregate options
       const optionCounts: Record<string, number> = {};
       for (const answer of mcAnswers) {
-        const value = JSON.parse(answer.value);
+        const value = JSON.parse((answer as any).value);
         const option = String(value);
         optionCounts[option] = (optionCounts[option] || 0) + 1;
       }
@@ -180,18 +160,17 @@ describe("Analytics Data Integrity", () => {
       expect(totalResponses).toBe(5);
     });
 
-    it("should calculate percentages correctly", async () => {
-      const survey = await createTestSurvey();
-      await insertResponses(survey, 4);
+    it("should calculate percentages correctly", () => {
+      const survey = createTestSurvey();
+      insertResponses(survey, 4);
 
-      const mcAnswers = await testDb
-        .select()
-        .from(answers)
-        .where(eq(answers.questionId, survey.questions.multipleChoice.id));
+      const mcAnswers = testSqlite.prepare(`
+        SELECT * FROM answers WHERE question_id = ?
+      `).all(survey.questions.multipleChoice.id);
 
       const optionCounts: Record<string, number> = {};
       for (const answer of mcAnswers) {
-        const value = JSON.parse(answer.value);
+        const value = JSON.parse((answer as any).value);
         optionCounts[String(value)] = (optionCounts[String(value)] || 0) + 1;
       }
 
@@ -212,21 +191,20 @@ describe("Analytics Data Integrity", () => {
   });
 
   describe("Analytics Aggregation - Text Questions", () => {
-    it("should extract keywords from text answers", async () => {
-      const survey = await createTestSurvey();
-      await insertResponses(survey, 5);
+    it("should extract keywords from text answers", () => {
+      const survey = createTestSurvey();
+      insertResponses(survey, 5);
 
-      const textAnswers = await testDb
-        .select()
-        .from(answers)
-        .where(eq(answers.questionId, survey.questions.shortText.id));
+      const textAnswers = testSqlite.prepare(`
+        SELECT * FROM answers WHERE question_id = ?
+      `).all(survey.questions.shortText.id);
 
       expect(textAnswers.length).toBe(5);
 
       // Extract keywords (simple word frequency analysis)
       const wordCounts: Record<string, number> = {};
       for (const answer of textAnswers) {
-        const value = JSON.parse(answer.value);
+        const value = JSON.parse((answer as any).value);
         const words = String(value).toLowerCase().split(/\s+/);
 
         for (const word of words) {
@@ -247,27 +225,23 @@ describe("Analytics Data Integrity", () => {
       expect(topKeywords.some(word => ["creative", "data", "thinker", "enthusiast"].includes(word))).toBe(true);
     });
 
-    it("should handle empty text responses", async () => {
-      const survey = await createTestSurvey();
-      const responseId = (await insertResponses(survey, 1))[0];
-      const now = Date.now();
+    it("should handle empty text responses", () => {
+      const survey = createTestSurvey();
+      const responseId = insertResponses(survey, 1)[0];
+      const now = new Date().toISOString();
 
       // Add empty text answer
-      await testDb.insert(answers).values({
-        id: "empty-text",
-        responseId,
-        questionId: survey.questions.longText.id,
-        value: JSON.stringify(""),
-        createdAt: now as any,
-      });
+      testSqlite.prepare(`
+        INSERT INTO answers (id, response_id, question_id, value, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run("empty-text", responseId, survey.questions.longText.id, JSON.stringify(""), now);
 
-      const textAnswers = await testDb
-        .select()
-        .from(answers)
-        .where(eq(answers.questionId, survey.questions.longText.id));
+      const textAnswers = testSqlite.prepare(`
+        SELECT * FROM answers WHERE question_id = ?
+      `).all(survey.questions.longText.id);
 
       // Should handle empty values gracefully
-      const nonEmptyAnswers = textAnswers.filter(a => {
+      const nonEmptyAnswers = textAnswers.filter((a: any) => {
         const value = JSON.parse(a.value);
         return String(value).trim().length > 0;
       });
@@ -277,98 +251,81 @@ describe("Analytics Data Integrity", () => {
   });
 
   describe("Edge Cases", () => {
-    it("should handle empty surveys gracefully", async () => {
-      const emptySurvey = await createEmptySurvey();
+    it("should handle empty surveys gracefully", () => {
+      const emptySurvey = createEmptySurvey();
 
       // Query responses
-      const surveyResponses = await testDb
-        .select()
-        .from(responses)
-        .where(eq(responses.surveyId, emptySurvey.surveyId));
+      const surveyResponses = testSqlite.prepare(`
+        SELECT * FROM responses WHERE survey_id = ?
+      `).all(emptySurvey.surveyId);
 
       expect(surveyResponses).toHaveLength(0);
 
       // Query answers for the question
-      const questionAnswers = await testDb
-        .select()
-        .from(answers)
-        .where(eq(answers.questionId, emptySurvey.questionId));
+      const questionAnswers = testSqlite.prepare(`
+        SELECT * FROM answers WHERE question_id = ?
+      `).all(emptySurvey.questionId);
 
       expect(questionAnswers).toHaveLength(0);
     });
 
-    it("should handle surveys with no completed responses", async () => {
-      const survey = await createTestSurvey();
-      const now = Date.now();
+    it("should handle surveys with no completed responses", () => {
+      const survey = createTestSurvey();
+      const now = new Date().toISOString();
 
       // Create incomplete response
       const responseId = "incomplete-response";
-      await testDb.insert(responses).values({
-        id: responseId,
-        surveyId: survey.surveyId,
-        completed: false, // Not completed
-        isAnonymous: false,
-        createdAt: now as any,
-      });
+      testSqlite.prepare(`
+        INSERT INTO responses (id, survey_id, completed, is_anonymous, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(responseId, survey.surveyId, 0, 0, now);
 
       // Query completed responses only
-      const completedResponses = await testDb
-        .select()
-        .from(responses)
-        .where(
-          and(
-            eq(responses.surveyId, survey.surveyId),
-            eq(responses.completed, true)
-          )
-        );
+      const completedResponses = testSqlite.prepare(`
+        SELECT * FROM responses WHERE survey_id = ? AND completed = 1
+      `).all(survey.surveyId);
 
       expect(completedResponses).toHaveLength(0);
     });
 
-    it("should handle missing answers for optional questions", async () => {
-      const survey = await createTestSurvey();
-      const responseId = (await insertResponses(survey, 1))[0];
+    it("should handle missing answers for optional questions", () => {
+      const survey = createTestSurvey();
+      const responseId = insertResponses(survey, 1)[0];
 
       // Remove answer for optional question
-      await testDb
-        .delete(answers)
-        .where(
-          and(
-            eq(answers.responseId, responseId),
-            eq(answers.questionId, survey.questions.shortText.id)
-          )
-        );
+      testSqlite.prepare(`
+        DELETE FROM answers WHERE response_id = ? AND question_id = ?
+      `).run(responseId, survey.questions.shortText.id);
 
       // Verify answer was removed
-      const remainingAnswers = await testDb
-        .select()
-        .from(answers)
-        .where(eq(answers.responseId, responseId));
+      const remainingAnswers = testSqlite.prepare(`
+        SELECT * FROM answers WHERE response_id = ?
+      `).all(responseId);
 
       expect(remainingAnswers).toHaveLength(4); // 5 - 1 removed
     });
 
-    it("should maintain data consistency across related tables", async () => {
-      const survey = await createTestSurvey();
-      await insertResponses(survey, 3);
+    it("should maintain data consistency across related tables", () => {
+      const survey = createTestSurvey();
+      insertResponses(survey, 3);
 
       // Verify referential integrity
-      const allAnswers = await testDb.select().from(answers);
+      const allAnswers = testSqlite.prepare(`SELECT * FROM answers`).all();
 
       for (const answer of allAnswers) {
+        const ans = answer as any;
+
         // Verify response exists
-        const [response] = await testDb
-          .select()
-          .from(responses)
-          .where(eq(responses.id, answer.responseId));
+        const response = testSqlite.prepare(`
+          SELECT * FROM responses WHERE id = ?
+        `).get(ans.response_id);
 
         expect(response).toBeDefined();
 
         // Verify question exists
-        const [question] = await testDb
-          .select()
-          .from(questions)
-          .where(eq(questions.id, answer.questionId));
+        const question = testSqlite.prepare(`
+          SELECT * FROM questions WHERE id = ?
+        `).get(ans.question_id);
 
         expect(question).toBeDefined();
       }
@@ -376,13 +333,13 @@ describe("Analytics Data Integrity", () => {
   });
 
   describe("Performance & Scalability", () => {
-    it("should handle large response volumes efficiently", async () => {
-      const survey = await createTestSurvey();
+    it("should handle large response volumes efficiently", () => {
+      const survey = createTestSurvey();
 
       const startTime = Date.now();
 
       // Insert 100 responses
-      await insertResponses(survey, 100);
+      insertResponses(survey, 100);
 
       const endTime = Date.now();
       const duration = endTime - startTime;
@@ -391,29 +348,27 @@ describe("Analytics Data Integrity", () => {
       expect(duration).toBeLessThan(2000);
 
       // Verify all were inserted
-      const allResponses = await testDb
-        .select()
-        .from(responses)
-        .where(eq(responses.surveyId, survey.surveyId));
+      const allResponses = testSqlite.prepare(`
+        SELECT * FROM responses WHERE survey_id = ?
+      `).all(survey.surveyId);
 
       expect(allResponses).toHaveLength(100);
     });
 
-    it("should aggregate large datasets correctly", async () => {
-      const survey = await createTestSurvey();
-      await insertResponses(survey, 50);
+    it("should aggregate large datasets correctly", () => {
+      const survey = createTestSurvey();
+      insertResponses(survey, 50);
 
       const startTime = Date.now();
 
       // Aggregate multiple choice answers
-      const mcAnswers = await testDb
-        .select()
-        .from(answers)
-        .where(eq(answers.questionId, survey.questions.multipleChoice.id));
+      const mcAnswers = testSqlite.prepare(`
+        SELECT * FROM answers WHERE question_id = ?
+      `).all(survey.questions.multipleChoice.id);
 
       const optionCounts: Record<string, number> = {};
       for (const answer of mcAnswers) {
-        const value = JSON.parse(answer.value);
+        const value = JSON.parse((answer as any).value);
         optionCounts[String(value)] = (optionCounts[String(value)] || 0) + 1;
       }
 
