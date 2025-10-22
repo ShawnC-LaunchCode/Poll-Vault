@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, FileText, BarChart, CheckCircle, Shield, TrendingUp } from "lucide-react";
+import { Users, FileText, BarChart, CheckCircle, Shield, TrendingUp, Database, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 
@@ -19,6 +19,11 @@ interface AdminStats {
   closedSurveys: number;
   totalResponses: number;
   completedResponses: number;
+  // Historical totals (including deleted items)
+  totalSurveysEverCreated: number;
+  totalSurveysDeleted: number;
+  totalResponsesEverCollected: number;
+  totalResponsesDeleted: number;
 }
 
 export default function AdminDashboard() {
@@ -245,6 +250,80 @@ export default function AdminDashboard() {
                         {stats.totalResponses > 0
                           ? `${((stats.completedResponses / stats.totalResponses) * 100).toFixed(1)}% completion rate`
                           : 'No responses yet'}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              {/* Historical Stats */}
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Historical Statistics (All Time)</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <Card className="border-indigo-200 bg-indigo-50/50">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">
+                        Total Surveys Created
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <div className="text-3xl font-bold text-indigo-600">{stats.totalSurveysEverCreated}</div>
+                        <Database className="h-8 w-8 text-indigo-600" />
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-2">
+                        Including deleted surveys
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-red-200 bg-red-50/50">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">
+                        Surveys Deleted
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <div className="text-3xl font-bold text-red-600">{stats.totalSurveysDeleted}</div>
+                        <Trash2 className="h-8 w-8 text-red-600" />
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-2">
+                        Permanently removed
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-blue-200 bg-blue-50/50">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">
+                        Total Responses Collected
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <div className="text-3xl font-bold text-blue-600">{stats.totalResponsesEverCollected}</div>
+                        <Database className="h-8 w-8 text-blue-600" />
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-2">
+                        Including deleted responses
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-orange-200 bg-orange-50/50">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">
+                        Responses Deleted
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <div className="text-3xl font-bold text-orange-600">{stats.totalResponsesDeleted}</div>
+                        <Trash2 className="h-8 w-8 text-orange-600" />
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-2">
+                        Via survey deletions
                       </div>
                     </CardContent>
                   </Card>

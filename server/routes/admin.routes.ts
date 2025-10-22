@@ -4,6 +4,7 @@ import { isAdmin } from "../middleware/adminAuth";
 import { userRepository } from "../repositories/UserRepository";
 import { surveyRepository } from "../repositories/SurveyRepository";
 import { responseRepository } from "../repositories/ResponseRepository";
+import { systemStatsRepository } from "../repositories/SystemStatsRepository";
 import { createLogger } from "../logger";
 
 const logger = createLogger({ module: 'admin-routes' });
@@ -280,10 +281,23 @@ export function registerAdminRoutes(app: Express): void {
         return res.status(404).json({ message: "Survey not found" });
       }
 
+      // Count responses before deletion (they'll be cascade deleted)
+      const responses = await responseRepository.findBySurvey(req.params.surveyId);
+      const responseCount = responses.length;
+
+      // Delete the survey (cascade deletes responses)
       await storage.deleteSurvey(req.params.surveyId);
 
+      // Update system stats
+      await systemStatsRepository.incrementSurveysDeleted(1, responseCount);
+
       logger.warn(
-        { adminId: req.adminUser.id, surveyId: req.params.surveyId, surveyTitle: survey.title },
+        {
+          adminId: req.adminUser.id,
+          surveyId: req.params.surveyId,
+          surveyTitle: survey.title,
+          deletedResponses: responseCount
+        },
         'Admin deleted survey'
       );
 
@@ -322,6 +336,9 @@ export function registerAdminRoutes(app: Express): void {
       );
       const flattenedResponses = allResponses.flat();
 
+      // Get historical stats
+      const systemStats = await systemStatsRepository.getStats();
+
       const stats = {
         totalUsers: users.length,
         adminUsers: adminCount,
@@ -332,6 +349,11 @@ export function registerAdminRoutes(app: Express): void {
         closedSurveys: flattenedSurveys.filter(s => s.status === 'closed').length,
         totalResponses: flattenedResponses.length,
         completedResponses: flattenedResponses.filter(r => r.completed).length,
+        // Historical totals (including deleted items)
+        totalSurveysEverCreated: systemStats.totalSurveysCreated,
+        totalSurveysDeleted: systemStats.totalSurveysDeleted,
+        totalResponsesEverCollected: systemStats.totalResponsesCollected,
+        totalResponsesDeleted: systemStats.totalResponsesDeleted,
       };
 
       logger.info({ adminId: req.adminUser.id }, 'Admin fetched system stats');

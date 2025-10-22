@@ -18,6 +18,7 @@ export { RecipientRepository, recipientRepository } from "./RecipientRepository"
 export { ResponseRepository, responseRepository } from "./ResponseRepository";
 export { AnalyticsRepository, analyticsRepository } from "./AnalyticsRepository";
 export { FileRepository, fileRepository } from "./FileRepository";
+export { SystemStatsRepository, systemStatsRepository } from "./SystemStatsRepository";
 
 // Export type for Insert operations
 export type { InsertAnalyticsEvent } from "./AnalyticsRepository";

@@ -254,6 +254,16 @@ export const anonymousResponseTracking = pgTable("anonymous_response_tracking", 
   index("anonymous_tracking_survey_session_idx").on(table.surveyId, table.sessionId),
 ]);
 
+// System statistics table for tracking historical totals
+export const systemStats = pgTable("system_stats", {
+  id: integer("id").primaryKey().default(1), // Single row table
+  totalSurveysCreated: integer("total_surveys_created").default(0).notNull(),
+  totalSurveysDeleted: integer("total_surveys_deleted").default(0).notNull(),
+  totalResponsesCollected: integer("total_responses_collected").default(0).notNull(),
+  totalResponsesDeleted: integer("total_responses_deleted").default(0).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   surveys: many(surveys),
@@ -405,6 +415,7 @@ export type InsertFile = typeof insertFileSchema._type;
 export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
 export type AnonymousResponseTracking = typeof anonymousResponseTracking.$inferSelect;
 export type InsertAnonymousResponseTracking = typeof insertAnonymousResponseTrackingSchema._type;
+export type SystemStats = typeof systemStats.$inferSelect;
 
 // Additional API response types
 export interface DashboardStats {

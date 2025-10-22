@@ -4,6 +4,7 @@ import {
   responseRepository,
   questionRepository,
   pageRepository,
+  systemStatsRepository,
   type DbTransaction
 } from "../repositories";
 import type {
@@ -60,6 +61,9 @@ export class ResponseService {
       completed: false,
       isAnonymous: false
     });
+
+    // Increment system stats counter
+    await systemStatsRepository.incrementResponsesCollected();
 
     return {
       response,
@@ -150,6 +154,9 @@ export class ResponseService {
 
       return newResponse;
     });
+
+    // Increment system stats counter
+    await systemStatsRepository.incrementResponsesCollected();
 
     return {
       response,

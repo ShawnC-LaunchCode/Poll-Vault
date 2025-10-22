@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { isAuthenticated } from "../googleAuth";
 import { insertSurveySchema } from "@shared/schema";
 import { surveyService, analyticsService } from "../services";
-import { recipientRepository, surveyRepository, pageRepository, questionRepository } from "../repositories";
+import { recipientRepository, surveyRepository, pageRepository, questionRepository, systemStatsRepository } from "../repositories";
 import { z } from "zod";
 import { exportService } from "../services/exportService";
 
@@ -35,6 +35,9 @@ export function registerSurveyRoutes(app: Express): void {
         creatorId: userId
       });
       const survey = await surveyService.createSurvey(surveyData, userId);
+
+      // Increment system stats counter
+      await systemStatsRepository.incrementSurveysCreated();
 
       res.json(survey);
     } catch (error) {
