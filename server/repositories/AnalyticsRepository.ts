@@ -547,13 +547,18 @@ export class AnalyticsRepository extends BaseRepository<
   }
 
   /**
-   * Aggregate text answers with keyword extraction
+   * Aggregate text answers by grouping identical responses (case-insensitive)
+   * Returns format suitable for bar charts with "Other" category for long tail
    */
   private aggregateText(
     answers: Array<{ value: any }>
-  ): { topKeywords: Array<{ word: string; count: number }>; totalWords: number } {
-    // Combine all text answers
-    const allText = answers
+  ): Array<{ option: string; count: number; percent: number }> {
+    if (answers.length === 0) {
+      return [];
+    }
+
+    // Extract text values
+    const textValues = answers
       .map(a => {
         const value = a.value;
         if (typeof value === 'string') return value;
@@ -562,37 +567,72 @@ export class AnalyticsRepository extends BaseRepository<
         }
         return String(value);
       })
-      .join(' ');
+      .map(text => text.trim())
+      .filter(text => text.length > 0);
 
-    // Extract and count words (excluding common stop words)
-    const stopWords = new Set([
-      'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-      'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been',
-      'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
-      'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that',
-      'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they'
-    ]);
-
-    const words = allText
-      .toLowerCase()
-      .replace(/[^\w\s]/g, '')
-      .split(/\s+/)
-      .filter(w => w.length > 2 && !stopWords.has(w));
-
-    const wordFreq: Record<string, number> = {};
-    for (const word of words) {
-      wordFreq[word] = (wordFreq[word] || 0) + 1;
+    if (textValues.length === 0) {
+      return [];
     }
 
-    const topKeywords = Object.entries(wordFreq)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([word, count]) => ({ word, count }));
+    // Group by case-insensitive key, but preserve best capitalization
+    const groups: Record<string, { count: number; displayValue: string }> = {};
 
-    return {
-      topKeywords,
-      totalWords: words.length,
-    };
+    for (const text of textValues) {
+      const key = text.toLowerCase();
+
+      if (!groups[key]) {
+        groups[key] = { count: 0, displayValue: text };
+      } else {
+        // Prefer capitalized version if any submission has it
+        const hasCapital = /[A-Z]/.test(text);
+        const currentHasCapital = /[A-Z]/.test(groups[key].displayValue);
+        if (hasCapital && !currentHasCapital) {
+          groups[key].displayValue = text;
+        }
+      }
+
+      groups[key].count++;
+    }
+
+    // Convert to array and sort by count descending
+    const sortedGroups = Object.entries(groups)
+      .map(([key, data]) => ({
+        option: data.displayValue,
+        count: data.count,
+        percent: (data.count / textValues.length) * 100
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    // Apply 80-90% threshold - keep adding responses until we hit threshold
+    const threshold = 0.85; // 85% threshold
+    let cumulativePercent = 0;
+    const topResponses: Array<{ option: string; count: number; percent: number }> = [];
+    let otherCount = 0;
+
+    for (const group of sortedGroups) {
+      if (cumulativePercent < threshold * 100 || topResponses.length < 3) {
+        // Always include at least top 3, or until threshold is met
+        topResponses.push(group);
+        cumulativePercent += group.percent;
+      } else {
+        otherCount += group.count;
+      }
+    }
+
+    // Add "Other" category if there are remaining responses
+    if (otherCount > 0) {
+      topResponses.push({
+        option: 'Other',
+        count: otherCount,
+        percent: (otherCount / textValues.length) * 100
+      });
+    }
+
+    // Round percentages to 2 decimal places
+    return topResponses.map(r => ({
+      ...r,
+      percent: Math.round(r.percent * 100) / 100
+    }));
   }
 
   /**
@@ -604,10 +644,9 @@ export class AnalyticsRepository extends BaseRepository<
         return { yes: 0, no: 0 };
       case 'multiple_choice':
       case 'radio':
-        return [];
       case 'short_text':
       case 'long_text':
-        return { topKeywords: [], totalWords: 0 };
+        return [];
       default:
         return null;
     }

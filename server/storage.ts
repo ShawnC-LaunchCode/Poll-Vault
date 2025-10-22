@@ -861,15 +861,26 @@ export class DatabaseStorage implements IStorage {
             { option: 'Yes', count: aggregation.yes || 0, percentage: totalAnswers > 0 ? Math.round((aggregation.yes / totalAnswers) * 100) : 0 },
             { option: 'No', count: aggregation.no || 0, percentage: totalAnswers > 0 ? Math.round((aggregation.no / totalAnswers) * 100) : 0 }
           ];
-        } else if (question.questionType === 'multiple_choice' || question.questionType === 'radio') {
-          // Already in array format, just rename 'percent' to 'percentage'
+        } else if (question.questionType === 'multiple_choice' || question.questionType === 'radio' || question.questionType === 'short_text') {
+          // Already in array format from repository, just rename 'percent' to 'percentage'
+          // short_text now uses grouped aggregates with case-insensitive grouping
           aggregates = aggregation.map((item: any) => ({
             option: item.option,
             count: item.count,
             percentage: item.percent
           }));
-        } else if (question.questionType === 'short_text' || question.questionType === 'long_text') {
-          // Get actual text answers for text questions
+        } else if (question.questionType === 'long_text') {
+          // For long_text, show raw text responses (usually unique)
+          // But also provide aggregates if there's any clustering
+          if (Array.isArray(aggregation) && aggregation.length > 0) {
+            aggregates = aggregation.map((item: any) => ({
+              option: item.option,
+              count: item.count,
+              percentage: item.percent
+            }));
+          }
+
+          // Also get raw text for display
           const textAnswersData = await db
             .select({ value: answers.value })
             .from(answers)

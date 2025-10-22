@@ -106,6 +106,43 @@ export function QuestionSummaryCard({ question }: QuestionSummaryCardProps) {
         );
 
       case 'short_text':
+        // Short text now shows grouped responses as a bar chart
+        if (!question.aggregates || question.aggregates.length === 0) {
+          return <p className="text-sm text-muted-foreground text-center py-8">No responses yet</p>;
+        }
+
+        return (
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={question.aggregates} margin={{ top: 10, right: 10, left: -20, bottom: 40 }}>
+              <XAxis
+                dataKey="option"
+                tick={{ fontSize: 12 }}
+                angle={-45}
+                textAnchor="end"
+                height={100}
+                interval={0}
+              />
+              <YAxis tick={{ fontSize: 12 }} />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    return (
+                      <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
+                        <p className="text-sm font-medium">{payload[0].payload.option}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {payload[0].value} responses ({payload[0].payload.percentage}%)
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+              <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        );
+
       case 'long_text':
         if (!question.textAnswers || question.textAnswers.length === 0) {
           return <p className="text-sm text-muted-foreground text-center py-8">No text responses yet</p>;
