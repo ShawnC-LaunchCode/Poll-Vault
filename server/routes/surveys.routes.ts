@@ -570,7 +570,7 @@ export function registerSurveyRoutes(app: Express): void {
       });
 
       const options = exportOptionsSchema.parse(req.body);
-      const exportedFile = await exportService.exportSurveyData(surveyId, options);
+      const exportedFile = await exportService.exportSurveyData(surveyId, userId, options);
 
       res.json({
         success: true,
