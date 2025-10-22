@@ -17,6 +17,9 @@ import ResponseDetails from "@/pages/ResponseDetails";
 import Recipients from "@/pages/Recipients";
 import SurveyAnalytics from "@/pages/SurveyAnalytics";
 import SurveyResults from "@/pages/SurveyResults";
+import AdminDashboard from "@/pages/AdminDashboard";
+import AdminUsers from "@/pages/AdminUsers";
+import AdminUserSurveys from "@/pages/AdminUserSurveys";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -49,6 +52,10 @@ function Router() {
           <Route path="/responses" component={Responses} />
           <Route path="/recipients" component={Recipients} />
           <Route path="/analytics" component={Dashboard} />
+          {/* Admin routes */}
+          <Route path="/admin" component={AdminDashboard} />
+          <Route path="/admin/users" component={AdminUsers} />
+          <Route path="/admin/users/:userId/surveys" component={AdminUserSurveys} />
           {/* 404 for authenticated users only */}
           <Route component={NotFound} />
         </>

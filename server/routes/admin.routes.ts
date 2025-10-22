@@ -1,0 +1,345 @@
+import type { Express } from "express";
+import { storage } from "../storage";
+import { isAdmin } from "../middleware/adminAuth";
+import { userRepository } from "../repositories/UserRepository";
+import { surveyRepository } from "../repositories/SurveyRepository";
+import { responseRepository } from "../repositories/ResponseRepository";
+import { createLogger } from "../logger";
+
+const logger = createLogger({ module: 'admin-routes' });
+
+/**
+ * Register admin-only routes
+ * These routes require admin role for access
+ */
+export function registerAdminRoutes(app: Express): void {
+
+  // ============================================================================
+  // User Management
+  // ============================================================================
+
+  /**
+   * GET /api/admin/users
+   * Get all users in the system
+   */
+  app.get('/api/admin/users', isAdmin, async (req: any, res) => {
+    try {
+      const users = await userRepository.findAllUsers();
+
+      // Return users with survey count
+      const usersWithStats = await Promise.all(
+        users.map(async (user) => {
+          const surveys = await surveyRepository.findByCreator(user.id);
+          return {
+            ...user,
+            surveyCount: surveys.length,
+          };
+        })
+      );
+
+      logger.info(
+        { adminId: req.adminUser.id, userCount: users.length },
+        'Admin fetched all users'
+      );
+
+      res.json(usersWithStats);
+    } catch (error) {
+      logger.error({ err: error, adminId: req.adminUser.id }, 'Error fetching all users');
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  /**
+   * PUT /api/admin/users/:userId/role
+   * Update user role (promote/demote admin)
+   */
+  app.put('/api/admin/users/:userId/role', isAdmin, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const { role } = req.body;
+
+      if (!role || (role !== 'admin' && role !== 'creator')) {
+        return res.status(400).json({
+          message: "Invalid role. Must be 'admin' or 'creator'"
+        });
+      }
+
+      // Prevent self-demotion
+      if (userId === req.adminUser.id && role === 'creator') {
+        return res.status(400).json({
+          message: "You cannot demote yourself from admin"
+        });
+      }
+
+      const updatedUser = await userRepository.updateRole(userId, role);
+
+      logger.info(
+        {
+          adminId: req.adminUser.id,
+          targetUserId: userId,
+          newRole: role,
+          oldRole: role === 'admin' ? 'creator' : 'admin'
+        },
+        `Admin ${role === 'admin' ? 'promoted' : 'demoted'} user`
+      );
+
+      res.json({
+        message: `User ${role === 'admin' ? 'promoted to admin' : 'demoted to creator'}`,
+        user: updatedUser
+      });
+    } catch (error) {
+      logger.error(
+        { err: error, adminId: req.adminUser.id, userId: req.params.userId },
+        'Error updating user role'
+      );
+
+      if (error instanceof Error && error.message === 'User not found') {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.status(500).json({ message: "Failed to update user role" });
+    }
+  });
+
+  /**
+   * GET /api/admin/users/:userId/surveys
+   * Get all surveys for a specific user
+   */
+  app.get('/api/admin/users/:userId/surveys', isAdmin, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+
+      // Verify user exists
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const surveys = await surveyRepository.findByCreator(userId);
+
+      logger.info(
+        { adminId: req.adminUser.id, targetUserId: userId, surveyCount: surveys.length },
+        'Admin fetched user surveys'
+      );
+
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+        surveys
+      });
+    } catch (error) {
+      logger.error(
+        { err: error, adminId: req.adminUser.id, userId: req.params.userId },
+        'Error fetching user surveys'
+      );
+      res.status(500).json({ message: "Failed to fetch user surveys" });
+    }
+  });
+
+  // ============================================================================
+  // Survey Management (Admin can view/edit any survey)
+  // ============================================================================
+
+  /**
+   * GET /api/admin/surveys
+   * Get all surveys in the system
+   */
+  app.get('/api/admin/surveys', isAdmin, async (req: any, res) => {
+    try {
+      // Get all users first
+      const users = await userRepository.findAllUsers();
+
+      // Get surveys for each user
+      const allSurveys = await Promise.all(
+        users.map(async (user) => {
+          const surveys = await surveyRepository.findByCreator(user.id);
+          return surveys.map(survey => ({
+            ...survey,
+            creator: {
+              id: user.id,
+              email: user.email,
+              firstName: user.firstName,
+              lastName: user.lastName,
+            }
+          }));
+        })
+      );
+
+      const flattenedSurveys = allSurveys.flat();
+
+      logger.info(
+        { adminId: req.adminUser.id, surveyCount: flattenedSurveys.length },
+        'Admin fetched all surveys'
+      );
+
+      res.json(flattenedSurveys);
+    } catch (error) {
+      logger.error({ err: error, adminId: req.adminUser.id }, 'Error fetching all surveys');
+      res.status(500).json({ message: "Failed to fetch surveys" });
+    }
+  });
+
+  /**
+   * GET /api/admin/surveys/:surveyId
+   * Get any survey (including full details)
+   */
+  app.get('/api/admin/surveys/:surveyId', isAdmin, async (req: any, res) => {
+    try {
+      const survey = await storage.getSurvey(req.params.surveyId);
+
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
+      }
+
+      logger.info(
+        { adminId: req.adminUser.id, surveyId: req.params.surveyId },
+        'Admin fetched survey details'
+      );
+
+      res.json(survey);
+    } catch (error) {
+      logger.error(
+        { err: error, adminId: req.adminUser.id, surveyId: req.params.surveyId },
+        'Error fetching survey'
+      );
+      res.status(500).json({ message: "Failed to fetch survey" });
+    }
+  });
+
+  /**
+   * GET /api/admin/surveys/:surveyId/responses
+   * Get all responses for any survey
+   */
+  app.get('/api/admin/surveys/:surveyId/responses', isAdmin, async (req: any, res) => {
+    try {
+      const survey = await storage.getSurvey(req.params.surveyId);
+
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
+      }
+
+      const responses = await responseRepository.findBySurvey(req.params.surveyId);
+
+      logger.info(
+        { adminId: req.adminUser.id, surveyId: req.params.surveyId, responseCount: responses.length },
+        'Admin fetched survey responses'
+      );
+
+      res.json(responses);
+    } catch (error) {
+      logger.error(
+        { err: error, adminId: req.adminUser.id, surveyId: req.params.surveyId },
+        'Error fetching survey responses'
+      );
+      res.status(500).json({ message: "Failed to fetch responses" });
+    }
+  });
+
+  /**
+   * PUT /api/admin/surveys/:surveyId
+   * Update any survey
+   */
+  app.put('/api/admin/surveys/:surveyId', isAdmin, async (req: any, res) => {
+    try {
+      const survey = await storage.getSurvey(req.params.surveyId);
+
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
+      }
+
+      const updatedSurvey = await storage.updateSurvey(req.params.surveyId, req.body);
+
+      logger.info(
+        { adminId: req.adminUser.id, surveyId: req.params.surveyId },
+        'Admin updated survey'
+      );
+
+      res.json(updatedSurvey);
+    } catch (error) {
+      logger.error(
+        { err: error, adminId: req.adminUser.id, surveyId: req.params.surveyId },
+        'Error updating survey'
+      );
+      res.status(500).json({ message: "Failed to update survey" });
+    }
+  });
+
+  /**
+   * DELETE /api/admin/surveys/:surveyId
+   * Delete any survey
+   */
+  app.delete('/api/admin/surveys/:surveyId', isAdmin, async (req: any, res) => {
+    try {
+      const survey = await storage.getSurvey(req.params.surveyId);
+
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
+      }
+
+      await storage.deleteSurvey(req.params.surveyId);
+
+      logger.warn(
+        { adminId: req.adminUser.id, surveyId: req.params.surveyId, surveyTitle: survey.title },
+        'Admin deleted survey'
+      );
+
+      res.json({ message: "Survey deleted successfully" });
+    } catch (error) {
+      logger.error(
+        { err: error, adminId: req.adminUser.id, surveyId: req.params.surveyId },
+        'Error deleting survey'
+      );
+      res.status(500).json({ message: "Failed to delete survey" });
+    }
+  });
+
+  // ============================================================================
+  // Admin Dashboard Stats
+  // ============================================================================
+
+  /**
+   * GET /api/admin/stats
+   * Get system-wide statistics
+   */
+  app.get('/api/admin/stats', isAdmin, async (req: any, res) => {
+    try {
+      const users = await userRepository.findAllUsers();
+      const adminCount = users.filter(u => u.role === 'admin').length;
+
+      // Get all surveys across all users
+      const allSurveys = await Promise.all(
+        users.map(user => surveyRepository.findByCreator(user.id))
+      );
+      const flattenedSurveys = allSurveys.flat();
+
+      // Get all responses across all surveys
+      const allResponses = await Promise.all(
+        flattenedSurveys.map(survey => responseRepository.findBySurvey(survey.id))
+      );
+      const flattenedResponses = allResponses.flat();
+
+      const stats = {
+        totalUsers: users.length,
+        adminUsers: adminCount,
+        creatorUsers: users.length - adminCount,
+        totalSurveys: flattenedSurveys.length,
+        activeSurveys: flattenedSurveys.filter(s => s.status === 'open').length,
+        draftSurveys: flattenedSurveys.filter(s => s.status === 'draft').length,
+        closedSurveys: flattenedSurveys.filter(s => s.status === 'closed').length,
+        totalResponses: flattenedResponses.length,
+        completedResponses: flattenedResponses.filter(r => r.completed).length,
+      };
+
+      logger.info({ adminId: req.adminUser.id }, 'Admin fetched system stats');
+
+      res.json(stats);
+    } catch (error) {
+      logger.error({ err: error, adminId: req.adminUser.id }, 'Error fetching admin stats');
+      res.status(500).json({ message: "Failed to fetch statistics" });
+    }
+  });
+}

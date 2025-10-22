@@ -33,11 +33,19 @@ export default function Sidebar() {
     }
   };
 
+  // Check if user is admin (from server response)
+  const isAdmin = (user as any)?.role === 'admin';
+
   const navigation = [
     { name: "Dashboard", href: "/", icon: "fas fa-home" },
     { name: "My Surveys", href: "/surveys", icon: "fas fa-list-ul" },
     { name: "Recipients", href: "/recipients", icon: "fas fa-users" },
     { name: "Analytics", href: "/analytics", icon: "fas fa-analytics" },
+  ];
+
+  const adminNavigation = [
+    { name: "Admin Dashboard", href: "/admin", icon: "fas fa-shield-alt" },
+    { name: "Manage Users", href: "/admin/users", icon: "fas fa-users-cog" },
   ];
 
   const isActive = (href: string) => {
@@ -78,6 +86,32 @@ export default function Sidebar() {
             </div>
           </Link>
         ))}
+
+        {/* Admin Section */}
+        {isAdmin && (
+          <>
+            <div className="pt-4 pb-2">
+              <div className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Administration
+              </div>
+            </div>
+            {adminNavigation.map((item) => (
+              <Link key={item.name} href={item.href}>
+                <div
+                  className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                    isActive(item.href)
+                      ? "bg-purple-600 text-white"
+                      : "text-muted-foreground hover:text-foreground hover:bg-purple-50"
+                  }`}
+                  data-testid={`link-${item.name.toLowerCase().replace(' ', '-')}`}
+                >
+                  <i className={`${item.icon} w-5`}></i>
+                  <span className="font-medium text-sm sm:text-base">{item.name}</span>
+                </div>
+              </Link>
+            ))}
+          </>
+        )}
       </nav>
 
       {/* User Profile */}

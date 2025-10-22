@@ -89,6 +89,35 @@ export class UserRepository extends BaseRepository<typeof users, User, UpsertUse
   }
 
   /**
+   * Get all users (admin only)
+   */
+  async findAllUsers(tx?: DbTransaction): Promise<User[]> {
+    const database = this.getDb(tx);
+    return await database
+      .select()
+      .from(users)
+      .orderBy(users.createdAt);
+  }
+
+  /**
+   * Update user role (admin only)
+   */
+  async updateRole(userId: string, role: 'admin' | 'creator', tx?: DbTransaction): Promise<User> {
+    const database = this.getDb(tx);
+    const [updatedUser] = await database
+      .update(users)
+      .set({ role, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+
+    if (!updatedUser) {
+      throw new Error('User not found');
+    }
+
+    return updatedUser;
+  }
+
+  /**
    * Check database connectivity
    */
   async ping(): Promise<boolean> {

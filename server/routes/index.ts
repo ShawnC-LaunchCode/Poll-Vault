@@ -8,6 +8,7 @@ import { registerResponseRoutes } from "./responses.routes";
 import { registerAnalyticsRoutes } from "./analytics.routes";
 import { registerFileRoutes } from "./files.routes";
 import { registerDashboardRoutes } from "./dashboard.routes";
+import { registerAdminRoutes } from "./admin.routes";
 
 /**
  * Register all modular routes
@@ -40,4 +41,7 @@ export function registerAllRoutes(app: Express): void {
 
   // File upload and management routes
   registerFileRoutes(app);
+
+  // Admin routes (must be after auth routes)
+  registerAdminRoutes(app);
 }
