@@ -5,7 +5,8 @@ import type {
   PageAnalytics,
   CompletionFunnelData,
   TimeSpentData,
-  EngagementMetrics
+  EngagementMetrics,
+  QuestionAggregate
 } from "@shared/schema";
 
 interface AnalyticsMetrics {
@@ -22,6 +23,7 @@ interface UseAnalyticsDataResult {
 
   // Analytics data
   questionAnalytics: QuestionAnalytics[];
+  questionAggregates: QuestionAggregate[];
   pageAnalytics: PageAnalytics[];
   funnelData: CompletionFunnelData[];
   timeSpentData: TimeSpentData[];
@@ -52,6 +54,14 @@ export function useAnalyticsData(surveyId: string | undefined, isAuthenticated: 
     enabled: !!surveyId && isAuthenticated,
     retry: false,
   });
+
+  // Fetch question aggregates for visualization
+  const { data: questionAggregatesData, isLoading: questionAggregatesLoading } = useQuery<{ surveyId: string; questions: QuestionAggregate[] }>({
+    queryKey: [`/api/surveys/${surveyId}/analytics/aggregates`],
+    enabled: !!surveyId && isAuthenticated,
+    retry: false,
+  });
+  const questionAggregates = questionAggregatesData?.questions || [];
 
   // Fetch page analytics
   const { data: pageAnalytics = [], isLoading: pageAnalyticsLoading } = useQuery<PageAnalytics[]>({
@@ -101,8 +111,9 @@ export function useAnalyticsData(surveyId: string | undefined, isAuthenticated: 
   };
 
   // Combined loading state
-  const isLoading = surveyLoading || questionAnalyticsLoading || pageAnalyticsLoading ||
-                    funnelDataLoading || timeSpentDataLoading || engagementMetricsLoading;
+  const isLoading = surveyLoading || questionAnalyticsLoading || questionAggregatesLoading ||
+                    pageAnalyticsLoading || funnelDataLoading || timeSpentDataLoading ||
+                    engagementMetricsLoading;
 
   // Chart configuration
   const chartConfig = {
@@ -124,6 +135,7 @@ export function useAnalyticsData(surveyId: string | undefined, isAuthenticated: 
   return {
     survey,
     questionAnalytics,
+    questionAggregates,
     pageAnalytics,
     funnelData,
     timeSpentData,
