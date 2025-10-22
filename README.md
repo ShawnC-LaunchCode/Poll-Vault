@@ -1,5 +1,7 @@
 # Poll-Vault
 
+[![CI](https://github.com/ShawnC-LaunchCode/Poll-Vault/workflows/CI/badge.svg)](https://github.com/ShawnC-LaunchCode/Poll-Vault/actions/workflows/ci.yml)
+
 **Poll-Vault** is a comprehensive survey and polling platform built with modern web technologies. Create, distribute, and analyze surveys with advanced features like conditional logic, multi-page surveys, and detailed analytics.
 
 ## Tech Stack
@@ -203,6 +205,10 @@ npm start                # Start production server
 npm run check            # TypeScript type checking
 npm run db:push          # Push schema changes to database
 npm run db:studio        # Open Drizzle Studio (database GUI)
+npm run test             # Run test suite
+npm run test:watch       # Run tests in watch mode
+npm run test:ui          # Run tests with interactive UI
+npm run test:coverage    # Run tests with coverage report
 ```
 
 ---
