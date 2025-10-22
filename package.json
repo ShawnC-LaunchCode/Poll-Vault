@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
+  "engines": {
+    "node": ">=20.19.0",
+    "npm": ">=10.0.0"
+  },
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx server/index.ts",
     "build": "cross-env VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID vite build && esbuild server/production.ts --platform=node --bundle --format=esm --outfile=dist/index.js --packages=external",
@@ -118,7 +122,6 @@
     "@vitejs/plugin-react": "^4.7.0",
     "@vitest/ui": "^4.0.1",
     "autoprefixer": "^10.4.20",
-    "better-sqlite3": "^12.4.1",
     "cross-env": "^10.1.0",
     "drizzle-kit": "^0.31.5",
     "esbuild": "^0.25.0",
@@ -130,6 +133,7 @@
     "vitest": "^4.0.1"
   },
   "optionalDependencies": {
+    "better-sqlite3": "^12.4.1",
     "bufferutil": "^4.0.8"
   }
 }
