@@ -40,7 +40,6 @@ export default function Sidebar() {
     { name: "Dashboard", href: "/", icon: "fas fa-home" },
     { name: "My Surveys", href: "/surveys", icon: "fas fa-list-ul" },
     { name: "Recipients", href: "/recipients", icon: "fas fa-users" },
-    { name: "Analytics", href: "/analytics", icon: "fas fa-analytics" },
   ];
 
   const adminNavigation = [
