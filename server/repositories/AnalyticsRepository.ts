@@ -1,6 +1,10 @@
 import { BaseRepository, type DbTransaction } from "./BaseRepository";
 import {
   analyticsEvents,
+  questions,
+  surveyPages,
+  answers,
+  responses,
   type AnalyticsEvent,
   insertAnalyticsEventSchema,
 } from "@shared/schema";
@@ -375,6 +379,238 @@ export class AnalyticsRepository extends BaseRepository<
       .where(lte(analyticsEvents.timestamp, cutoffDate))
       .returning({ id: analyticsEvents.id });
     return result.length;
+  }
+
+  // ==================== Question Aggregations ====================
+
+  /**
+   * Get aggregated answer data for all questions in a survey
+   * Returns visualization-ready data per question type
+   */
+  async getQuestionAggregates(surveyId: string, tx?: DbTransaction): Promise<Record<string, any>> {
+    const database = this.getDb(tx);
+
+    // Get all questions for this survey
+    const surveyQuestions = await database
+      .select({
+        questionId: questions.id,
+        questionTitle: questions.title,
+        questionType: questions.type,
+        pageId: questions.pageId,
+        options: questions.options,
+      })
+      .from(questions)
+      .innerJoin(surveyPages, eq(questions.pageId, surveyPages.id))
+      .where(eq(surveyPages.surveyId, surveyId))
+      .orderBy(surveyPages.order, questions.order);
+
+    const results: Record<string, any> = {};
+
+    for (const question of surveyQuestions) {
+      // Get all answers for this question
+      const questionAnswers = await database
+        .select({
+          answerId: answers.id,
+          value: answers.value,
+          responseId: answers.responseId,
+        })
+        .from(answers)
+        .innerJoin(responses, eq(answers.responseId, responses.id))
+        .where(
+          and(
+            eq(responses.surveyId, surveyId),
+            eq(answers.questionId, question.questionId)
+          )
+        );
+
+      // Aggregate based on question type
+      results[question.questionId] = {
+        questionId: question.questionId,
+        questionTitle: question.questionTitle,
+        questionType: question.questionType,
+        totalAnswers: questionAnswers.length,
+        aggregation: this.aggregateQuestionAnswers(question, questionAnswers),
+      };
+    }
+
+    return results;
+  }
+
+  /**
+   * Aggregate answers based on question type
+   */
+  private aggregateQuestionAnswers(
+    question: any,
+    answers: Array<{ answerId: string; value: any; responseId: string }>
+  ): any {
+    if (answers.length === 0) {
+      return this.getEmptyAggregation(question.questionType);
+    }
+
+    switch (question.questionType) {
+      case 'yes_no':
+        return this.aggregateYesNo(answers);
+
+      case 'multiple_choice':
+      case 'radio':
+        return this.aggregateMultipleChoice(answers);
+
+      case 'short_text':
+      case 'long_text':
+        return this.aggregateText(answers);
+
+      default:
+        return { raw: answers.map(a => a.value) };
+    }
+  }
+
+  /**
+   * Aggregate yes/no question answers
+   */
+  private aggregateYesNo(answers: Array<{ value: any }>): { yes: number; no: number } {
+    let yes = 0;
+    let no = 0;
+
+    for (const answer of answers) {
+      const value = answer.value;
+
+      // Handle different value formats
+      if (typeof value === 'boolean') {
+        value ? yes++ : no++;
+      } else if (typeof value === 'object' && value !== null) {
+        const text = (value as any).text;
+        if (text === true || text === 'true' || text === 'Yes' || text === 'yes') {
+          yes++;
+        } else {
+          no++;
+        }
+      } else {
+        const str = String(value).toLowerCase();
+        if (str === 'true' || str === 'yes') {
+          yes++;
+        } else {
+          no++;
+        }
+      }
+    }
+
+    return { yes, no };
+  }
+
+  /**
+   * Aggregate multiple choice / radio question answers
+   */
+  private aggregateMultipleChoice(
+    answers: Array<{ value: any }>
+  ): Array<{ option: string; count: number; percent: number }> {
+    const counts: Record<string, number> = {};
+    let totalSelections = 0;
+
+    for (const answer of answers) {
+      const value = answer.value;
+      let options: string[] = [];
+
+      // Handle different value formats
+      if (Array.isArray(value)) {
+        options = value.map(v => String(v));
+      } else if (typeof value === 'object' && value !== null) {
+        const valueObj = value as Record<string, any>;
+        if (valueObj.text) {
+          options = Array.isArray(valueObj.text)
+            ? valueObj.text.map(v => String(v))
+            : [String(valueObj.text)];
+        } else if (valueObj.selected) {
+          options = Array.isArray(valueObj.selected)
+            ? valueObj.selected.map(v => String(v))
+            : [String(valueObj.selected)];
+        } else {
+          options = [String(value)];
+        }
+      } else {
+        options = [String(value)];
+      }
+
+      for (const option of options) {
+        counts[option] = (counts[option] || 0) + 1;
+        totalSelections++;
+      }
+    }
+
+    // Convert to array format with percentages
+    return Object.entries(counts)
+      .map(([option, count]) => ({
+        option,
+        count,
+        percent: totalSelections > 0 ? Math.round((count / totalSelections) * 100 * 100) / 100 : 0,
+      }))
+      .sort((a, b) => b.count - a.count); // Sort by count descending
+  }
+
+  /**
+   * Aggregate text answers with keyword extraction
+   */
+  private aggregateText(
+    answers: Array<{ value: any }>
+  ): { topKeywords: Array<{ word: string; count: number }>; totalWords: number } {
+    // Combine all text answers
+    const allText = answers
+      .map(a => {
+        const value = a.value;
+        if (typeof value === 'string') return value;
+        if (typeof value === 'object' && value !== null) {
+          return (value as any).text || String(value);
+        }
+        return String(value);
+      })
+      .join(' ');
+
+    // Extract and count words (excluding common stop words)
+    const stopWords = new Set([
+      'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+      'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been',
+      'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
+      'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that',
+      'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they'
+    ]);
+
+    const words = allText
+      .toLowerCase()
+      .replace(/[^\w\s]/g, '')
+      .split(/\s+/)
+      .filter(w => w.length > 2 && !stopWords.has(w));
+
+    const wordFreq: Record<string, number> = {};
+    for (const word of words) {
+      wordFreq[word] = (wordFreq[word] || 0) + 1;
+    }
+
+    const topKeywords = Object.entries(wordFreq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([word, count]) => ({ word, count }));
+
+    return {
+      topKeywords,
+      totalWords: words.length,
+    };
+  }
+
+  /**
+   * Return empty aggregation structure for question type
+   */
+  private getEmptyAggregation(questionType: string): any {
+    switch (questionType) {
+      case 'yes_no':
+        return { yes: 0, no: 0 };
+      case 'multiple_choice':
+      case 'radio':
+        return [];
+      case 'short_text':
+      case 'long_text':
+        return { topKeywords: [], totalWords: 0 };
+      default:
+        return null;
+    }
   }
 }
 

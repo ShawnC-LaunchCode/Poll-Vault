@@ -3,6 +3,7 @@ import rateLimit from "express-rate-limit";
 import { storage } from "../storage";
 import { isAuthenticated } from "../googleAuth";
 import { insertAnalyticsEventSchema } from "@shared/schema";
+import { analyticsService } from "../services/AnalyticsService";
 
 /**
  * Rate limiting for analytics events
@@ -138,6 +139,36 @@ export function registerAnalyticsRoutes(app: Express): void {
     } catch (error) {
       console.error("Error fetching question analytics:", error);
       res.status(500).json({ message: "Failed to fetch question analytics" });
+    }
+  });
+
+  /**
+   * GET /api/surveys/:surveyId/analytics/aggregates
+   * Get aggregated question analytics for visualization
+   * Returns per-question aggregates (yes/no counts, multiple choice distributions, text keywords)
+   */
+  app.get('/api/surveys/:surveyId/analytics/aggregates', isAuthenticated, async (req: any, res) => {
+    try {
+      const { surveyId } = req.params;
+      const userId = req.user.claims.sub;
+
+      const aggregates = await analyticsService.getQuestionAggregates(surveyId, userId);
+
+      res.json({
+        surveyId,
+        questions: aggregates
+      });
+    } catch (error) {
+      console.error("Error fetching question aggregates:", error);
+      if (error instanceof Error) {
+        if (error.message === "Survey not found") {
+          return res.status(404).json({ message: error.message });
+        }
+        if (error.message.includes("Access denied")) {
+          return res.status(403).json({ message: error.message });
+        }
+      }
+      res.status(500).json({ message: "Failed to get question analytics" });
     }
   });
 
