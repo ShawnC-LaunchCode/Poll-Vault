@@ -1,5 +1,7 @@
 import { useAnalyticsData } from "@/hooks/useAnalyticsData";
 import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "@tanstack/react-query";
+import type { Response } from "@shared/schema";
 import { ResultsCard } from "@/components/charts";
 import { Card, CardContent } from "@/components/ui/card";
 import { BarChart3 } from "lucide-react";
@@ -11,6 +13,13 @@ interface OverallSummaryProps {
 export function OverallSummary({ surveyId }: OverallSummaryProps) {
   const { isAuthenticated } = useAuth();
   const { questionAggregates, isLoading } = useAnalyticsData(surveyId, isAuthenticated);
+
+  // Fetch actual response count
+  const { data: responses } = useQuery<Response[]>({
+    queryKey: [`/api/surveys/${surveyId}/responses`],
+    enabled: !!surveyId && isAuthenticated,
+    retry: false,
+  });
 
   if (isLoading) {
     return (
@@ -49,7 +58,7 @@ export function OverallSummary({ surveyId }: OverallSummaryProps) {
         <div>
           <h2 className="text-lg sm:text-xl font-semibold text-foreground">Question Analytics</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Aggregated responses across {questionAggregates.length} questions
+            {responses?.length || 0} responses across {questionAggregates.length} questions
           </p>
         </div>
       </div>

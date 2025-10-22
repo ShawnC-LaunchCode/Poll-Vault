@@ -534,6 +534,7 @@ export interface QuestionAnalytics {
   questionTitle: string;
   questionType: string;
   pageId: string;
+  totalResponses: number; // total survey responses
   totalViews: number;
   totalAnswers: number;
   totalSkips: number;

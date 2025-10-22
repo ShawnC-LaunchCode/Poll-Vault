@@ -745,6 +745,14 @@ export class DatabaseStorage implements IStorage {
 
   // Advanced analytics methods
   async getQuestionAnalytics(surveyId: string): Promise<QuestionAnalytics[]> {
+    // Count total responses for this survey
+    const [totalResponsesResult] = await db
+      .select({ count: count() })
+      .from(responses)
+      .where(eq(responses.surveyId, surveyId));
+
+    const totalResponses = totalResponsesResult.count;
+
     // Get all questions for this survey
     const surveyQuestions = await db
       .select({
@@ -839,6 +847,7 @@ export class DatabaseStorage implements IStorage {
         questionTitle: question.questionTitle,
         questionType: question.questionType,
         pageId: question.pageId,
+        totalResponses,
         totalViews,
         totalAnswers,
         totalSkips,
