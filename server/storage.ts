@@ -765,6 +765,10 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(surveyPages, eq(questions.pageId, surveyPages.id))
       .where(eq(surveyPages.surveyId, surveyId));
 
+    // Get aggregates from analyticsRepository for all questions
+    const { analyticsRepository } = await import('./repositories');
+    const aggregatesData = await analyticsRepository.getQuestionAggregates(surveyId);
+
     const analytics: QuestionAnalytics[] = [];
 
     for (const question of surveyQuestions) {
@@ -842,6 +846,54 @@ export class DatabaseStorage implements IStorage {
         ? sortedTimes[Math.floor(sortedTimes.length / 2)] / 1000
         : 0;
 
+      // Get aggregates for this question
+      const questionAggregateData = aggregatesData[question.questionId];
+      const aggregation = questionAggregateData?.aggregation;
+
+      // Transform aggregates to frontend format
+      let aggregates: Array<{ option: string; count: number; percentage: number }> | undefined;
+      let textAnswers: string[] | undefined;
+
+      if (aggregation) {
+        if (question.questionType === 'yes_no') {
+          // Transform yes/no object to array format
+          aggregates = [
+            { option: 'Yes', count: aggregation.yes || 0, percentage: totalAnswers > 0 ? Math.round((aggregation.yes / totalAnswers) * 100) : 0 },
+            { option: 'No', count: aggregation.no || 0, percentage: totalAnswers > 0 ? Math.round((aggregation.no / totalAnswers) * 100) : 0 }
+          ];
+        } else if (question.questionType === 'multiple_choice' || question.questionType === 'radio') {
+          // Already in array format, just rename 'percent' to 'percentage'
+          aggregates = aggregation.map((item: any) => ({
+            option: item.option,
+            count: item.count,
+            percentage: item.percent
+          }));
+        } else if (question.questionType === 'short_text' || question.questionType === 'long_text') {
+          // Get actual text answers for text questions
+          const textAnswersData = await db
+            .select({ value: answers.value })
+            .from(answers)
+            .innerJoin(responses, eq(answers.responseId, responses.id))
+            .where(
+              and(
+                eq(responses.surveyId, surveyId),
+                eq(answers.questionId, question.questionId)
+              )
+            );
+
+          textAnswers = textAnswersData
+            .map((a: { value: any }) => {
+              const value = a.value;
+              if (typeof value === 'string') return value;
+              if (typeof value === 'object' && value !== null) {
+                return (value as any).text || String(value);
+              }
+              return String(value);
+            })
+            .filter((text: string) => text && text.trim().length > 0);
+        }
+      }
+
       analytics.push({
         questionId: question.questionId,
         questionTitle: question.questionTitle,
@@ -855,6 +907,8 @@ export class DatabaseStorage implements IStorage {
         avgTimeSpent,
         medianTimeSpent,
         dropOffCount: totalViews - totalAnswers - totalSkips,
+        aggregates,
+        textAnswers,
       });
     }
 

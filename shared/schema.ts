@@ -542,6 +542,8 @@ export interface QuestionAnalytics {
   avgTimeSpent: number; // in seconds
   medianTimeSpent: number; // in seconds
   dropOffCount: number; // how many people left at this question
+  aggregates?: Array<{ option: string; count: number; percentage: number }>; // for multiple choice, radio, yes_no
+  textAnswers?: string[]; // for short_text, long_text
 }
 
 export interface PageAnalytics {
