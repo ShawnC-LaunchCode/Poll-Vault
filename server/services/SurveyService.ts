@@ -2,6 +2,7 @@ import {
   surveyRepository,
   pageRepository,
   questionRepository,
+  userRepository,
   type DbTransaction
 } from "../repositories";
 import type {
@@ -17,13 +18,20 @@ import { validateSurveyForPublish, canChangeStatus } from "./surveyValidation";
  */
 export class SurveyService {
   /**
-   * Verify user owns the survey
+   * Verify user owns the survey (admins can access any survey)
    */
   async verifyOwnership(surveyId: string, userId: string): Promise<Survey> {
     const survey = await surveyRepository.findById(surveyId);
 
     if (!survey) {
       throw new Error("Survey not found");
+    }
+
+    // Check if user is an admin
+    const user = await userRepository.findById(userId);
+    if (user && user.role === 'admin') {
+      // Admins can access any survey
+      return survey;
     }
 
     if (survey.creatorId !== userId) {
