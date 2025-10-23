@@ -26,6 +26,7 @@ import {
   TimeAnalysisTab,
   EngagementTab
 } from "@/features/survey-analytics/components";
+import { AiInsights } from "@/components/results/AiInsights";
 
 export default function SurveyAnalytics() {
   const { surveyId } = useParams();
@@ -108,6 +109,9 @@ export default function SurveyAnalytics() {
             avgAnswerRate={metrics.avgAnswerRate}
             engagementScore={engagementMetrics?.engagementScore || 0}
           />
+
+          {/* AI Insights Section */}
+          <AiInsights surveyId={surveyId!} />
 
           {/* Analytics Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">

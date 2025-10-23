@@ -12,13 +12,20 @@ import { Card, CardContent } from "@/components/ui/card";
 import { IndividualResponses } from "@/components/results/IndividualResponses";
 import { OverallSummary } from "@/components/results/OverallSummary";
 import { QuestionDetails } from "@/components/results/QuestionDetails";
-import { ArrowLeft, Users, BarChart3, Download, XCircle, ListChecks } from "lucide-react";
+import { AiInsights } from "@/components/results/AiInsights";
+import { ArrowLeft, Users, BarChart3, Download, XCircle, ListChecks, Sparkles } from "lucide-react";
 
 export default function SurveyResults() {
   const { surveyId } = useParams();
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState("questions");
+
+  // Check URL params for initial tab
+  const urlParams = new URLSearchParams(window.location.search);
+  const tabParam = urlParams.get('tab');
+  const initialTab = tabParam === 'ai-insights' ? 'ai-insights' : 'questions';
+
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -111,7 +118,7 @@ export default function SurveyResults() {
 
         <div className="flex-1 overflow-auto p-4 sm:p-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-            <TabsList className="grid w-full grid-cols-3 h-auto">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto">
               <TabsTrigger value="questions" className="text-xs sm:text-sm px-2 sm:px-4 py-2">
                 <ListChecks className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="hidden sm:inline">Question Details</span>
@@ -127,6 +134,11 @@ export default function SurveyResults() {
                 <span className="hidden sm:inline">Overall Summary</span>
                 <span className="sm:hidden">Summary</span>
               </TabsTrigger>
+              <TabsTrigger value="ai-insights" className="text-xs sm:text-sm px-2 sm:px-4 py-2">
+                <Sparkles className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">AI Insights</span>
+                <span className="sm:hidden">AI</span>
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="questions" className="space-y-4 sm:space-y-6">
@@ -139,6 +151,10 @@ export default function SurveyResults() {
 
             <TabsContent value="overall" className="space-y-4 sm:space-y-6">
               <OverallSummary surveyId={surveyId!} />
+            </TabsContent>
+
+            <TabsContent value="ai-insights" className="space-y-4 sm:space-y-6">
+              <AiInsights surveyId={surveyId!} />
             </TabsContent>
           </Tabs>
 

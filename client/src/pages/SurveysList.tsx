@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { SkeletonCard } from "@/components/shared/SkeletonCard";
 import { Link } from "wouter";
-import { Plus, Edit, BarChart, Users, Trash2, FileText, Copy } from "lucide-react";
+import { Plus, Edit, BarChart, Users, Trash2, FileText, Copy, Sparkles } from "lucide-react";
 
 export default function SurveysList() {
   const { toast } = useToast();
@@ -160,7 +160,7 @@ export default function SurveysList() {
                         <Link href={`/surveys/${survey.id}/results`}>
                           <Button variant="outline" size="sm" data-testid={`button-view-responses-${survey.id}`}>
                             <BarChart className="w-4 h-4 mr-1" />
-                            Responses
+                            Results
                           </Button>
                         </Link>
                         <Link href={`/surveys/${survey.id}/recipients`}>
@@ -172,11 +172,24 @@ export default function SurveysList() {
                         <Button
                           variant="outline"
                           size="sm"
+                          className="bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700 dark:bg-purple-950 dark:hover:bg-purple-900 dark:border-purple-800 dark:text-purple-300"
+                          onClick={() => {
+                            // Navigate to Results page, AI Insights tab
+                            window.location.href = `/surveys/${survey.id}/results?tab=ai-insights`;
+                          }}
+                          data-testid={`button-ai-insights-${survey.id}`}
+                        >
+                          <Sparkles className="w-4 h-4 mr-1" />
+                          AI Insights
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleCopyLink(survey)}
                           data-testid={`button-copy-link-${survey.id}`}
                         >
                           <Copy className="w-4 h-4 mr-1" />
-                          Copy Link
+                          Link
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>

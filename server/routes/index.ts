@@ -10,6 +10,7 @@ import { registerFileRoutes } from "./files.routes";
 import { registerDashboardRoutes } from "./dashboard.routes";
 import { registerAdminRoutes } from "./admin.routes";
 import { registerExportRoutes } from "./export.routes";
+import { registerAiRoutes } from "./ai.routes";
 
 /**
  * Register all modular routes
@@ -45,6 +46,9 @@ export function registerAllRoutes(app: Express): void {
 
   // Export routes (CSV and PDF)
   registerExportRoutes(app);
+
+  // AI-powered analytics routes
+  registerAiRoutes(app);
 
   // Admin routes (must be after auth routes)
   registerAdminRoutes(app);
