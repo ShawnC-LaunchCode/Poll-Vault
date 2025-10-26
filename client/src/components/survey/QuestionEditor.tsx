@@ -104,7 +104,7 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
         required: selectedQuestionData.required || false,
         options: (selectedQuestionData.options as string[]) || [],
         loopConfig: selectedQuestionData.loopConfig as LoopGroupConfig || undefined,
-        fileUploadConfig: selectedQuestionData.type === 'file_upload' ? 
+        fileUploadConfig: selectedQuestionData.type === 'file_upload' ?
           (selectedQuestionData.options as any) || {
             acceptedTypes: [],
             maxFileSize: 10 * 1024 * 1024,
@@ -114,7 +114,7 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
           } : undefined
       });
       setIsEditing(true);
-      
+
       // Load subquestions if this is a loop group
       if (selectedQuestionData.type === 'loop_group') {
         const questionWithSubs = questions?.find(q => q.id === selectedQuestionData.id) as QuestionWithSubquestions;
@@ -134,7 +134,7 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
       setSubquestions([]);
       setIsEditing(false);
     }
-  }, [selectedQuestionData, questions]);
+  }, [selectedQuestionData]);
 
   // Create question mutation
   const createQuestionMutation = useMutation({
