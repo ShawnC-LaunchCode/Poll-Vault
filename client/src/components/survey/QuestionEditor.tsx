@@ -72,6 +72,8 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
     queryKey: ["/api/pages", pageId, "questions"],
     enabled: !!pageId,
     retry: false,
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Load selected question data
@@ -79,6 +81,8 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
     queryKey: ["/api/questions", selectedQuestion],
     enabled: !!selectedQuestion,
     retry: false,
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Load conditional rules for the survey
@@ -86,6 +90,8 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
     queryKey: ["/api/surveys", surveyId, "conditional-rules"],
     enabled: !!surveyId,
     retry: false,
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Load all questions in the survey for conditional logic dependencies
@@ -93,6 +99,8 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
     queryKey: ["/api/surveys", surveyId, "all-questions"],
     enabled: !!surveyId,
     retry: false,
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   useEffect(() => {
