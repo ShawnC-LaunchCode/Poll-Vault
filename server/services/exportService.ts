@@ -7,6 +7,7 @@ import type { Survey, Response, Answer, Question, LoopGroupSubquestion, Question
 import fs from 'fs';
 import path from 'path';
 import { format } from 'date-fns';
+import { formatAnswerValue as formatAnswerValueUtil, extractTextValue } from '../utils/answerFormatting';
 
 export interface ExportOptions {
   format: 'csv' | 'pdf';
@@ -304,20 +305,8 @@ class ExportService {
   }
 
   private formatAnswerValue(value: any, questionType: string): string {
-    if (!value) return '';
-
-    switch (questionType) {
-      case 'multiple_choice':
-        return Array.isArray(value) ? value.join('; ') : String(value);
-      case 'yes_no':
-        return value === true ? 'Yes' : value === false ? 'No' : String(value);
-      case 'date_time':
-        return value ? format(new Date(value), 'yyyy-MM-dd HH:mm:ss') : '';
-      case 'file_upload':
-        return value && typeof value === 'object' && 'files' in value && (value as any).files?.length ? `${(value as any).files.length} file(s)` : '';
-      default:
-        return String(value);
-    }
+    // Use the utility function which properly handles { text: "value" } objects
+    return formatAnswerValueUtil(value, questionType);
   }
 
   private async generatePDF(
@@ -573,7 +562,7 @@ class ExportService {
 
   private analyzeChoiceQuestion(answers: Answer[], options: string[]): Record<string, number> {
     const counts: Record<string, number> = {};
-    
+
     // Initialize all options with 0
     if (options) {
       options.forEach(option => {
@@ -586,13 +575,17 @@ class ExportService {
       if (Array.isArray(answer.value)) {
         // Multiple choice
         answer.value.forEach(val => {
-          if (typeof val === 'string') {
-            counts[val] = (counts[val] || 0) + 1;
+          const extractedVal = extractTextValue(val);
+          if (extractedVal) {
+            counts[extractedVal] = (counts[extractedVal] || 0) + 1;
           }
         });
-      } else if (typeof answer.value === 'string') {
+      } else {
         // Single choice
-        counts[answer.value] = (counts[answer.value] || 0) + 1;
+        const extractedVal = extractTextValue(answer.value);
+        if (extractedVal) {
+          counts[extractedVal] = (counts[extractedVal] || 0) + 1;
+        }
       }
     });
 

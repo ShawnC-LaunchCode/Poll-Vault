@@ -37,7 +37,11 @@ export function IndividualAnswersList({ answers, questionType, questionTitle }: 
       if (Array.isArray(value)) {
         return value.join(", ");
       }
-      // Handle JSON objects
+      // Handle objects with a 'text' property (from text inputs)
+      if ('text' in value) {
+        return String(value.text || '');
+      }
+      // Handle other JSON objects
       return JSON.stringify(value);
     }
 

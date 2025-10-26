@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { Survey, Question, Response, Answer } from "@shared/schema";
 import { SURVEY_ANALYSIS_PROMPT, fillPromptVariables } from "../config/aiPrompts";
 import { surveyRepository, pageRepository, responseRepository } from "../repositories";
+import { extractTextValue } from "../utils/answerFormatting";
 
 /**
  * Service for Google Gemini AI integration
@@ -143,9 +144,9 @@ export class GeminiService {
       switch (question.type) {
         case 'short_text':
         case 'long_text':
-          // Show all text responses
+          // Show all text responses, extracting from { text: "value" } objects if needed
           const textResponses = answers
-            .map(a => String(a.value))
+            .map(a => extractTextValue(a.value))
             .filter(v => v && v.trim().length > 0);
 
           if (textResponses.length > 0) {
@@ -161,7 +162,8 @@ export class GeminiService {
           // Show all selected options
           const selectedOptions = answers
             .flatMap(a => Array.isArray(a.value) ? a.value : [a.value])
-            .filter(v => v);
+            .filter(v => v)
+            .map(v => extractTextValue(v));
 
           const optionCounts = selectedOptions.reduce((acc, option) => {
             acc[option] = (acc[option] || 0) + 1;
@@ -178,7 +180,7 @@ export class GeminiService {
 
         case 'radio':
           // Show distribution
-          const choices = answers.map(a => String(a.value));
+          const choices = answers.map(a => extractTextValue(a.value));
           const choiceCounts = choices.reduce((acc, choice) => {
             acc[choice] = (acc[choice] || 0) + 1;
             return acc;
@@ -204,7 +206,7 @@ export class GeminiService {
         case 'date_time':
           // Show date range
           const dates = answers
-            .map(a => new Date(String(a.value)))
+            .map(a => new Date(extractTextValue(a.value)))
             .filter(d => !isNaN(d.getTime()))
             .sort((a, b) => a.getTime() - b.getTime());
 

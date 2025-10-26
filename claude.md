@@ -1,8 +1,8 @@
 # Poll-Vault: Developer Reference Guide
 
-**Last Updated:** 2025-10-22
+**Last Updated:** 2025-10-23
 **Project Type:** Survey/Polling Platform (formerly DevPulse)
-**Tech Stack:** Node.js/Express, React, PostgreSQL, Drizzle ORM
+**Tech Stack:** Node.js/Express, React, PostgreSQL (Neon), Drizzle ORM
 
 ---
 
@@ -687,7 +687,7 @@ application/vnd.openxmlformats-officedocument.wordprocessingml.document
 # CRITICAL - Application will not start without these
 NODE_ENV=development|production
 PORT=5000
-DATABASE_URL=postgresql://user:pass@host:port/dbname
+DATABASE_URL=<your-neon-postgres-url>  # Neon PostgreSQL connection string
 GOOGLE_CLIENT_ID=<server-side-client-id>
 VITE_GOOGLE_CLIENT_ID=<client-side-client-id>
 SESSION_SECRET=<strong-random-secret-32+chars>
@@ -700,7 +700,13 @@ MAX_FILE_SIZE=10485760  # 10MB in bytes
 UPLOAD_DIR=./uploads
 ```
 
-### Local Development Setup
+### Development Setup
+
+**Prerequisites:**
+- Neon PostgreSQL database (create at https://neon.tech - free tier available)
+- Google OAuth credentials (from Google Cloud Console)
+
+**Setup Steps:**
 ```bash
 # 1. Install dependencies
 npm install
@@ -709,8 +715,11 @@ npm install
 cp .env.example .env
 
 # 3. Edit .env with your values
+#    - Add DATABASE_URL from your Neon database
+#    - Add Google OAuth credentials
+#    - Generate SESSION_SECRET: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
-# 4. Setup database
+# 4. Push database schema to Neon
 npm run db:push
 
 # 5. Start development server
@@ -718,6 +727,8 @@ npm run dev
 
 # Server runs on: http://localhost:5000
 ```
+
+**Note:** Both development and production use Neon PostgreSQL - no local database required.
 
 ---
 
@@ -824,7 +835,7 @@ const { visible, required } = evaluateConditionalLogic(question.id, context);
 **Database:**
 - [ ] Run migrations: `npm run db:push`
 - [ ] Verify all indices exist
-- [ ] Set up connection pooling (if not using Neon)
+- [ ] Neon handles connection pooling automatically
 
 **Security:**
 - [ ] Rotate all API keys and secrets
@@ -848,14 +859,18 @@ const { visible, required } = evaluateConditionalLogic(question.id, context);
 - GitHub repository with Poll-Vault code
 - Railway account (free tier available)
 - Google Cloud Console project for OAuth
-- Neon or Railway PostgreSQL database
+- Neon PostgreSQL database (same one you use for development)
 
 **Step-by-Step Guide:**
 
-**1. Database Setup (Neon - Recommended)**
+**1. Database Setup**
 ```bash
-# Create a Neon database at https://neon.tech
+# Use your existing Neon database from development OR create a new production database
+# Create at https://neon.tech (free tier available)
 # Copy the DATABASE_URL (PostgreSQL connection string)
+#
+# TIP: You can use the same Neon database for dev and production (with separate schemas)
+#      or create separate databases for each environment
 ```
 
 **2. Google OAuth Configuration**
@@ -966,14 +981,14 @@ railway logs
 4. Update ALLOWED_ORIGIN and Google OAuth URLs
 
 ### Supported Platforms
-- **Railway:** Auto-deploy from GitHub, managed PostgreSQL
-- **Heroku:** Heroku Postgres, automatic PORT binding
-- **Google Cloud Run:** Serverless containers, Cloud SQL
+- **Railway:** Auto-deploy from GitHub (use Neon for database)
+- **Heroku:** Automatic PORT binding (use Neon for database)
+- **Google Cloud Run:** Serverless containers (use Neon for database)
 - **Vercel/Netlify:** Serverless functions (requires adaptation)
 
 **Platform Notes:**
 - Always use `process.env.PORT` for port binding
-- Use platform-provided DATABASE_URL
+- Use Neon PostgreSQL for database (DATABASE_URL environment variable)
 - Set environment variables in platform dashboard
 - Build command: `npm run build`
 - Start command: `npm start`
@@ -1016,7 +1031,6 @@ railway logs
 - No query caching (consider Redis)
 - No response pagination on large datasets
 - No lazy loading for file uploads
-- No database connection pooling optimization
 
 **Testing:**
 - Missing E2E test coverage (implement Playwright suite)
@@ -1137,7 +1151,13 @@ npm run test:e2e         # Run end-to-end tests
 
 ---
 
-**Document Version:** 3.0
-**Last Updated:** 2025-10-15
+**Document Version:** 3.1
+**Last Updated:** 2025-10-23
+
+**Recent Documentation Updates:**
+- Clarified that Neon PostgreSQL is used for both development and production
+- Removed local database setup references
+- Simplified environment setup instructions
+- Updated deployment guide to emphasize Neon as the primary database solution
 
 This document serves as a comprehensive reference for the Poll-Vault platform. For detailed implementation examples, see the actual codebase files referenced throughout this document.

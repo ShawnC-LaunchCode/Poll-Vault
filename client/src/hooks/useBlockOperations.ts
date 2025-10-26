@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { SurveyPage, Question } from "@shared/schema";
@@ -236,36 +237,38 @@ export function useBlockOperations(surveyId: string) {
   });
 
   // ===== HANDLER FUNCTIONS =====
+  // Note: These are intentionally missing mutation dependencies to maintain stable references
+  // The mutation.mutate function is always current and safe to call
 
-  const handleUpdatePage = (pageId: string, data: Partial<SurveyPage>) => {
+  const handleUpdatePage = useCallback((pageId: string, data: Partial<SurveyPage>) => {
     updatePageMutation.mutate({ pageId, data });
-  };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleCopyPage = (pageId: string) => {
+  const handleCopyPage = useCallback((pageId: string) => {
     duplicatePageMutation.mutate(pageId);
-  };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleAddQuestion = (pageId: string, type: string) => {
+  const handleAddQuestion = useCallback((pageId: string, type: string) => {
     addQuestionMutation.mutate({ pageId, type });
-  };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleUpdateQuestion = (questionId: string, data: Partial<Question>) => {
+  const handleUpdateQuestion = useCallback((questionId: string, data: Partial<Question>) => {
     console.log('[useBlockOperations] handleUpdateQuestion called', {
       questionId,
       data
     });
     updateQuestionMutation.mutate({ questionId, data });
-  };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleCopyQuestion = (questionId: string) => {
+  const handleCopyQuestion = useCallback((questionId: string) => {
     duplicateQuestionMutation.mutate(questionId);
-  };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleDeleteQuestion = (questionId: string) => {
+  const handleDeleteQuestion = useCallback((questionId: string) => {
     if (confirm("Are you sure you want to delete this question?")) {
       deleteQuestionMutation.mutate(questionId);
     }
-  };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     // Mutations
