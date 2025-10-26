@@ -1,11 +1,14 @@
+import { motion } from 'framer-motion';
 import type { QuestionAggregate, YesNoAggregation, ChoiceAggregation, TextAggregation } from '@shared/schema';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { YesNoChart } from './YesNoChart';
 import { MultipleChoiceChart } from './MultipleChoiceChart';
 import { KeywordList } from './KeywordList';
+import { FileText, BarChart3, ListChecks, MessageSquare } from 'lucide-react';
 
 interface ResultsCardProps {
   question: QuestionAggregate;
+  index?: number;
 }
 
 function isYesNoAggregation(data: any): data is YesNoAggregation {
@@ -20,14 +23,36 @@ function isTextAggregation(data: any): data is TextAggregation {
   return data && typeof data === 'object' && 'topKeywords' in data && 'totalWords' in data;
 }
 
-export function ResultsCard({ question }: ResultsCardProps) {
+// Get icon based on question type
+function getQuestionIcon(questionType: string) {
+  switch (questionType) {
+    case 'yes_no':
+      return <BarChart3 className="w-4 h-4 text-green-600" />;
+    case 'multiple_choice':
+      return <ListChecks className="w-4 h-4 text-blue-600" />;
+    case 'radio':
+      return <ListChecks className="w-4 h-4 text-purple-600" />;
+    case 'short_text':
+    case 'long_text':
+      return <MessageSquare className="w-4 h-4 text-indigo-600" />;
+    default:
+      return <FileText className="w-4 h-4 text-gray-600" />;
+  }
+}
+
+export function ResultsCard({ question, index = 0 }: ResultsCardProps) {
   const renderChart = () => {
     // Handle no answers
     if (question.totalAnswers === 0) {
       return (
-        <div className="flex items-center justify-center h-64 text-muted-foreground">
-          <p>No responses yet</p>
-        </div>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-col items-center justify-center h-48 sm:h-64 text-muted-foreground"
+        >
+          <BarChart3 className="w-12 h-12 mb-3 opacity-20" />
+          <p className="text-sm">No responses yet</p>
+        </motion.div>
       );
     }
 
@@ -52,23 +77,53 @@ export function ResultsCard({ question }: ResultsCardProps) {
 
     // Fallback for unsupported question types
     return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground">
-        <p>Visualization not available for this question type</p>
-      </div>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="flex flex-col items-center justify-center h-48 sm:h-64 text-muted-foreground"
+      >
+        <FileText className="w-12 h-12 mb-3 opacity-20" />
+        <p className="text-sm">Visualization not available for this question type</p>
+      </motion.div>
     );
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">{question.questionTitle}</CardTitle>
-        <CardDescription>
-          {question.totalAnswers} {question.totalAnswers === 1 ? 'response' : 'responses'}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {renderChart()}
-      </CardContent>
-    </Card>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        duration: 0.4,
+        delay: index * 0.1,
+        ease: 'easeOut'
+      }}
+    >
+      <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
+        <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-100 pb-3">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5">
+              {getQuestionIcon(question.questionType)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <CardTitle className="text-base sm:text-lg leading-tight break-words">
+                {question.questionTitle}
+              </CardTitle>
+              <CardDescription className="mt-1 flex flex-wrap items-center gap-2">
+                <span className="text-xs sm:text-sm">
+                  {question.totalAnswers} {question.totalAnswers === 1 ? 'response' : 'responses'}
+                </span>
+                <span className="hidden sm:inline text-gray-300">•</span>
+                <span className="text-xs sm:text-sm capitalize text-gray-500">
+                  {question.questionType.replace('_', ' ')}
+                </span>
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4 sm:p-6">
+          {renderChart()}
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }

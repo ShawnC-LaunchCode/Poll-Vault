@@ -64,8 +64,8 @@ export function OverallSummary({ surveyId }: OverallSummaryProps) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        {questionAggregates.map((question) => (
-          <ResultsCard key={question.questionId} question={question} />
+        {questionAggregates.map((question, index) => (
+          <ResultsCard key={question.questionId} question={question} index={index} />
         ))}
       </div>
     </div>
