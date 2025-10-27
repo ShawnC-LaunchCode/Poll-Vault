@@ -62,6 +62,8 @@ export function QuestionCard({
   const [localOptions, setLocalOptions] = useState<string[]>(
     (question.options as string[]) || []
   );
+  const [localDescription, setLocalDescription] = useState(question.description || "");
+  const [localLoopConfig, setLocalLoopConfig] = useState((question.loopConfig as any) || {});
 
   // Stable keys for options to prevent re-mounting during typing
   const optionKeysRef = useRef<string[]>([]);
@@ -69,11 +71,14 @@ export function QuestionCard({
   // Refs for option inputs to enable keyboard navigation
   const optionInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
 
-  // Debounce timer ref for option updates
+  // Debounce timer refs
   const optionsDebounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const descriptionDebounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const loopConfigDebounceTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Flush function to immediately save any pending changes
   const flushPendingSaves = useRef<FlushFunction>(() => {
+    // Flush options
     if (optionsDebounceTimer.current) {
       clearTimeout(optionsDebounceTimer.current);
       optionsDebounceTimer.current = null;
@@ -82,6 +87,26 @@ export function QuestionCard({
       const questionOptions = (question.options as string[]) || [];
       if (JSON.stringify(currentOptions) !== JSON.stringify(questionOptions)) {
         onUpdateQuestion(question.id, { options: currentOptions as any });
+      }
+    }
+
+    // Flush description
+    if (descriptionDebounceTimer.current) {
+      clearTimeout(descriptionDebounceTimer.current);
+      descriptionDebounceTimer.current = null;
+
+      if (localDescription !== (question.description || "")) {
+        onUpdateQuestion(question.id, { description: localDescription });
+      }
+    }
+
+    // Flush loop config
+    if (loopConfigDebounceTimer.current) {
+      clearTimeout(loopConfigDebounceTimer.current);
+      loopConfigDebounceTimer.current = null;
+
+      if (JSON.stringify(localLoopConfig) !== JSON.stringify(question.loopConfig || {})) {
+        onUpdateQuestion(question.id, { loopConfig: localLoopConfig as any });
       }
     }
   });
@@ -101,6 +126,20 @@ export function QuestionCard({
     }
   }, [question.options, question.id]);
 
+  // Sync localDescription when question.description changes (if not typing)
+  useEffect(() => {
+    if (!descriptionDebounceTimer.current) {
+      setLocalDescription(question.description || "");
+    }
+  }, [question.description]);
+
+  // Sync localLoopConfig when question.loopConfig changes (if not typing)
+  useEffect(() => {
+    if (!loopConfigDebounceTimer.current) {
+      setLocalLoopConfig((question.loopConfig as any) || {});
+    }
+  }, [question.loopConfig]);
+
   // Register flush function with coordinator
   useEffect(() => {
     if (registerFlush) {
@@ -114,6 +153,7 @@ export function QuestionCard({
   // Update flush function ref when dependencies change
   useEffect(() => {
     flushPendingSaves.current = () => {
+      // Flush options
       if (optionsDebounceTimer.current) {
         clearTimeout(optionsDebounceTimer.current);
         optionsDebounceTimer.current = null;
@@ -124,8 +164,28 @@ export function QuestionCard({
           onUpdateQuestion(question.id, { options: currentOptions as any });
         }
       }
+
+      // Flush description
+      if (descriptionDebounceTimer.current) {
+        clearTimeout(descriptionDebounceTimer.current);
+        descriptionDebounceTimer.current = null;
+
+        if (localDescription !== (question.description || "")) {
+          onUpdateQuestion(question.id, { description: localDescription });
+        }
+      }
+
+      // Flush loop config
+      if (loopConfigDebounceTimer.current) {
+        clearTimeout(loopConfigDebounceTimer.current);
+        loopConfigDebounceTimer.current = null;
+
+        if (JSON.stringify(localLoopConfig) !== JSON.stringify(question.loopConfig || {})) {
+          onUpdateQuestion(question.id, { loopConfig: localLoopConfig as any });
+        }
+      }
     };
-  }, [localOptions, question.id, question.options, onUpdateQuestion]);
+  }, [localOptions, localDescription, localLoopConfig, question.id, question.options, question.description, question.loopConfig, onUpdateQuestion]);
 
   const {
     attributes,
@@ -152,7 +212,16 @@ export function QuestionCard({
   };
 
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onUpdateQuestion(question.id, { description: e.target.value });
+    const newDescription = e.target.value;
+    setLocalDescription(newDescription);
+
+    // Debounce the update
+    if (descriptionDebounceTimer.current) {
+      clearTimeout(descriptionDebounceTimer.current);
+    }
+    descriptionDebounceTimer.current = setTimeout(() => {
+      onUpdateQuestion(question.id, { description: newDescription });
+    }, 500);
   };
 
   const handleRequiredToggle = (checked: boolean) => {
@@ -209,35 +278,61 @@ export function QuestionCard({
     }, 100); // Short 100ms delay for removal
   };
 
-  // Flush pending updates when component unmounts or when card is collapsed
+  // Flush pending updates when component unmounts
   useEffect(() => {
     return () => {
       // On unmount, flush any pending changes
       if (optionsDebounceTimer.current) {
         clearTimeout(optionsDebounceTimer.current);
-        // Save the current localOptions to ensure no data loss
         const currentOptions = localOptions;
         const questionOptions = (question.options as string[]) || [];
-        // Only update if there are actual changes
         if (JSON.stringify(currentOptions) !== JSON.stringify(questionOptions)) {
           onUpdateQuestion(question.id, { options: currentOptions as any });
         }
       }
+      if (descriptionDebounceTimer.current) {
+        clearTimeout(descriptionDebounceTimer.current);
+        if (localDescription !== (question.description || "")) {
+          onUpdateQuestion(question.id, { description: localDescription });
+        }
+      }
+      if (loopConfigDebounceTimer.current) {
+        clearTimeout(loopConfigDebounceTimer.current);
+        if (JSON.stringify(localLoopConfig) !== JSON.stringify(question.loopConfig || {})) {
+          onUpdateQuestion(question.id, { loopConfig: localLoopConfig as any });
+        }
+      }
     };
-  }, [localOptions, question.id, question.options, onUpdateQuestion]);
+  }, [localOptions, localDescription, localLoopConfig, question.id, question.options, question.description, question.loopConfig, onUpdateQuestion]);
 
   // Flush pending updates when card is collapsed
   useEffect(() => {
-    if (!isExpanded && optionsDebounceTimer.current) {
-      clearTimeout(optionsDebounceTimer.current);
-      const currentOptions = localOptions;
-      const questionOptions = (question.options as string[]) || [];
-      if (JSON.stringify(currentOptions) !== JSON.stringify(questionOptions)) {
-        onUpdateQuestion(question.id, { options: currentOptions as any });
+    if (!isExpanded) {
+      if (optionsDebounceTimer.current) {
+        clearTimeout(optionsDebounceTimer.current);
+        const currentOptions = localOptions;
+        const questionOptions = (question.options as string[]) || [];
+        if (JSON.stringify(currentOptions) !== JSON.stringify(questionOptions)) {
+          onUpdateQuestion(question.id, { options: currentOptions as any });
+        }
+        optionsDebounceTimer.current = null;
       }
-      optionsDebounceTimer.current = null;
+      if (descriptionDebounceTimer.current) {
+        clearTimeout(descriptionDebounceTimer.current);
+        if (localDescription !== (question.description || "")) {
+          onUpdateQuestion(question.id, { description: localDescription });
+        }
+        descriptionDebounceTimer.current = null;
+      }
+      if (loopConfigDebounceTimer.current) {
+        clearTimeout(loopConfigDebounceTimer.current);
+        if (JSON.stringify(localLoopConfig) !== JSON.stringify(question.loopConfig || {})) {
+          onUpdateQuestion(question.id, { loopConfig: localLoopConfig as any });
+        }
+        loopConfigDebounceTimer.current = null;
+      }
     }
-  }, [isExpanded, localOptions, question.id, question.options, onUpdateQuestion]);
+  }, [isExpanded, localOptions, localDescription, localLoopConfig, question.id, question.options, question.description, question.loopConfig, onUpdateQuestion]);
 
   const hasOptions = question.type === "multiple_choice" || question.type === "radio";
   const isLoopGroup = question.type === "loop_group";
@@ -310,13 +405,19 @@ export function QuestionCard({
 
   // Handle loop config changes
   const handleLoopConfigChange = (field: string, value: any) => {
-    const currentConfig = question.loopConfig as any || {};
-    onUpdateQuestion(question.id, {
-      loopConfig: {
-        ...currentConfig,
-        [field]: value
-      } as any
-    });
+    const newConfig = {
+      ...localLoopConfig,
+      [field]: value
+    };
+    setLocalLoopConfig(newConfig);
+
+    // Debounce the update
+    if (loopConfigDebounceTimer.current) {
+      clearTimeout(loopConfigDebounceTimer.current);
+    }
+    loopConfigDebounceTimer.current = setTimeout(() => {
+      onUpdateQuestion(question.id, { loopConfig: newConfig as any });
+    }, 500);
   };
 
   // Add subquestion
@@ -473,7 +574,7 @@ export function QuestionCard({
                 Description (optional)
               </label>
               <Textarea
-                value={question.description || ""}
+                value={localDescription}
                 onChange={handleDescriptionChange}
                 placeholder="Add a description or help text for this question..."
                 className="min-h-[60px] text-sm"
@@ -481,7 +582,7 @@ export function QuestionCard({
             </div>
 
             {/* Required Toggle */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
               <label className="text-xs font-medium text-gray-600">
                 Required Question
               </label>
@@ -556,7 +657,7 @@ export function QuestionCard({
                     <Input
                       type="number"
                       min="1"
-                      value={(question.loopConfig as any)?.minIterations || 1}
+                      value={localLoopConfig?.minIterations || 1}
                       onChange={(e) => handleLoopConfigChange('minIterations', parseInt(e.target.value))}
                       className="text-sm"
                     />
@@ -566,7 +667,7 @@ export function QuestionCard({
                     <Input
                       type="number"
                       min="1"
-                      value={(question.loopConfig as any)?.maxIterations || 5}
+                      value={localLoopConfig?.maxIterations || 5}
                       onChange={(e) => handleLoopConfigChange('maxIterations', parseInt(e.target.value))}
                       className="text-sm"
                     />
@@ -578,7 +679,7 @@ export function QuestionCard({
                   <div>
                     <Label className="text-xs font-medium text-gray-600">Add Button Text</Label>
                     <Input
-                      value={(question.loopConfig as any)?.addButtonText || 'Add Item'}
+                      value={localLoopConfig?.addButtonText || 'Add Item'}
                       onChange={(e) => handleLoopConfigChange('addButtonText', e.target.value)}
                       placeholder="Add Item"
                       className="text-sm"
@@ -587,7 +688,7 @@ export function QuestionCard({
                   <div>
                     <Label className="text-xs font-medium text-gray-600">Remove Button Text</Label>
                     <Input
-                      value={(question.loopConfig as any)?.removeButtonText || 'Remove'}
+                      value={localLoopConfig?.removeButtonText || 'Remove'}
                       onChange={(e) => handleLoopConfigChange('removeButtonText', e.target.value)}
                       placeholder="Remove"
                       className="text-sm"

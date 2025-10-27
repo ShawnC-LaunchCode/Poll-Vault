@@ -44,13 +44,24 @@ export function LoopSubquestionCard({
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [localTitle, setLocalTitle] = useState(subquestion.title);
+  const [localLoopConfig, setLocalLoopConfig] = useState((subquestion.loopConfig as any) || {});
   const queryClient = useQueryClient();
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const titleDebounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const loopConfigDebounceTimer = useRef<NodeJS.Timeout | null>(null);
 
-  // Update local title when subquestion prop changes
+  // Update local title when subquestion prop changes (if not typing)
   useEffect(() => {
-    setLocalTitle(subquestion.title);
+    if (!titleDebounceTimer.current) {
+      setLocalTitle(subquestion.title);
+    }
   }, [subquestion.title]);
+
+  // Update local loop config when subquestion prop changes (if not typing)
+  useEffect(() => {
+    if (!loopConfigDebounceTimer.current) {
+      setLocalLoopConfig((subquestion.loopConfig as any) || {});
+    }
+  }, [subquestion.loopConfig]);
 
   const isLoopGroup = subquestion.type === "loop_group";
   const indentLevel = depth * 24; // 24px per nesting level
@@ -141,12 +152,12 @@ export function LoopSubquestionCard({
     setLocalTitle(newTitle);
 
     // Clear existing timer
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
+    if (titleDebounceTimer.current) {
+      clearTimeout(titleDebounceTimer.current);
     }
 
     // Set new timer to update after 500ms of inactivity
-    debounceTimerRef.current = setTimeout(() => {
+    titleDebounceTimer.current = setTimeout(() => {
       updateSubquestionMutation.mutate({
         id: subquestion.id,
         data: { title: newTitle }
@@ -154,28 +165,41 @@ export function LoopSubquestionCard({
     }, 500);
   };
 
-  // Cleanup timer on unmount
+  // Handle loop config changes with debouncing
+  const handleLoopConfigChange = (field: string, value: any) => {
+    const newConfig = {
+      ...localLoopConfig,
+      [field]: value
+    };
+    setLocalLoopConfig(newConfig);
+
+    // Clear existing timer
+    if (loopConfigDebounceTimer.current) {
+      clearTimeout(loopConfigDebounceTimer.current);
+    }
+
+    // Set new timer to update after 500ms of inactivity
+    loopConfigDebounceTimer.current = setTimeout(() => {
+      updateSubquestionMutation.mutate({
+        id: subquestion.id,
+        data: {
+          loopConfig: newConfig
+        }
+      });
+    }, 500);
+  };
+
+  // Cleanup timers on unmount
   useEffect(() => {
     return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
+      if (titleDebounceTimer.current) {
+        clearTimeout(titleDebounceTimer.current);
+      }
+      if (loopConfigDebounceTimer.current) {
+        clearTimeout(loopConfigDebounceTimer.current);
       }
     };
   }, []);
-
-  // Handle loop config changes
-  const handleLoopConfigChange = (field: string, value: any) => {
-    const currentConfig = subquestion.loopConfig || {};
-    updateSubquestionMutation.mutate({
-      id: subquestion.id,
-      data: {
-        loopConfig: {
-          ...currentConfig,
-          [field]: value
-        }
-      }
-    });
-  };
 
   // Add nested subquestion
   const handleAddNestedSubquestion = (type: string) => {
@@ -258,7 +282,7 @@ export function LoopSubquestionCard({
                 <Input
                   type="number"
                   min="1"
-                  value={(subquestion.loopConfig as any)?.minIterations || 1}
+                  value={localLoopConfig?.minIterations || 1}
                   onChange={(e) => handleLoopConfigChange('minIterations', parseInt(e.target.value))}
                   className="text-xs h-8"
                 />
@@ -268,7 +292,7 @@ export function LoopSubquestionCard({
                 <Input
                   type="number"
                   min="1"
-                  value={(subquestion.loopConfig as any)?.maxIterations || 5}
+                  value={localLoopConfig?.maxIterations || 5}
                   onChange={(e) => handleLoopConfigChange('maxIterations', parseInt(e.target.value))}
                   className="text-xs h-8"
                 />
@@ -280,7 +304,7 @@ export function LoopSubquestionCard({
               <div>
                 <Label className="text-xs font-medium text-gray-600">Add Button</Label>
                 <Input
-                  value={(subquestion.loopConfig as any)?.addButtonText || 'Add Item'}
+                  value={localLoopConfig?.addButtonText || 'Add Item'}
                   onChange={(e) => handleLoopConfigChange('addButtonText', e.target.value)}
                   placeholder="Add Item"
                   className="text-xs h-8"
@@ -289,7 +313,7 @@ export function LoopSubquestionCard({
               <div>
                 <Label className="text-xs font-medium text-gray-600">Remove Button</Label>
                 <Input
-                  value={(subquestion.loopConfig as any)?.removeButtonText || 'Remove'}
+                  value={localLoopConfig?.removeButtonText || 'Remove'}
                   onChange={(e) => handleLoopConfigChange('removeButtonText', e.target.value)}
                   placeholder="Remove"
                   className="text-xs h-8"
