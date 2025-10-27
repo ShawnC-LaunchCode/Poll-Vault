@@ -12,7 +12,7 @@ import {
   type InsertConditionalRule,
   type QuestionWithSubquestions,
 } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc, max } from "drizzle-orm";
 
 /**
  * Repository for question-related database operations
@@ -21,6 +21,30 @@ import { eq, and } from "drizzle-orm";
 export class QuestionRepository extends BaseRepository<typeof questions, Question, InsertQuestion> {
   constructor() {
     super(questions);
+  }
+
+  /**
+   * Override create to automatically assign the next available order number
+   */
+  async create(data: InsertQuestion, tx?: DbTransaction): Promise<Question> {
+    const database = this.getDb(tx);
+
+    // Get the maximum order for questions in this page
+    const [result] = await database
+      .select({ maxOrder: max(questions.order) })
+      .from(questions)
+      .where(eq(questions.pageId, data.pageId));
+
+    // Assign the next order number (maxOrder + 1, or 1 if no questions exist)
+    const nextOrder = (result?.maxOrder ?? 0) + 1;
+
+    // Create the question with the calculated order
+    const [question] = await database
+      .insert(questions)
+      .values({ ...data, order: nextOrder } as any)
+      .returning();
+
+    return question;
   }
 
   /**
