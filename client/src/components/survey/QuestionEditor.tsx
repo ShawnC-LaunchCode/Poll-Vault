@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -62,7 +62,11 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
   });
 
   const [isEditing, setIsEditing] = useState(false);
-  
+
+  // Stable keys for options to prevent re-mounting during typing
+  const optionKeysRef = useRef<string[]>([]);
+  const subquestionOptionKeysRef = useRef<string[]>([]);
+
   // Conditional logic state
   const [showConditionalLogic, setShowConditionalLogic] = useState(false);
   const [conditionalRules, setConditionalRules] = useState<ConditionalRule[]>([]);
@@ -105,12 +109,17 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
 
   useEffect(() => {
     if (selectedQuestionData) {
+      const options = (selectedQuestionData.options as string[]) || [];
+
+      // Generate stable keys for existing options
+      optionKeysRef.current = options.map((_, i) => `option-${selectedQuestionData.id}-${i}`);
+
       setQuestionData({
         type: selectedQuestionData.type,
         title: selectedQuestionData.title,
         description: selectedQuestionData.description || "",
         required: selectedQuestionData.required || false,
-        options: (selectedQuestionData.options as string[]) || [],
+        options: options,
         loopConfig: selectedQuestionData.loopConfig as LoopGroupConfig || undefined,
         fileUploadConfig: selectedQuestionData.type === 'file_upload' ?
           (selectedQuestionData.options as any) || {
@@ -131,6 +140,10 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
         }
       }
     } else {
+      // Reset keys when creating new question
+      optionKeysRef.current = [];
+      subquestionOptionKeysRef.current = [];
+
       setQuestionData({
         type: "short_text",
         title: "",
@@ -225,6 +238,10 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
   });
 
   const resetForm = () => {
+    // Reset stable keys
+    optionKeysRef.current = [];
+    subquestionOptionKeysRef.current = [];
+
     setQuestionData({
       type: "short_text",
       title: "",
@@ -266,6 +283,10 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
   };
 
   const addOption = () => {
+    // Generate stable key for new option
+    const newKey = `option-${Date.now()}-${Math.random()}`;
+    optionKeysRef.current = [...optionKeysRef.current, newKey];
+
     setQuestionData(prev => ({
       ...prev,
       options: [...prev.options, ""]
@@ -280,6 +301,9 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
   };
 
   const removeOption = (index: number) => {
+    // Remove the key for this option
+    optionKeysRef.current = optionKeysRef.current.filter((_, i) => i !== index);
+
     setQuestionData(prev => ({
       ...prev,
       options: prev.options.filter((_, i) => i !== index)
@@ -387,6 +411,10 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
   };
 
   const addSubquestionOption = () => {
+    // Generate stable key for new subquestion option
+    const newKey = `subq-option-${Date.now()}-${Math.random()}`;
+    subquestionOptionKeysRef.current = [...subquestionOptionKeysRef.current, newKey];
+
     setSubquestionData(prev => ({
       ...prev,
       options: [...prev.options, ""]
@@ -401,6 +429,9 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
   };
 
   const removeSubquestionOption = (index: number) => {
+    // Remove the key for this subquestion option
+    subquestionOptionKeysRef.current = subquestionOptionKeysRef.current.filter((_, i) => i !== index);
+
     setSubquestionData(prev => ({
       ...prev,
       options: prev.options.filter((_, i) => i !== index)
@@ -613,25 +644,31 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
             <div className="space-y-2">
               <label className="block text-sm font-medium text-foreground">Answer Options</label>
               <div className="space-y-2">
-                {questionData.options.map((option, index) => (
-                  <div key={`option-${index}-${option.substring(0, 10)}`} className="flex items-center space-x-2">
-                    <Input
-                      placeholder={`Option ${index + 1}`}
-                      value={option}
-                      onChange={(e) => updateOption(index, e.target.value)}
-                      data-testid={`input-option-${index}`}
-                      autoComplete="off"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeOption(index)}
-                      data-testid={`button-remove-option-${index}`}
-                    >
-                      <i className="fas fa-trash text-sm"></i>
-                    </Button>
-                  </div>
-                ))}
+                {questionData.options.map((option, index) => {
+                  // Ensure we have a key for this index
+                  if (!optionKeysRef.current[index]) {
+                    optionKeysRef.current[index] = `option-${Date.now()}-${index}-${Math.random()}`;
+                  }
+                  return (
+                    <div key={optionKeysRef.current[index]} className="flex items-center space-x-2">
+                      <Input
+                        placeholder={`Option ${index + 1}`}
+                        value={option}
+                        onChange={(e) => updateOption(index, e.target.value)}
+                        data-testid={`input-option-${index}`}
+                        autoComplete="off"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeOption(index)}
+                        data-testid={`button-remove-option-${index}`}
+                      >
+                        <i className="fas fa-trash text-sm"></i>
+                      </Button>
+                    </div>
+                  );
+                })}
                 <Button
                   variant="ghost"
                   onClick={addOption}
@@ -728,25 +765,31 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-foreground">Answer Options</label>
                     <div className="space-y-2">
-                      {subquestionData.options.map((option, index) => (
-                        <div key={`subq-option-${index}-${option.substring(0, 10)}`} className="flex items-center space-x-2">
-                          <Input
-                            placeholder={`Option ${index + 1}`}
-                            value={option}
-                            onChange={(e) => updateSubquestionOption(index, e.target.value)}
-                            data-testid={`input-subquestion-option-${index}`}
-                            autoComplete="off"
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeSubquestionOption(index)}
-                            data-testid={`button-remove-subquestion-option-${index}`}
-                          >
-                            <i className="fas fa-trash text-sm"></i>
-                          </Button>
-                        </div>
-                      ))}
+                      {subquestionData.options.map((option, index) => {
+                        // Ensure we have a key for this index
+                        if (!subquestionOptionKeysRef.current[index]) {
+                          subquestionOptionKeysRef.current[index] = `subq-option-${Date.now()}-${index}-${Math.random()}`;
+                        }
+                        return (
+                          <div key={subquestionOptionKeysRef.current[index]} className="flex items-center space-x-2">
+                            <Input
+                              placeholder={`Option ${index + 1}`}
+                              value={option}
+                              onChange={(e) => updateSubquestionOption(index, e.target.value)}
+                              data-testid={`input-subquestion-option-${index}`}
+                              autoComplete="off"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeSubquestionOption(index)}
+                              data-testid={`button-remove-subquestion-option-${index}`}
+                            >
+                              <i className="fas fa-trash text-sm"></i>
+                            </Button>
+                          </div>
+                        );
+                      })}
                       <Button
                         variant="ghost"
                         onClick={addSubquestionOption}
