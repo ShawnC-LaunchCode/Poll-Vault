@@ -459,6 +459,9 @@ export class AnalyticsRepository extends BaseRepository<
       case 'long_text':
         return this.aggregateText(answers);
 
+      case 'date_time':
+        return this.aggregateDateTime(answers);
+
       default:
         return { raw: answers.map(a => a.value) };
     }
@@ -636,6 +639,67 @@ export class AnalyticsRepository extends BaseRepository<
   }
 
   /**
+   * Aggregate date/time question answers
+   * Groups identical date/times and counts occurrences
+   */
+  private aggregateDateTime(
+    answers: Array<{ value: any }>
+  ): Array<{ option: string; count: number; percent: number }> {
+    if (answers.length === 0) {
+      return [];
+    }
+
+    // Extract and format date/time values
+    const dateTimeValues = answers
+      .map(a => {
+        const value = a.value;
+
+        // Handle different value formats
+        if (typeof value === 'string') {
+          return value;
+        } else if (typeof value === 'object' && value !== null) {
+          // Handle object format: { text: "...", date: "...", time: "..." }
+          if ((value as any).text) {
+            return (value as any).text;
+          }
+          if ((value as any).date) {
+            const date = (value as any).date;
+            const time = (value as any).time;
+            return time ? `${date} ${time}` : date;
+          }
+          // Try to convert to ISO string if it's a Date object
+          if (value instanceof Date) {
+            return value.toISOString();
+          }
+          return String(value);
+        }
+        return String(value);
+      })
+      .filter(val => val && val.trim().length > 0);
+
+    if (dateTimeValues.length === 0) {
+      return [];
+    }
+
+    // Group by exact match (case-sensitive for dates/times)
+    const counts: Record<string, number> = {};
+
+    for (const dateTime of dateTimeValues) {
+      const trimmed = dateTime.trim();
+      counts[trimmed] = (counts[trimmed] || 0) + 1;
+    }
+
+    // Convert to array format with percentages, sorted by count descending
+    return Object.entries(counts)
+      .map(([option, count]) => ({
+        option,
+        count,
+        percent: Math.round((count / dateTimeValues.length) * 100 * 100) / 100
+      }))
+      .sort((a, b) => b.count - a.count);
+  }
+
+  /**
    * Return empty aggregation structure for question type
    */
   private getEmptyAggregation(questionType: string): any {
@@ -646,6 +710,7 @@ export class AnalyticsRepository extends BaseRepository<
       case 'radio':
       case 'short_text':
       case 'long_text':
+      case 'date_time':
         return [];
       default:
         return null;

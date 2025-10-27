@@ -902,6 +902,15 @@ export class DatabaseStorage implements IStorage {
               return String(value);
             })
             .filter((text: string) => text && text.trim().length > 0);
+        } else if (question.questionType === 'date_time') {
+          // For date_time, show aggregated date/time values
+          if (Array.isArray(aggregation) && aggregation.length > 0) {
+            aggregates = aggregation.map((item: any) => ({
+              option: item.option,
+              count: item.count,
+              percentage: item.percent
+            }));
+          }
         }
       }
 
