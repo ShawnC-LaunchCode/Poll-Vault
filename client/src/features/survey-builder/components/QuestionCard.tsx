@@ -43,6 +43,9 @@ export function QuestionCard({
     (question.options as string[]) || []
   );
 
+  // Stable keys for options to prevent re-mounting during typing
+  const optionKeysRef = useRef<string[]>([]);
+
   // Debounce timer ref for option updates
   const optionsDebounceTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -61,9 +64,19 @@ export function QuestionCard({
   });
 
   // Sync localOptions when question.options changes from external source
+  // BUT not if there's a pending debounce (user is actively typing)
   useEffect(() => {
-    setLocalOptions((question.options as string[]) || []);
-  }, [question.options]);
+    if (!optionsDebounceTimer.current) {
+      const newOptions = (question.options as string[]) || [];
+      setLocalOptions(newOptions);
+
+      // Generate stable keys for options
+      optionKeysRef.current = newOptions.map((_, i) => {
+        // Reuse existing key if it exists, otherwise generate new one
+        return optionKeysRef.current[i] || `opt-${question.id}-${i}-${Date.now()}`;
+      });
+    }
+  }, [question.options, question.id]);
 
   // Register flush function with coordinator
   useEffect(() => {
@@ -139,6 +152,11 @@ export function QuestionCard({
   const handleAddOption = () => {
     const newOptions = [...localOptions, ""];
     setLocalOptions(newOptions);
+
+    // Generate stable key for new option
+    const newKey = `opt-${question.id}-${newOptions.length - 1}-${Date.now()}`;
+    optionKeysRef.current = [...optionKeysRef.current, newKey];
+
     // Don't save to server yet - only update local state
     // This prevents unnecessary mutations that cause the card to collapse
   };
@@ -155,6 +173,10 @@ export function QuestionCard({
   const handleRemoveOption = (index: number) => {
     const newOptions = localOptions.filter((_, i) => i !== index);
     setLocalOptions(newOptions);
+
+    // Remove the corresponding key
+    optionKeysRef.current = optionKeysRef.current.filter((_, i) => i !== index);
+
     // Debounce the update to prevent collapse (but with shorter delay)
     if (optionsDebounceTimer.current) {
       clearTimeout(optionsDebounceTimer.current);
@@ -315,24 +337,31 @@ export function QuestionCard({
                   Answer Options
                 </label>
                 <div className="space-y-2">
-                  {localOptions.map((option, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <Input
-                        value={option}
-                        onChange={(e) => handleOptionChange(index, e.target.value)}
-                        placeholder={`Option ${index + 1}`}
-                        className="text-sm"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveOption(index)}
-                        className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
+                  {localOptions.map((option, index) => {
+                    // Ensure we have a stable key for this index
+                    if (!optionKeysRef.current[index]) {
+                      optionKeysRef.current[index] = `opt-${question.id}-${index}-${Date.now()}`;
+                    }
+                    return (
+                      <div key={optionKeysRef.current[index]} className="flex items-center gap-2">
+                        <Input
+                          value={option}
+                          onChange={(e) => handleOptionChange(index, e.target.value)}
+                          placeholder={`Option ${index + 1}`}
+                          className="text-sm"
+                          autoComplete="off"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveOption(index)}
+                          className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    );
+                  })}
                   <Button
                     variant="outline"
                     size="sm"
