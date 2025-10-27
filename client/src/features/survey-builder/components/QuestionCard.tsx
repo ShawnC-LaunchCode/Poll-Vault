@@ -55,6 +55,9 @@ export function QuestionCard({
     return isLoopGroup || (hasOptions && options.filter(o => o.trim()).length === 0);
   };
 
+  // Check if this is a newly created question (title starts with "New")
+  const isNewQuestion = question.title.startsWith("New ");
+
   const [isExpanded, setIsExpanded] = useState(shouldStartExpanded());
   const [localOptions, setLocalOptions] = useState<string[]>(
     (question.options as string[]) || []
@@ -62,6 +65,9 @@ export function QuestionCard({
 
   // Stable keys for options to prevent re-mounting during typing
   const optionKeysRef = useRef<string[]>([]);
+
+  // Refs for option inputs to enable keyboard navigation
+  const optionInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
 
   // Debounce timer ref for option updates
   const optionsDebounceTimer = useRef<NodeJS.Timeout | null>(null);
@@ -322,6 +328,55 @@ export function QuestionCard({
     });
   };
 
+  // Handle Enter key on title - focus first option for radio/multiple_choice
+  const handleTitleEnterKey = () => {
+    if (hasOptions) {
+      if (localOptions.length === 0) {
+        // Add first option if none exist
+        const newOptions = [""];
+        setLocalOptions(newOptions);
+        optionKeysRef.current = [`opt-${question.id}-0-${Date.now()}`];
+        // Focus will be set after the option is rendered
+        setTimeout(() => {
+          const firstInput = optionInputRefs.current.get(0);
+          if (firstInput) {
+            firstInput.focus();
+          }
+        }, 0);
+      } else {
+        // Focus existing first option
+        const firstInput = optionInputRefs.current.get(0);
+        if (firstInput) {
+          firstInput.focus();
+          firstInput.select();
+        }
+      }
+    }
+  };
+
+  // Handle Enter key on option inputs - move to next option or add new one
+  const handleOptionKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const nextInput = optionInputRefs.current.get(index + 1);
+      if (nextInput) {
+        // Focus next option
+        nextInput.focus();
+        nextInput.select();
+      } else {
+        // At the last option, add a new one
+        handleAddOption();
+        // Focus will be set automatically after the new option is added
+        setTimeout(() => {
+          const newInput = optionInputRefs.current.get(index + 1);
+          if (newInput) {
+            newInput.focus();
+          }
+        }, 0);
+      }
+    }
+  };
+
   return (
     <Card
       ref={setNodeRef}
@@ -368,6 +423,8 @@ export function QuestionCard({
               onSave={handleTitleSave}
               className="text-sm font-medium"
               placeholder="Question title..."
+              autoFocus={isNewQuestion}
+              onEnterKey={handleTitleEnterKey}
             />
           </div>
 
@@ -449,8 +506,16 @@ export function QuestionCard({
                     return (
                       <div key={optionKeysRef.current[index]} className="flex items-center gap-2">
                         <Input
+                          ref={(el) => {
+                            if (el) {
+                              optionInputRefs.current.set(index, el);
+                            } else {
+                              optionInputRefs.current.delete(index);
+                            }
+                          }}
                           value={option}
                           onChange={(e) => handleOptionChange(index, e.target.value)}
+                          onKeyDown={(e) => handleOptionKeyDown(index, e)}
                           placeholder={`Option ${index + 1}`}
                           className="text-sm"
                           autoComplete="off"
@@ -553,13 +618,25 @@ export function QuestionCard({
                     </div>
                   )}
 
-                  {/* Add Subquestion Dropdown - Now at the bottom and more prominent */}
-                  <div className="mt-3 p-3 bg-blue-50 border-2 border-blue-200 border-dashed rounded-lg">
+                  {/* Add Subquestion Dropdown - Green when empty, blue after first subquestion */}
+                  <div className={`mt-3 p-3 border-2 border-dashed rounded-lg ${
+                    subquestions.length === 0
+                      ? 'bg-green-50 border-green-300'
+                      : 'bg-blue-50 border-blue-200'
+                  }`}>
                     <div className="flex items-center gap-2">
-                      <Plus className="h-4 w-4 text-blue-600" />
-                      <Label className="text-xs font-medium text-blue-700">Add Subquestion:</Label>
+                      <Plus className={`h-4 w-4 ${
+                        subquestions.length === 0 ? 'text-green-600' : 'text-blue-600'
+                      }`} />
+                      <Label className={`text-xs font-medium ${
+                        subquestions.length === 0 ? 'text-green-700' : 'text-blue-700'
+                      }`}>Add Subquestion:</Label>
                       <Select onValueChange={handleAddSubquestion}>
-                        <SelectTrigger className="flex-1 h-9 text-sm bg-white border-blue-300 hover:border-blue-400 focus:ring-blue-500">
+                        <SelectTrigger className={`flex-1 h-9 text-sm bg-white ${
+                          subquestions.length === 0
+                            ? 'border-green-300 hover:border-green-400 focus:ring-green-500'
+                            : 'border-blue-300 hover:border-blue-400 focus:ring-blue-500'
+                        }`}>
                           <SelectValue placeholder="Select question type..." />
                         </SelectTrigger>
                         <SelectContent>

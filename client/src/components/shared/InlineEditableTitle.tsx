@@ -6,6 +6,8 @@ interface InlineEditableTitleProps {
   onSave: (value: string) => void;
   className?: string;
   placeholder?: string;
+  autoFocus?: boolean;
+  onEnterKey?: () => void;
 }
 
 export function InlineEditableTitle({
@@ -13,8 +15,10 @@ export function InlineEditableTitle({
   onSave,
   className = "",
   placeholder = "Enter title...",
+  autoFocus = false,
+  onEnterKey,
 }: InlineEditableTitleProps) {
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(autoFocus);
   const [localValue, setLocalValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -53,6 +57,9 @@ export function InlineEditableTitle({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       handleSave();
+      if (onEnterKey) {
+        onEnterKey();
+      }
     } else if (e.key === "Escape") {
       setLocalValue(value);
       setIsEditing(false);
