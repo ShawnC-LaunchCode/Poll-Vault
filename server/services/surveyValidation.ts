@@ -6,12 +6,40 @@ export interface ValidationError {
   field: string;
   message: string;
   severity: "error" | "warning";
+  questionId?: string;  // Added to identify specific question
+  pageId?: string;      // Added to identify page
 }
 
 export interface ValidationResult {
   valid: boolean;
   errors: ValidationError[];
   warnings: ValidationError[];
+}
+
+/**
+ * Helper function to check if text appears to be default/placeholder text
+ */
+function isDefaultText(text: string): boolean {
+  if (!text || text.trim().length === 0) return true;
+
+  const defaultPatterns = [
+    /^option\s*\d+$/i,           // "Option 1", "Option 2", etc.
+    /^choice\s*\d+$/i,           // "Choice 1", "Choice 2", etc.
+    /^answer\s*\d+$/i,           // "Answer 1", "Answer 2", etc.
+    /^enter\s+(your\s+)?question/i, // "Enter question", "Enter your question"
+    /^question\s+text$/i,        // "Question text"
+    /^untitled/i,                // "Untitled question"
+  ];
+
+  return defaultPatterns.some(pattern => pattern.test(text.trim()));
+}
+
+/**
+ * Helper function to check if an option appears to be empty or default
+ */
+function isEmptyOrDefaultOption(option: string): boolean {
+  if (!option || option.trim().length === 0) return true;
+  return isDefaultText(option);
 }
 
 /**
@@ -132,16 +160,51 @@ export async function validateSurveyForPublish(
         .where(eq(questions.pageId, page.id));
 
       for (const question of pageQuestions) {
-        // Check multiple choice/radio questions have options
-        if (
-          (question.type === "multiple_choice" || question.type === "radio") &&
-          (!question.options || (Array.isArray(question.options) && question.options.length === 0))
-        ) {
+        // Check for empty or default question titles (now an ERROR, not warning)
+        if (!question.title || question.title.trim().length === 0) {
           errors.push({
             field: "questions",
-            message: `Question "${question.title}" (${question.type}) has no options`,
+            message: `Question on page "${page.title || page.order}" has no title`,
             severity: "error",
+            questionId: question.id,
+            pageId: page.id,
           });
+        } else if (isDefaultText(question.title)) {
+          errors.push({
+            field: "questions",
+            message: `Question "${question.title}" on page "${page.title || page.order}" appears to have default/placeholder text`,
+            severity: "error",
+            questionId: question.id,
+            pageId: page.id,
+          });
+        }
+
+        // Check multiple choice/radio questions have valid options
+        if (question.type === "multiple_choice" || question.type === "radio") {
+          const options = Array.isArray(question.options) ? question.options : [];
+
+          if (options.length === 0) {
+            errors.push({
+              field: "questions",
+              message: `Question "${question.title}" (${question.type}) has no options`,
+              severity: "error",
+              questionId: question.id,
+              pageId: page.id,
+            });
+          } else {
+            // Check each option for empty or default text
+            const emptyOrDefaultOptions = options.filter((opt: string) => isEmptyOrDefaultOption(opt));
+
+            if (emptyOrDefaultOptions.length > 0) {
+              errors.push({
+                field: "questions",
+                message: `Question "${question.title}" has ${emptyOrDefaultOptions.length} empty or default option(s) (e.g., "Option 1", "Option 2")`,
+                severity: "error",
+                questionId: question.id,
+                pageId: page.id,
+              });
+            }
+          }
         }
 
         // Check loop groups have proper configuration
@@ -150,15 +213,8 @@ export async function validateSurveyForPublish(
             field: "questions",
             message: `Loop group question "${question.title}" has no loop configuration`,
             severity: "error",
-          });
-        }
-
-        // Warn about questions without titles
-        if (!question.title || question.title.trim().length === 0) {
-          warnings.push({
-            field: "questions",
-            message: `Question on page ${page.order} has no title`,
-            severity: "warning",
+            questionId: question.id,
+            pageId: page.id,
           });
         }
       }

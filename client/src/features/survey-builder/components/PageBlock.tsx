@@ -15,6 +15,7 @@ interface PageBlockProps {
   page: SurveyPage;
   questions: Question[];
   isCollapsed: boolean;
+  errorQuestionIds?: Set<string>;
   onToggleCollapse: (pageId: string) => void;
   onUpdatePage: (pageId: string, data: Partial<SurveyPage>) => void;
   onCopyPage: (pageId: string) => void;
@@ -30,6 +31,7 @@ export function PageBlock({
   page,
   questions,
   isCollapsed,
+  errorQuestionIds,
   onToggleCollapse,
   onUpdatePage,
   onCopyPage,
@@ -154,6 +156,7 @@ export function PageBlock({
                   <QuestionCard
                     key={question.id}
                     question={question}
+                    hasError={errorQuestionIds?.has(question.id)}
                     onUpdateQuestion={onUpdateQuestion}
                     onCopyQuestion={onCopyQuestion}
                     onDeleteQuestion={onDeleteQuestion}

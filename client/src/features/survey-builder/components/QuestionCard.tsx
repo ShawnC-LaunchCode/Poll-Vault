@@ -18,6 +18,7 @@ import type { FlushFunction } from "@/hooks/useSaveCoordinator";
 
 interface QuestionCardProps {
   question: Question;
+  hasError?: boolean;
   onUpdateQuestion: (questionId: string, data: Partial<Question>) => void;
   onCopyQuestion: (questionId: string) => void;
   onDeleteQuestion: (questionId: string) => void;
@@ -37,6 +38,7 @@ const questionTypeLabels: Record<string, string> = {
 
 export function QuestionCard({
   question,
+  hasError = false,
   onUpdateQuestion,
   onCopyQuestion,
   onDeleteQuestion,
@@ -481,9 +483,12 @@ export function QuestionCard({
   return (
     <Card
       ref={setNodeRef}
+      id={`question-${question.id}`}
       style={style}
       className={`bg-gray-50 ml-8 mb-2 transition-all ${
-        isDragging ? "shadow-lg ring-2 ring-primary" : "hover:shadow-md"
+        isDragging ? "shadow-lg ring-2 ring-primary" :
+        hasError ? "shadow-md border-2 border-red-500 ring-1 ring-red-200" :
+        "hover:shadow-md"
       }`}
     >
       <CardContent className="p-3">

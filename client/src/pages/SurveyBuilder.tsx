@@ -23,7 +23,9 @@ import { useReorderPages, useReorderQuestions } from "@/hooks/useReordering";
 import { useKeyboardShortcuts, type KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { useSaveCoordinator } from "@/hooks/useSaveCoordinator";
+import { apiRequest } from "@/lib/queryClient";
 import { PublishChecklistModal } from "@/components/survey/PublishChecklistModal";
+import { ValidationErrorModal } from "@/components/survey/ValidationErrorModal";
 import {
   TopNavBar,
   BlocksToolbar,
@@ -35,6 +37,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import type { SurveyPage, Question } from "@shared/schema";
+
+interface ValidationError {
+  field: string;
+  message: string;
+  severity: "error" | "warning";
+  questionId?: string;
+  pageId?: string;
+}
 
 export default function SurveyBuilder() {
   const { surveyId } = useParams();
@@ -53,6 +63,11 @@ export default function SurveyBuilder() {
 
   // Keyboard shortcuts modal state
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+
+  // Validation error state
+  const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [errorQuestionIds, setErrorQuestionIds] = useState<Set<string>>(new Set());
 
   // Filter input ref for keyboard shortcut
   const filterInputRef = useRef<HTMLInputElement>(null);
@@ -152,9 +167,58 @@ export default function SurveyBuilder() {
   };
 
   // Handler for toggling active/inactive status
-  const handleActivateToggle = (checked: boolean) => {
-    const newStatus = checked ? "open" : "draft";
-    setSurveyData({ ...surveyData, status: newStatus });
+  const handleActivateToggle = async (checked: boolean) => {
+    if (!checked) {
+      // Deactivating (open → draft) - no validation needed
+      const newStatus = "draft";
+      setSurveyData({ ...surveyData, status: newStatus });
+      return;
+    }
+
+    // Activating (draft → open) - validate first
+    try {
+      const response = await apiRequest("GET", `/api/surveys/${effectiveSurveyId}/validate`);
+      const validationResult = await response.json();
+
+      if (!validationResult.valid) {
+        // Validation failed - show error modal and don't change status
+        setValidationErrors(validationResult.errors);
+        setShowValidationModal(true);
+
+        // Track which question IDs have errors for highlighting
+        const questionIds = new Set<string>(
+          validationResult.errors
+            .filter((e: ValidationError) => e.questionId)
+            .map((e: ValidationError) => e.questionId as string)
+        );
+        setErrorQuestionIds(questionIds);
+
+        toast({
+          title: "Cannot Activate Survey",
+          description: `Please fix ${validationResult.errors.length} validation error(s)`,
+          variant: "destructive",
+        });
+      } else {
+        // Validation passed - activate survey
+        const newStatus = "open";
+        setSurveyData({ ...surveyData, status: newStatus });
+
+        // Clear any previous errors
+        setValidationErrors([]);
+        setErrorQuestionIds(new Set());
+
+        toast({
+          title: "Survey Activated",
+          description: "Your survey is now open for responses",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Validation Failed",
+        description: error instanceof Error ? error.message : "Failed to validate survey",
+        variant: "destructive",
+      });
+    }
   };
 
   // Preview handler (for keyboard shortcut)
@@ -188,6 +252,35 @@ export default function SurveyBuilder() {
       }
       return newSet;
     });
+  };
+
+  // Handle clicking on validation error - scroll to question and expand page
+  const handleValidationErrorClick = (error: ValidationError) => {
+    // Close the validation modal
+    setShowValidationModal(false);
+
+    // Expand the page containing the error
+    if (error.pageId && collapsedPageIds.has(error.pageId)) {
+      handleTogglePageCollapse(error.pageId);
+    }
+
+    // Switch to blocks tab if not already there
+    setActiveTab("blocks");
+
+    // Scroll to the question
+    setTimeout(() => {
+      if (error.questionId) {
+        const questionElement = document.getElementById(`question-${error.questionId}`);
+        if (questionElement) {
+          questionElement.scrollIntoView({ behavior: "smooth", block: "center" });
+          // Add a temporary highlight animation
+          questionElement.classList.add("ring-2", "ring-red-500", "ring-offset-2");
+          setTimeout(() => {
+            questionElement.classList.remove("ring-2", "ring-red-500", "ring-offset-2");
+          }, 2000);
+        }
+      }
+    }, 300); // Wait for page to expand
   };
 
   // Drag-and-drop sensors
@@ -512,6 +605,7 @@ export default function SurveyBuilder() {
                               page={page}
                               questions={pageQuestions}
                               isCollapsed={collapsedPageIds.has(page.id)}
+                              errorQuestionIds={errorQuestionIds}
                               onToggleCollapse={handleTogglePageCollapse}
                               onUpdatePage={handleUpdatePage}
                               onCopyPage={handleCopyPage}
@@ -604,6 +698,14 @@ export default function SurveyBuilder() {
           onSuccess={handlePublishSuccess}
         />
       )}
+
+      {/* Validation Error Modal */}
+      <ValidationErrorModal
+        open={showValidationModal}
+        errors={validationErrors}
+        onClose={() => setShowValidationModal(false)}
+        onErrorClick={handleValidationErrorClick}
+      />
 
       {/* Keyboard Shortcuts Help Modal */}
       <KeyboardShortcutsHelp
