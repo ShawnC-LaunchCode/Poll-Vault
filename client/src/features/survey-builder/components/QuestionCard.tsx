@@ -42,7 +42,20 @@ export function QuestionCard({
   onDeleteQuestion,
   registerFlush,
 }: QuestionCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  // Determine if this question should start expanded
+  // Expand by default if it's a new question that needs configuration:
+  // - Radio/Multiple Choice with no options
+  // - Loop Group (always needs configuration)
+  const shouldStartExpanded = () => {
+    const hasOptions = question.type === "multiple_choice" || question.type === "radio";
+    const isLoopGroup = question.type === "loop_group";
+    const options = (question.options as string[]) || [];
+
+    // Expand if it's a loop group, or if it's a choice question with no/empty options
+    return isLoopGroup || (hasOptions && options.filter(o => o.trim()).length === 0);
+  };
+
+  const [isExpanded, setIsExpanded] = useState(shouldStartExpanded());
   const [localOptions, setLocalOptions] = useState<string[]>(
     (question.options as string[]) || []
   );
