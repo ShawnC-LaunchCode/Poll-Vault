@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -43,7 +43,14 @@ export function LoopSubquestionCard({
 }: LoopSubquestionCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [localTitle, setLocalTitle] = useState(subquestion.title);
   const queryClient = useQueryClient();
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Update local title when subquestion prop changes
+  useEffect(() => {
+    setLocalTitle(subquestion.title);
+  }, [subquestion.title]);
 
   const isLoopGroup = subquestion.type === "loop_group";
   const indentLevel = depth * 24; // 24px per nesting level
@@ -129,6 +136,33 @@ export function LoopSubquestionCard({
     }
   });
 
+  // Handle title change with debouncing
+  const handleTitleChange = (newTitle: string) => {
+    setLocalTitle(newTitle);
+
+    // Clear existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Set new timer to update after 500ms of inactivity
+    debounceTimerRef.current = setTimeout(() => {
+      updateSubquestionMutation.mutate({
+        id: subquestion.id,
+        data: { title: newTitle }
+      });
+    }, 500);
+  };
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
   // Handle loop config changes
   const handleLoopConfigChange = (field: string, value: any) => {
     const currentConfig = subquestion.loopConfig || {};
@@ -178,11 +212,8 @@ export function LoopSubquestionCard({
                 <div className="flex items-center gap-2 mb-2">
                   {isLoopGroup && <span className="text-base">🔁</span>}
                   <Input
-                    value={subquestion.title}
-                    onChange={(e) => updateSubquestionMutation.mutate({
-                      id: subquestion.id,
-                      data: { title: e.target.value }
-                    })}
+                    value={localTitle}
+                    onChange={(e) => handleTitleChange(e.target.value)}
                     className="text-sm font-medium"
                   />
                 </div>
