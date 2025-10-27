@@ -48,8 +48,8 @@ export function useReorderQuestions(surveyId: string) {
       });
     },
     onSuccess: () => {
-      // Invalidate all question caches for this survey
-      queryClient.invalidateQueries({ queryKey: ["/api/pages"] });
+      // Invalidate the pages cache which includes nested questions
+      queryClient.invalidateQueries({ queryKey: ["/api/surveys", surveyId, "pages"] });
       toast({
         title: "Success",
         description: "Questions reordered successfully",
