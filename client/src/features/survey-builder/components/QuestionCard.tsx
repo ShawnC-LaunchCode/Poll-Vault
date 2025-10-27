@@ -519,30 +519,16 @@ export function QuestionCard({
 
                 {/* Subquestions */}
                 <div className="border-t pt-4">
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="mb-3">
                     <Label className="text-xs font-medium text-gray-600">Subquestions</Label>
-                    <Select onValueChange={handleAddSubquestion}>
-                      <SelectTrigger className="w-[180px] h-8 text-xs">
-                        <SelectValue placeholder="Add subquestion" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="short_text">Short Text</SelectItem>
-                        <SelectItem value="long_text">Long Text</SelectItem>
-                        <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
-                        <SelectItem value="radio">Radio</SelectItem>
-                        <SelectItem value="yes_no">Yes/No</SelectItem>
-                        <SelectItem value="date_time">Date/Time</SelectItem>
-                        <SelectItem value="loop_group">🔁 Nested Loop</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
 
                   {subquestions.length === 0 ? (
-                    <div className="text-center py-4 text-xs text-gray-400 border-2 border-dashed rounded">
-                      No subquestions yet. Add one to get started.
+                    <div className="text-center py-4 text-xs text-gray-400 border-2 border-dashed rounded mb-3">
+                      No subquestions yet. Add one below to get started.
                     </div>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-2 mb-3">
                       {subquestions.map((subq: any) => (
                         <LoopSubquestionCard
                           key={subq.id}
@@ -553,6 +539,28 @@ export function QuestionCard({
                       ))}
                     </div>
                   )}
+
+                  {/* Add Subquestion Dropdown - Now at the bottom and more prominent */}
+                  <div className="mt-3 p-3 bg-blue-50 border-2 border-blue-200 border-dashed rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Plus className="h-4 w-4 text-blue-600" />
+                      <Label className="text-xs font-medium text-blue-700">Add Subquestion:</Label>
+                      <Select onValueChange={handleAddSubquestion}>
+                        <SelectTrigger className="flex-1 h-9 text-sm bg-white border-blue-300 hover:border-blue-400 focus:ring-blue-500">
+                          <SelectValue placeholder="Select question type..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="short_text">Short Text</SelectItem>
+                          <SelectItem value="long_text">Long Text</SelectItem>
+                          <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
+                          <SelectItem value="radio">Radio</SelectItem>
+                          <SelectItem value="yes_no">Yes/No</SelectItem>
+                          <SelectItem value="date_time">Date/Time</SelectItem>
+                          <SelectItem value="loop_group">🔁 Nested Loop</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
