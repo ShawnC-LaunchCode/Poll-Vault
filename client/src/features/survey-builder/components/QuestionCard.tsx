@@ -8,7 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { InlineEditableTitle } from "@/components/shared/InlineEditableTitle";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Question } from "@shared/schema";
 import type { FlushFunction } from "@/hooks/useSaveCoordinator";
 
@@ -217,6 +220,93 @@ export function QuestionCard({
   }, [isExpanded, localOptions, question.id, question.options, onUpdateQuestion]);
 
   const hasOptions = question.type === "multiple_choice" || question.type === "radio";
+  const isLoopGroup = question.type === "loop_group";
+
+  // Loop group subquestions management
+  const queryClient = useQueryClient();
+
+  // Fetch subquestions for loop group
+  const { data: subquestions = [] } = useQuery({
+    queryKey: ['/api/questions', question.id, 'subquestions'],
+    queryFn: async () => {
+      if (!isLoopGroup) return [];
+      const res = await fetch(`/api/questions/${question.id}/subquestions`, {
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Failed to fetch subquestions');
+      return res.json();
+    },
+    enabled: isLoopGroup && isExpanded
+  });
+
+  // Create subquestion mutation
+  const createSubquestionMutation = useMutation({
+    mutationFn: async (data: { type: string; title: string; order: number }) => {
+      const res = await fetch(`/api/questions/${question.id}/subquestions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error('Failed to create subquestion');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/questions', question.id, 'subquestions'] });
+    }
+  });
+
+  // Update subquestion mutation
+  const updateSubquestionMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await fetch(`/api/subquestions/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error('Failed to update subquestion');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/questions', question.id, 'subquestions'] });
+    }
+  });
+
+  // Delete subquestion mutation
+  const deleteSubquestionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/subquestions/${id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Failed to delete subquestion');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/questions', question.id, 'subquestions'] });
+    }
+  });
+
+  // Handle loop config changes
+  const handleLoopConfigChange = (field: string, value: any) => {
+    const currentConfig = question.loopConfig as any || {};
+    onUpdateQuestion(question.id, {
+      loopConfig: {
+        ...currentConfig,
+        [field]: value
+      } as any
+    });
+  };
+
+  // Add subquestion
+  const handleAddSubquestion = (type: string) => {
+    createSubquestionMutation.mutate({
+      type,
+      title: `New ${type.replace('_', ' ')} question`,
+      order: subquestions.length + 1
+    });
+  };
 
   return (
     <Card
@@ -371,6 +461,130 @@ export function QuestionCard({
                     <Plus className="h-3.5 w-3.5" />
                     Add Option
                   </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Loop Group Configuration */}
+            {isLoopGroup && (
+              <div className="space-y-4 border-t pt-4">
+                <h4 className="text-sm font-medium text-gray-700">Loop Configuration</h4>
+
+                {/* Min/Max Iterations */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-medium text-gray-600">Min Items</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={(question.loopConfig as any)?.minIterations || 1}
+                      onChange={(e) => handleLoopConfigChange('minIterations', parseInt(e.target.value))}
+                      className="text-sm"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-medium text-gray-600">Max Items</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={(question.loopConfig as any)?.maxIterations || 5}
+                      onChange={(e) => handleLoopConfigChange('maxIterations', parseInt(e.target.value))}
+                      className="text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Button Text */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-medium text-gray-600">Add Button Text</Label>
+                    <Input
+                      value={(question.loopConfig as any)?.addButtonText || 'Add Item'}
+                      onChange={(e) => handleLoopConfigChange('addButtonText', e.target.value)}
+                      placeholder="Add Item"
+                      className="text-sm"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-medium text-gray-600">Remove Button Text</Label>
+                    <Input
+                      value={(question.loopConfig as any)?.removeButtonText || 'Remove'}
+                      onChange={(e) => handleLoopConfigChange('removeButtonText', e.target.value)}
+                      placeholder="Remove"
+                      className="text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Subquestions */}
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="text-xs font-medium text-gray-600">Subquestions</Label>
+                    <Select onValueChange={handleAddSubquestion}>
+                      <SelectTrigger className="w-[180px] h-8 text-xs">
+                        <SelectValue placeholder="Add subquestion" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="short_text">Short Text</SelectItem>
+                        <SelectItem value="long_text">Long Text</SelectItem>
+                        <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
+                        <SelectItem value="radio">Radio</SelectItem>
+                        <SelectItem value="yes_no">Yes/No</SelectItem>
+                        <SelectItem value="date_time">Date/Time</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {subquestions.length === 0 ? (
+                    <div className="text-center py-4 text-xs text-gray-400 border-2 border-dashed rounded">
+                      No subquestions yet. Add one to get started.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {subquestions.map((subq: any) => (
+                        <Card key={subq.id} className="bg-white">
+                          <CardContent className="p-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <Input
+                                  value={subq.title}
+                                  onChange={(e) => updateSubquestionMutation.mutate({
+                                    id: subq.id,
+                                    data: { title: e.target.value }
+                                  })}
+                                  className="text-sm font-medium mb-2"
+                                />
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="text-xs">
+                                    {subq.type.replace('_', ' ')}
+                                  </Badge>
+                                  <label className="flex items-center gap-1 text-xs text-gray-600">
+                                    <Switch
+                                      checked={subq.required || false}
+                                      onCheckedChange={(checked) => updateSubquestionMutation.mutate({
+                                        id: subq.id,
+                                        data: { required: checked }
+                                      })}
+                                      className="scale-75"
+                                    />
+                                    Required
+                                  </label>
+                                </div>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => deleteSubquestionMutation.mutate(subq.id)}
+                                className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
