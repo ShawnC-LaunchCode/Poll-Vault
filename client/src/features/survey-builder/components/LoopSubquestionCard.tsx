@@ -7,6 +7,16 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface LoopSubquestionCardProps {
@@ -32,10 +42,15 @@ export function LoopSubquestionCard({
   depth = 0
 }: LoopSubquestionCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const queryClient = useQueryClient();
 
   const isLoopGroup = subquestion.type === "loop_group";
   const indentLevel = depth * 24; // 24px per nesting level
+
+  // Progressive background shading based on depth
+  const backgroundShades = ["bg-white", "bg-gray-50", "bg-gray-100", "bg-gray-150"];
+  const backgroundColor = backgroundShades[Math.min(depth, backgroundShades.length - 1)];
 
   // Fetch nested subquestions if this is a loop group
   const { data: nestedSubquestions = [] } = useQuery({
@@ -80,8 +95,22 @@ export function LoopSubquestionCard({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/questions', parentQuestionId, 'subquestions'] });
+      setShowDeleteConfirm(false);
     }
   });
+
+  // Handle delete with confirmation for loop groups
+  const handleDelete = () => {
+    if (isLoopGroup && nestedSubquestions.length > 0) {
+      setShowDeleteConfirm(true);
+    } else {
+      deleteSubquestionMutation.mutate(subquestion.id);
+    }
+  };
+
+  const confirmDelete = () => {
+    deleteSubquestionMutation.mutate(subquestion.id);
+  };
 
   // Create nested subquestion mutation
   const createNestedSubquestionMutation = useMutation({
@@ -124,38 +153,42 @@ export function LoopSubquestionCard({
   };
 
   return (
-    <Card className="bg-white border-l-4 border-l-blue-400" style={{ marginLeft: `${indentLevel}px` }}>
-      <CardContent className="p-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-start gap-2 flex-1 min-w-0">
-            {/* Expand/Collapse for loop groups */}
-            {isLoopGroup && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="h-7 w-7 p-0 shrink-0"
-              >
-                {isExpanded ? (
-                  <ChevronDown className="h-4 w-4" />
-                ) : (
-                  <ChevronRight className="h-4 w-4" />
-                )}
-              </Button>
-            )}
+    <>
+      <Card className={`${backgroundColor} border-l-4 border-l-blue-400`} style={{ marginLeft: `${indentLevel}px` }}>
+        <CardContent className="p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2 flex-1 min-w-0">
+              {/* Expand/Collapse for loop groups */}
+              {isLoopGroup && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  className="h-7 w-7 p-0 shrink-0"
+                >
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
 
-            <div className="flex-1 min-w-0">
-              <Input
-                value={subquestion.title}
-                onChange={(e) => updateSubquestionMutation.mutate({
-                  id: subquestion.id,
-                  data: { title: e.target.value }
-                })}
-                className="text-sm font-medium mb-2"
-              />
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-2">
+                  {isLoopGroup && <span className="text-base">🔁</span>}
+                  <Input
+                    value={subquestion.title}
+                    onChange={(e) => updateSubquestionMutation.mutate({
+                      id: subquestion.id,
+                      data: { title: e.target.value }
+                    })}
+                    className="text-sm font-medium"
+                  />
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant="outline" className="text-xs">
-                  {isLoopGroup ? "🔁 " : ""}{questionTypeLabels[subquestion.type] || subquestion.type}
+                  {questionTypeLabels[subquestion.type] || subquestion.type}
                 </Badge>
                 <label className="flex items-center gap-1 text-xs text-gray-600">
                   <Switch
@@ -172,15 +205,15 @@ export function LoopSubquestionCard({
             </div>
           </div>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => deleteSubquestionMutation.mutate(subquestion.id)}
-            className="h-7 w-7 p-0 text-red-500 hover:text-red-700 shrink-0"
-          >
-            <X className="h-3.5 w-3.5" />
-          </Button>
-        </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDelete}
+              className="h-7 w-7 p-0 text-red-500 hover:text-red-700 shrink-0"
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
 
         {/* Loop Group Configuration (Expanded) */}
         {isLoopGroup && isExpanded && (
@@ -274,5 +307,28 @@ export function LoopSubquestionCard({
         )}
       </CardContent>
     </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Loop Question</AlertDialogTitle>
+            <AlertDialogDescription>
+              This loop contains {nestedSubquestions.length} nested question{nestedSubquestions.length !== 1 ? 's' : ''}.
+              Deleting this loop will remove all nested subquestions. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              Delete All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
