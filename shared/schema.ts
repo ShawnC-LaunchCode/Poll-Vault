@@ -132,6 +132,7 @@ export const loopGroupSubquestions = pgTable("loop_group_subquestions", {
   description: text("description"),
   required: boolean("required").default(false),
   options: jsonb("options"),
+  loopConfig: jsonb("loop_config"), // For nested loop groups: {minIterations, maxIterations, addButtonText, removeButtonText}
   order: integer("order").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });

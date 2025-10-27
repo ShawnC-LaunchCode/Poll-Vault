@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { InlineEditableTitle } from "@/components/shared/InlineEditableTitle";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { LoopSubquestionCard } from "./LoopSubquestionCard";
 import type { Question } from "@shared/schema";
 import type { FlushFunction } from "@/hooks/useSaveCoordinator";
 
@@ -531,6 +532,7 @@ export function QuestionCard({
                         <SelectItem value="radio">Radio</SelectItem>
                         <SelectItem value="yes_no">Yes/No</SelectItem>
                         <SelectItem value="date_time">Date/Time</SelectItem>
+                        <SelectItem value="loop_group">🔁 Nested Loop</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -542,46 +544,12 @@ export function QuestionCard({
                   ) : (
                     <div className="space-y-2">
                       {subquestions.map((subq: any) => (
-                        <Card key={subq.id} className="bg-white">
-                          <CardContent className="p-3">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1 min-w-0">
-                                <Input
-                                  value={subq.title}
-                                  onChange={(e) => updateSubquestionMutation.mutate({
-                                    id: subq.id,
-                                    data: { title: e.target.value }
-                                  })}
-                                  className="text-sm font-medium mb-2"
-                                />
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="outline" className="text-xs">
-                                    {subq.type.replace('_', ' ')}
-                                  </Badge>
-                                  <label className="flex items-center gap-1 text-xs text-gray-600">
-                                    <Switch
-                                      checked={subq.required || false}
-                                      onCheckedChange={(checked) => updateSubquestionMutation.mutate({
-                                        id: subq.id,
-                                        data: { required: checked }
-                                      })}
-                                      className="scale-75"
-                                    />
-                                    Required
-                                  </label>
-                                </div>
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => deleteSubquestionMutation.mutate(subq.id)}
-                                className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
+                        <LoopSubquestionCard
+                          key={subq.id}
+                          subquestion={subq}
+                          parentQuestionId={question.id}
+                          depth={0}
+                        />
                       ))}
                     </div>
                   )}
