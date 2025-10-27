@@ -116,7 +116,7 @@ export default function SurveyPreview() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
       {/* Preview Banner */}
-      <div className="bg-blue-600 text-white py-3 px-4 shadow-md">
+      <div className="sticky top-0 z-50 bg-blue-600 text-white py-3 px-4 shadow-md">
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Eye className="h-5 w-5" />

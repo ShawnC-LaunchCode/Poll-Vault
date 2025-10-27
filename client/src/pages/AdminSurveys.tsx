@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Link } from "wouter";
-import { ArrowLeft, FileText, BarChart, Edit, User, Trash2 } from "lucide-react";
+import { ArrowLeft, FileText, BarChart, Edit, User, Trash2, Eye, Copy } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { apiRequest } from "@/lib/queryClient";
 import type { Survey } from "@shared/schema";
@@ -53,6 +53,32 @@ export default function AdminSurveys() {
       });
     },
   });
+
+  const copyLink = (survey: Survey) => {
+    const baseUrl = window.location.origin;
+    let surveyLink = '';
+
+    if (survey.publicLink) {
+      // If survey has a public link, use that
+      surveyLink = `${baseUrl}/survey/${survey.publicLink}`;
+    } else {
+      // Otherwise, use the survey ID
+      surveyLink = `${baseUrl}/survey/${survey.id}`;
+    }
+
+    navigator.clipboard.writeText(surveyLink).then(() => {
+      toast({
+        title: "Link copied",
+        description: "Survey link has been copied to clipboard",
+      });
+    }).catch(() => {
+      toast({
+        title: "Error",
+        description: "Failed to copy link to clipboard",
+        variant: "destructive",
+      });
+    });
+  };
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -155,6 +181,16 @@ export default function AdminSurveys() {
                         </div>
 
                         <div className="flex flex-wrap gap-2 pt-2">
+                          <Link href={`/surveys/${survey.id}/preview`}>
+                            <Button variant="outline" size="sm">
+                              <Eye className="w-4 h-4 mr-1" />
+                              Preview
+                            </Button>
+                          </Link>
+                          <Button variant="outline" size="sm" onClick={() => copyLink(survey)}>
+                            <Copy className="w-4 h-4 mr-1" />
+                            Copy Link
+                          </Button>
                           <Link href={`/builder/${survey.id}`}>
                             <Button variant="outline" size="sm">
                               <Edit className="w-4 h-4 mr-1" />
