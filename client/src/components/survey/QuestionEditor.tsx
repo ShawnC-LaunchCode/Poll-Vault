@@ -614,12 +614,13 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
               <label className="block text-sm font-medium text-foreground">Answer Options</label>
               <div className="space-y-2">
                 {questionData.options.map((option, index) => (
-                  <div key={index} className="flex items-center space-x-2">
+                  <div key={`option-${index}-${option.substring(0, 10)}`} className="flex items-center space-x-2">
                     <Input
                       placeholder={`Option ${index + 1}`}
                       value={option}
                       onChange={(e) => updateOption(index, e.target.value)}
                       data-testid={`input-option-${index}`}
+                      autoComplete="off"
                     />
                     <Button
                       variant="ghost"
@@ -728,12 +729,13 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
                     <label className="block text-sm font-medium text-foreground">Answer Options</label>
                     <div className="space-y-2">
                       {subquestionData.options.map((option, index) => (
-                        <div key={index} className="flex items-center space-x-2">
+                        <div key={`subq-option-${index}-${option.substring(0, 10)}`} className="flex items-center space-x-2">
                           <Input
                             placeholder={`Option ${index + 1}`}
                             value={option}
                             onChange={(e) => updateSubquestionOption(index, e.target.value)}
                             data-testid={`input-subquestion-option-${index}`}
+                            autoComplete="off"
                           />
                           <Button
                             variant="ghost"
