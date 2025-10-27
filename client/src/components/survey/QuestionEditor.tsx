@@ -166,9 +166,10 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
         order: questionCount + 1
       });
     },
-    onSuccess: () => {
+    onSuccess: (newQuestion: Question) => {
       queryClient.invalidateQueries({ queryKey: ["/api/pages", pageId, "questions"] });
-      resetForm();
+      // Select the newly created question for editing
+      onQuestionSelect(newQuestion.id);
       toast({
         title: "Success",
         description: "Question created successfully",
@@ -472,7 +473,19 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
               key={type.value}
               variant={questionData.type === type.value ? "default" : "outline"}
               className="flex items-center space-x-3 p-3 h-auto text-left justify-start"
-              onClick={() => setQuestionData(prev => ({ ...prev, type: type.value }))}
+              onClick={() => {
+                // Auto-populate options for radio and multiple choice
+                if ((type.value === 'radio' || type.value === 'multiple_choice') && questionData.options.length === 0) {
+                  // Generate stable keys for 2 default options
+                  optionKeysRef.current = [
+                    `option-${Date.now()}-0`,
+                    `option-${Date.now()}-1`
+                  ];
+                  setQuestionData(prev => ({ ...prev, type: type.value, options: ['', ''] }));
+                } else {
+                  setQuestionData(prev => ({ ...prev, type: type.value }));
+                }
+              }}
               data-testid={`button-question-type-${type.value}`}
             >
               <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
@@ -511,7 +524,7 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
           </div>
 
           <div className="flex items-center space-x-4">
-            <label className="flex items-center space-x-2">
+            <label className="flex items-center gap-2 lg:gap-1.5">
               <Checkbox
                 checked={questionData.required}
                 onCheckedChange={(checked) => setQuestionData(prev => ({ ...prev, required: !!checked }))}
@@ -570,7 +583,7 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
                 </div>
               </div>
               <div>
-                <label className="flex items-center space-x-2">
+                <label className="flex items-center gap-2 lg:gap-1.5">
                   <Checkbox
                     checked={questionData.loopConfig?.allowReorder || false}
                     onCheckedChange={(checked) => updateLoopConfig('allowReorder', !!checked)}
@@ -627,7 +640,7 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
               </div>
 
               <div className="flex items-center space-x-4">
-                <label className="flex items-center space-x-2">
+                <label className="flex items-center gap-2 lg:gap-1.5">
                   <Checkbox
                     checked={questionData.fileUploadConfig?.allowMultiple || true}
                     onCheckedChange={(checked) => updateFileUploadConfig('allowMultiple', !!checked)}
@@ -710,6 +723,8 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
               <Button
                 onClick={() => setShowSubquestionForm(!showSubquestionForm)}
                 size="sm"
+                variant={subquestions.length === 0 ? "default" : "default"}
+                className={subquestions.length === 0 ? "bg-green-600 hover:bg-green-700" : ""}
                 data-testid="button-add-subquestion"
               >
                 <i className="fas fa-plus mr-2"></i>
@@ -750,7 +765,7 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
                 </div>
 
                 <div className="flex items-center space-x-4">
-                  <label className="flex items-center space-x-2">
+                  <label className="flex items-center gap-2 lg:gap-1.5">
                     <Checkbox
                       checked={subquestionData.required}
                       onCheckedChange={(checked) => setSubquestionData(prev => ({ ...prev, required: !!checked }))}
