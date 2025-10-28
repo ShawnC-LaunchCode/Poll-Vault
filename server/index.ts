@@ -1,9 +1,6 @@
 import dotenv from "dotenv";
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
-import session from 'express-session'; // ⬅️ NEW IMPORT: For session management
-import connectPgSimple from 'connect-pg-simple'; // ⬅️ NEW IMPORT: Assuming PostgreSQL store
-import passport from 'passport'; // ⬅️ NEW IMPORT: Assuming Passport is used for authentication
 import { registerRoutes } from "./routes";
 import { log } from "./utils";
 import { serveStatic } from "./static";
@@ -13,37 +10,8 @@ dotenv.config();
 
 const app = express();
 
-// =====================================================================
-// 💡 FIX 3: TRUST PROXY AND CONFIGURE SECURE SESSIONS (CRITICAL FOR RAILWAY)
-// These settings fix proxy/HTTPS detection for session cookies.
-app.set('trust proxy', 1); // ⬅️ NEW: Trust the Railway proxy
-const PgStore = connectPgSimple(session);
-
-const sessionConfig = {
-    // Session secret MUST be set via Railway variable
-    secret: process.env.SESSION_SECRET || 'a-very-insecure-default', // ⬅️ NEW ENV VAR NEEDED
-    resave: false,
-    saveUninitialized: false,
-    store: new PgStore({
-        // Assuming your DB URL is named DATABASE_URL for the session store
-        conString: process.env.DATABASE_URL, 
-        tableName: 'session',
-        createTableIfMissing: true,
-    }),
-    cookie: {
-        maxAge: 1000 * 60 * 60 * 24 * 365, // 365 days (1 year - maximum lifespan)
-        secure: true, // ⬅️ MUST BE TRUE for HTTPS (Railway)
-        httpOnly: true,
-        sameSite: 'Lax' as 'lax', // For production/cross-origin flows
-    }
-};
-
-app.use(session(sessionConfig)); // ⬅️ NEW: Use Session Middleware
-
-// ⬅️ NEW: Initialize Passport (or whatever your auth library is)
-app.use(passport.initialize());
-app.use(passport.session());
-// =====================================================================
+// Note: Session and auth setup is handled by setupAuth() in registerRoutes()
+// to avoid duplicate middleware registration
 
 // =====================================================================
 // 💡 CORS CONFIGURATION
