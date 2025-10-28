@@ -7,6 +7,11 @@ import { randomUUID } from 'crypto';
 const unlinkAsync = promisify(fs.unlink);
 const mkdirAsync = promisify(fs.mkdir);
 
+// Handle CommonJS/ESM compatibility for multer
+// In Vitest/ESM mode, multer might be wrapped in { default: multer }
+// @ts-ignore - multer types don't account for ESM/CommonJS differences
+const multerInstance = (multer as any).default || multer;
+
 // File upload configuration
 export const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
 export const MAX_FILE_SIZE = process.env.MAX_FILE_SIZE ? 
@@ -35,7 +40,7 @@ async function ensureUploadDir() {
 }
 
 // Configure multer storage
-const storage = multer.diskStorage({
+const storage = multerInstance.diskStorage({
   destination: async (req, file, cb) => {
     await ensureUploadDir();
     cb(null, UPLOAD_DIR);
@@ -59,7 +64,7 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCa
 };
 
 // Create multer instance
-export const upload = multer({
+export const upload = multerInstance({
   storage,
   fileFilter,
   limits: {

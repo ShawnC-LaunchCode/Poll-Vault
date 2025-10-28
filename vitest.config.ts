@@ -8,6 +8,11 @@ export default defineConfig({
     setupFiles: ["./tests/setup.ts"],
     include: ["tests/**/*.test.ts"],
     exclude: ["tests/e2e/**/*", "node_modules/**/*"],
+    server: {
+      deps: {
+        inline: ["multer"], // Force multer to be processed by Vite/Vitest
+      },
+    },
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],

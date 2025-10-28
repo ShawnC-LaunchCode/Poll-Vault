@@ -63,16 +63,26 @@ vi.mock("google-auth-library", () => ({
   })),
 }));
 
-// Mock file upload
+// Mock file upload - multer is a CommonJS module
+// Mock file upload - multer is a CommonJS module  
 vi.mock("multer", () => {
-  const multer = () => ({
+  const multer: any = (options?: any) => ({
     single: () => (req: any, res: any, next: any) => next(),
     array: () => (req: any, res: any, next: any) => next(),
+    fields: () => (req: any, res: any, next: any) => next(),
   });
+
+  // Add diskStorage method
+  multer.diskStorage = (options: any) => ({
+    _handleFile: (req: any, file: any, cb: any) => cb(null, { path: '/tmp/test-file', size: 0 }),
+    _removeFile: (req: any, file: any, cb: any) => cb(null),
+  });
+
+  // Set default export
+  multer.default = multer;
+
   return { default: multer };
 });
-
-// Increase timeout for integration tests
 if (process.env.TEST_TYPE === "integration") {
   vi.setConfig({ testTimeout: 30000 });
 }
