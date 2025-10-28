@@ -3,6 +3,7 @@ import { isAuthenticated } from "../googleAuth";
 import { storage } from "../storage";
 import { insertRecipientSchema, insertGlobalRecipientSchema } from "@shared/schema";
 import { sendSurveyInvitation } from "../services/sendgrid";
+import { surveyService } from "../services";
 
 /**
  * Register recipient-related routes
@@ -21,9 +22,11 @@ export function registerRecipientRoutes(app: Express): void {
   app.post('/api/surveys/:surveyId/recipients', isAuthenticated, async (req: any, res) => {
     try {
       const survey = await storage.getSurvey(req.params.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
       }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       const recipientData = insertRecipientSchema.parse({ ...req.body, surveyId: req.params.surveyId });
       const recipient = await storage.createRecipient(recipientData);
@@ -41,9 +44,11 @@ export function registerRecipientRoutes(app: Express): void {
   app.get('/api/surveys/:surveyId/recipients', isAuthenticated, async (req: any, res) => {
     try {
       const survey = await storage.getSurvey(req.params.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
       }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       const recipients = await storage.getRecipientsBySurvey(req.params.surveyId);
       res.json(recipients);

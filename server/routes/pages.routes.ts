@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { storage } from "../storage";
 import { isAuthenticated } from "../googleAuth";
 import { insertSurveyPageSchema } from "@shared/schema";
+import { surveyService } from "../services";
 
 /**
  * Register survey page-related routes
@@ -15,16 +16,18 @@ export function registerPageRoutes(app: Express): void {
    */
   app.post('/api/surveys/:surveyId/pages', isAuthenticated, async (req: any, res) => {
     try {
-      const survey = await storage.getSurvey(req.params.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
-      }
+      const userId = req.user.claims.sub;
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(req.params.surveyId, userId);
 
       const pageData = insertSurveyPageSchema.parse({ ...req.body, surveyId: req.params.surveyId });
       const page = await storage.createSurveyPage(pageData);
       res.json(page);
     } catch (error) {
       console.error("Error creating page:", error);
+      if (error instanceof Error && error.message.includes("Access denied")) {
+        return res.status(403).json({ message: error.message });
+      }
       res.status(500).json({ message: "Failed to create page" });
     }
   });
@@ -35,10 +38,9 @@ export function registerPageRoutes(app: Express): void {
    */
   app.get('/api/surveys/:surveyId/pages', isAuthenticated, async (req: any, res) => {
     try {
-      const survey = await storage.getSurvey(req.params.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
-      }
+      const userId = req.user.claims.sub;
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(req.params.surveyId, userId);
 
       // Check if client wants questions included
       const includeQuestions = req.query.includeQuestions === 'true';
@@ -50,6 +52,9 @@ export function registerPageRoutes(app: Express): void {
       res.json(pages);
     } catch (error) {
       console.error("Error fetching pages:", error);
+      if (error instanceof Error && error.message.includes("Access denied")) {
+        return res.status(403).json({ message: error.message });
+      }
       res.status(500).json({ message: "Failed to fetch pages" });
     }
   });
@@ -60,10 +65,9 @@ export function registerPageRoutes(app: Express): void {
    */
   app.put('/api/surveys/:surveyId/pages/reorder', isAuthenticated, async (req: any, res) => {
     try {
-      const survey = await storage.getSurvey(req.params.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
-      }
+      const userId = req.user.claims.sub;
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(req.params.surveyId, userId);
 
       const { pages } = req.body;
       if (!pages || !Array.isArray(pages)) {
@@ -81,6 +85,9 @@ export function registerPageRoutes(app: Express): void {
       res.json(reorderedPages);
     } catch (error) {
       console.error("Error reordering pages:", error);
+      if (error instanceof Error && error.message.includes("Access denied")) {
+        return res.status(403).json({ message: error.message });
+      }
       res.status(500).json({ message: "Failed to reorder pages" });
     }
   });

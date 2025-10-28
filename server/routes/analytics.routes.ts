@@ -4,6 +4,7 @@ import { storage } from "../storage";
 import { isAuthenticated } from "../googleAuth";
 import { insertAnalyticsEventSchema } from "@shared/schema";
 import { analyticsService } from "../services/AnalyticsService";
+import { surveyService } from "../services";
 
 /**
  * Rate limiting for analytics events
@@ -130,9 +131,11 @@ export function registerAnalyticsRoutes(app: Express): void {
   app.get('/api/surveys/:surveyId/analytics/questions', isAuthenticated, async (req: any, res) => {
     try {
       const survey = await storage.getSurvey(req.params.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
       }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       const analytics = await storage.getQuestionAnalytics(req.params.surveyId);
       res.json(analytics);
@@ -179,9 +182,11 @@ export function registerAnalyticsRoutes(app: Express): void {
   app.get('/api/surveys/:surveyId/analytics/pages', isAuthenticated, async (req: any, res) => {
     try {
       const survey = await storage.getSurvey(req.params.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
       }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       const analytics = await storage.getPageAnalytics(req.params.surveyId);
       res.json(analytics);
@@ -198,9 +203,11 @@ export function registerAnalyticsRoutes(app: Express): void {
   app.get('/api/surveys/:surveyId/analytics/funnel', isAuthenticated, async (req: any, res) => {
     try {
       const survey = await storage.getSurvey(req.params.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
       }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       const funnelData = await storage.getCompletionFunnelData(req.params.surveyId);
       res.json(funnelData);
@@ -217,9 +224,11 @@ export function registerAnalyticsRoutes(app: Express): void {
   app.get('/api/surveys/:surveyId/analytics/time-spent', isAuthenticated, async (req: any, res) => {
     try {
       const survey = await storage.getSurvey(req.params.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
       }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       const timeData = await storage.getTimeSpentData(req.params.surveyId);
       res.json(timeData);
@@ -236,9 +245,11 @@ export function registerAnalyticsRoutes(app: Express): void {
   app.get('/api/surveys/:surveyId/analytics/engagement', isAuthenticated, async (req: any, res) => {
     try {
       const survey = await storage.getSurvey(req.params.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
       }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       const engagement = await storage.getEngagementMetrics(req.params.surveyId);
       res.json(engagement);
@@ -255,9 +266,11 @@ export function registerAnalyticsRoutes(app: Express): void {
   app.get('/api/surveys/:surveyId/analytics', isAuthenticated, async (req: any, res) => {
     try {
       const survey = await storage.getSurvey(req.params.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
       }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       const analytics = await storage.getAnalyticsBySurvey(req.params.surveyId);
       res.json(analytics);

@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { storage } from "../storage";
 import { isAuthenticated } from "../googleAuth";
 import { insertQuestionSchema, insertLoopGroupSubquestionSchema, insertConditionalRuleSchema } from "@shared/schema";
+import { surveyService } from "../services";
 
 /**
  * Register question-related routes
@@ -29,9 +30,8 @@ export function registerQuestionRoutes(app: Express): void {
         return res.status(404).json({ message: "Survey not found" });
       }
 
-      if (survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
-      }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       const questionData = insertQuestionSchema.parse({ ...req.body, pageId: req.params.pageId });
       const question = await storage.createQuestion(questionData);
@@ -58,9 +58,8 @@ export function registerQuestionRoutes(app: Express): void {
         return res.status(404).json({ message: "Survey not found" });
       }
 
-      if (survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
-      }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       const questions = await storage.getQuestionsWithSubquestionsByPage(req.params.pageId);
       res.json(questions);
@@ -97,9 +96,11 @@ export function registerQuestionRoutes(app: Express): void {
       }
 
       const survey = await storage.getSurvey(page.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
       }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       const updates = insertQuestionSchema.partial().parse(req.body);
       console.log('[Question Update] Parsed updates:', JSON.stringify(updates, null, 2));
@@ -148,10 +149,11 @@ export function registerQuestionRoutes(app: Express): void {
       }
 
       const survey = await storage.getSurvey(page.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        console.log('[DELETE Question] Access denied. Survey creator:', survey?.creatorId, 'User:', req.user.claims.sub);
-        return res.status(403).json({ message: "Access denied" });
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
       }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       console.log('[DELETE Question] Authorization passed. Deleting question...');
       await storage.deleteQuestion(req.params.id);
@@ -183,9 +185,11 @@ export function registerQuestionRoutes(app: Express): void {
   app.put('/api/surveys/:surveyId/questions/reorder', isAuthenticated, async (req: any, res) => {
     try {
       const survey = await storage.getSurvey(req.params.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
       }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       const { questions } = req.body;
       if (!questions || !Array.isArray(questions)) {
@@ -228,9 +232,11 @@ export function registerQuestionRoutes(app: Express): void {
       }
 
       const survey = await storage.getSurvey(page.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
       }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       if (question.type !== 'loop_group') {
         return res.status(400).json({ message: "Question is not a loop group" });
@@ -265,9 +271,11 @@ export function registerQuestionRoutes(app: Express): void {
       }
 
       const survey = await storage.getSurvey(page.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
       }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       const subquestions = await storage.getLoopGroupSubquestions(req.params.questionId);
       res.json(subquestions);
@@ -299,9 +307,11 @@ export function registerQuestionRoutes(app: Express): void {
       }
 
       const survey = await storage.getSurvey(page.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
       }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       const updates = insertLoopGroupSubquestionSchema.partial().parse(req.body);
       const updatedSubquestion = await storage.updateLoopGroupSubquestion(req.params.id, updates);
@@ -334,9 +344,11 @@ export function registerQuestionRoutes(app: Express): void {
       }
 
       const survey = await storage.getSurvey(page.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
       }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       await storage.deleteLoopGroupSubquestion(req.params.id);
       res.json({ message: "Subquestion deleted successfully" });
@@ -357,9 +369,11 @@ export function registerQuestionRoutes(app: Express): void {
   app.post('/api/surveys/:surveyId/conditional-rules', isAuthenticated, async (req: any, res) => {
     try {
       const survey = await storage.getSurvey(req.params.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
       }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       const ruleData = insertConditionalRuleSchema.parse({ ...req.body, surveyId: req.params.surveyId });
       const rule = await storage.createConditionalRule(ruleData);
@@ -377,9 +391,11 @@ export function registerQuestionRoutes(app: Express): void {
   app.get('/api/surveys/:surveyId/conditional-rules', isAuthenticated, async (req: any, res) => {
     try {
       const survey = await storage.getSurvey(req.params.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
       }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       const rules = await storage.getConditionalRulesBySurvey(req.params.surveyId);
       res.json(rules);
@@ -406,9 +422,11 @@ export function registerQuestionRoutes(app: Express): void {
       }
 
       const survey = await storage.getSurvey(page.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
       }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       const rules = await storage.getConditionalRulesByQuestion(req.params.questionId);
       res.json(rules);
@@ -430,9 +448,11 @@ export function registerQuestionRoutes(app: Express): void {
       }
 
       const survey = await storage.getSurvey(rule.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
       }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       const updates = insertConditionalRuleSchema.partial().parse(req.body);
       const updatedRule = await storage.updateConditionalRule(req.params.id, updates);
@@ -455,9 +475,11 @@ export function registerQuestionRoutes(app: Express): void {
       }
 
       const survey = await storage.getSurvey(rule.surveyId);
-      if (!survey || survey.creatorId !== req.user.claims.sub) {
-        return res.status(403).json({ message: "Access denied" });
+      if (!survey) {
+        return res.status(404).json({ message: "Survey not found" });
       }
+      // Verify ownership (allows admin access)
+      await surveyService.verifyOwnership(survey.id, req.user.claims.sub);
 
       await storage.deleteConditionalRule(req.params.id);
       res.json({ message: "Conditional rule deleted successfully" });
