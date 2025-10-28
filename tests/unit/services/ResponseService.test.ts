@@ -20,13 +20,15 @@ describe("ResponseService", () => {
   beforeEach(() => {
     mockResponseRepo = {
       create: vi.fn(),
+      createAnonymousResponse: vi.fn(),
       findById: vi.fn(),
       findBySurvey: vi.fn(),
       findByRecipient: vi.fn(),
       update: vi.fn(),
       saveAnswer: vi.fn(),
-      checkAnonymousLimit: vi.fn(),
+      checkAnonymousLimit: vi.fn().mockResolvedValue(false), // Default: not limited
       findAnswersByResponse: vi.fn(),
+      transaction: vi.fn((callback) => callback()), // Mock transaction support
     };
 
     mockSurveyRepo = {
@@ -37,6 +39,7 @@ describe("ResponseService", () => {
     mockQuestionRepo = {
       findBySurveyId: vi.fn(),
       findById: vi.fn(),
+      findByPageWithSubquestions: vi.fn(), // For completeResponse validation
     };
 
     mockRecipientRepo = {
@@ -132,7 +135,8 @@ describe("ResponseService", () => {
       });
 
       mockSurveyRepo.findByPublicLink.mockResolvedValue(survey);
-      mockResponseRepo.create.mockResolvedValue(response);
+      mockResponseRepo.checkAnonymousLimit.mockResolvedValue(false); // Not limited
+      mockResponseRepo.createAnonymousResponse.mockResolvedValue(response);
 
       const result = await service.createAnonymousResponse("public-123", {
         ipAddress: "192.168.1.1",
@@ -176,13 +180,14 @@ describe("ResponseService", () => {
           ipAddress: "192.168.1.1",
           userAgent: "Test Browser",
         })
-      ).rejects.toThrow("not enabled for anonymous");
+      ).rejects.toThrow("Anonymous responses are not allowed");
     });
   });
 
   describe("submitAnswer", () => {
     it("should save a single answer", async () => {
-      const response = createTestResponse({ completed: false });
+      const survey = createTestSurvey();
+      const response = createTestResponse({ surveyId: survey.id, completed: false });
       const question = createTestQuestion("page-1", { id: "question-123" });
       const answerData = {
         responseId: response.id,
@@ -191,6 +196,7 @@ describe("ResponseService", () => {
       };
 
       mockResponseRepo.findById.mockResolvedValue(response);
+      mockSurveyRepo.findById.mockResolvedValue(survey);
       mockQuestionRepo.findById.mockResolvedValue(question);
       mockResponseRepo.saveAnswer.mockResolvedValue(
         createTestAnswer(response.id, question.id)
@@ -213,7 +219,7 @@ describe("ResponseService", () => {
           questionId: "question-123",
           value: { text: "Late answer" },
         })
-      ).rejects.toThrow("already been completed");
+      ).rejects.toThrow("Cannot modify a completed response");
     });
 
     it("should throw error if response not found", async () => {
@@ -247,7 +253,7 @@ describe("ResponseService", () => {
       });
       mockSurveyRepo.findById.mockResolvedValue(survey);
       mockPageRepo.findBySurvey.mockResolvedValue([page]);
-      mockQuestionRepo.findBySurveyId.mockResolvedValue(questions);
+      mockQuestionRepo.findByPageWithSubquestions.mockResolvedValue(questions);
       mockResponseRepo.findAnswersByResponse.mockResolvedValue(answers);
       mockResponseRepo.update.mockResolvedValue(
         createTestCompletedResponse(survey.id, { id: response.id })
@@ -277,11 +283,11 @@ describe("ResponseService", () => {
       });
       mockSurveyRepo.findById.mockResolvedValue(survey);
       mockPageRepo.findBySurvey.mockResolvedValue([page]);
-      mockQuestionRepo.findBySurveyId.mockResolvedValue(questions);
+      mockQuestionRepo.findByPageWithSubquestions.mockResolvedValue(questions);
       mockResponseRepo.findAnswersByResponse.mockResolvedValue(answers);
 
       await expect(service.completeResponse(response.id)).rejects.toThrow(
-        "Required question"
+        "Missing required questions"
       );
     });
   });
@@ -296,7 +302,7 @@ describe("ResponseService", () => {
       mockSurveyRepo.findById.mockResolvedValue(survey);
       mockResponseRepo.findBySurvey.mockResolvedValue(responses);
 
-      const result = await service.getResponsesForSurvey(survey.id);
+      const result = await service.getResponsesForSurvey(survey.id, survey.creatorId);
 
       expect(result).toHaveLength(5);
       expect(result.every((r) => r.surveyId === survey.id)).toBe(true);
@@ -311,7 +317,7 @@ describe("ResponseService", () => {
       mockSurveyRepo.findById.mockResolvedValue(survey);
       mockResponseRepo.findBySurvey.mockResolvedValue(completedResponses);
 
-      const result = await service.getResponsesForSurvey(survey.id, true);
+      const result = await service.getResponsesForSurvey(survey.id, survey.creatorId, true);
 
       expect(result).toHaveLength(3);
       expect(result.every((r) => r.completed === true)).toBe(true);
@@ -332,8 +338,9 @@ describe("ResponseService", () => {
         survey,
         answers,
       });
+      mockSurveyRepo.findById.mockResolvedValue(survey);
 
-      const result = await service.getResponseDetails(response.id);
+      const result = await service.getResponseDetails(response.id, survey.creatorId);
 
       expect(result.id).toBe(response.id);
       expect(result.survey).toBeDefined();

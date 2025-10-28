@@ -3,6 +3,20 @@ import { AnalyticsService } from "../../../server/services/AnalyticsService";
 import { createTestSurvey, createTestPage, createTestQuestion } from "../../factories/mockFactories";
 import { createTestResponse, createTestCompletedResponse } from "../../factories/responseFactory";
 
+// Mock the storage module - AnalyticsService calls storage directly for some methods
+// Use vi.hoisted to ensure mockStorage is available during hoisting
+const mockStorage = vi.hoisted(() => ({
+  getQuestionAnalytics: vi.fn(),
+  getPageAnalytics: vi.fn(),
+  getCompletionFunnelData: vi.fn(),
+  getTimeSpentData: vi.fn(),
+  getEngagementMetrics: vi.fn(),
+}));
+
+vi.mock("../../../server/storage", () => ({
+  storage: mockStorage,
+}));
+
 describe("AnalyticsService", () => {
   let service: AnalyticsService;
   let mockAnalyticsRepo: any;
@@ -12,10 +26,14 @@ describe("AnalyticsService", () => {
   let mockPageRepo: any;
 
   beforeEach(() => {
+    // Reset all storage mocks
+    vi.clearAllMocks();
+
     mockAnalyticsRepo = {
       getAverageCompletionTime: vi.fn(),
       getQuestionMetrics: vi.fn(),
       getPageMetrics: vi.fn(),
+      getQuestionAggregates: vi.fn(),
     };
 
     mockResponseRepo = {
@@ -107,7 +125,7 @@ describe("AnalyticsService", () => {
       mockSurveyRepo.findById.mockResolvedValue(survey);
       mockPageRepo.findBySurveyId.mockResolvedValue([page]);
       mockQuestionRepo.findBySurveyId.mockResolvedValue(questions);
-      mockAnalyticsRepo.getQuestionMetrics.mockResolvedValue(mockMetrics);
+      mockStorage.getQuestionAnalytics.mockResolvedValue(mockMetrics);
 
       const result = await service.getQuestionAnalytics(survey.id, survey.creatorId);
 
@@ -140,7 +158,7 @@ describe("AnalyticsService", () => {
 
       mockSurveyRepo.findById.mockResolvedValue(survey);
       mockPageRepo.findBySurveyId.mockResolvedValue(pages);
-      mockAnalyticsRepo.getPageMetrics.mockResolvedValue(mockMetrics);
+      mockStorage.getPageAnalytics.mockResolvedValue(mockMetrics);
 
       const result = await service.getPageAnalytics(survey.id, survey.creatorId);
 
@@ -165,7 +183,7 @@ describe("AnalyticsService", () => {
 
       mockSurveyRepo.findById.mockResolvedValue(survey);
       mockPageRepo.findBySurveyId.mockResolvedValue(pages);
-      mockAnalyticsRepo.getPageMetrics.mockResolvedValue(mockMetrics);
+      mockStorage.getCompletionFunnelData.mockResolvedValue(mockMetrics);
 
       const result = await service.getCompletionFunnel(survey.id, survey.creatorId);
 
@@ -180,7 +198,7 @@ describe("AnalyticsService", () => {
 
       mockSurveyRepo.findById.mockResolvedValue(survey);
       mockPageRepo.findBySurveyId.mockResolvedValue(pages);
-      mockAnalyticsRepo.getPageMetrics.mockResolvedValue(mockMetrics);
+      mockStorage.getCompletionFunnelData.mockResolvedValue(mockMetrics);
 
       const result = await service.getCompletionFunnel(survey.id, survey.creatorId);
 
@@ -199,7 +217,11 @@ describe("AnalyticsService", () => {
 
       mockSurveyRepo.findById.mockResolvedValue(survey);
       mockResponseRepo.findBySurvey.mockResolvedValue(responses);
-      mockAnalyticsRepo.getAverageCompletionTime.mockResolvedValue(300);
+      mockStorage.getTimeSpentData.mockResolvedValue({
+        averageTime: 300,
+        medianTime: 300,
+        responses: 2,
+      });
 
       const result = await service.getTimeSpentData(survey.id, survey.creatorId);
 
@@ -212,7 +234,11 @@ describe("AnalyticsService", () => {
 
       mockSurveyRepo.findById.mockResolvedValue(survey);
       mockResponseRepo.findBySurvey.mockResolvedValue([]);
-      mockAnalyticsRepo.getAverageCompletionTime.mockResolvedValue(null);
+      mockStorage.getTimeSpentData.mockResolvedValue({
+        averageTime: null,
+        medianTime: null,
+        responses: 0,
+      });
 
       const result = await service.getTimeSpentData(survey.id, survey.creatorId);
 
@@ -231,7 +257,12 @@ describe("AnalyticsService", () => {
 
       mockSurveyRepo.findById.mockResolvedValue(survey);
       mockResponseRepo.findBySurvey.mockResolvedValue(responses);
-      mockAnalyticsRepo.getAverageCompletionTime.mockResolvedValue(240);
+      mockStorage.getEngagementMetrics.mockResolvedValue({
+        totalResponses: 100,
+        completedResponses: 80,
+        abandonmentRate: 0.2,
+        averageCompletionTime: 240,
+      });
 
       const result = await service.getEngagementMetrics(survey.id, survey.creatorId);
 
@@ -245,7 +276,12 @@ describe("AnalyticsService", () => {
 
       mockSurveyRepo.findById.mockResolvedValue(survey);
       mockResponseRepo.findBySurvey.mockResolvedValue([]);
-      mockAnalyticsRepo.getAverageCompletionTime.mockResolvedValue(null);
+      mockStorage.getEngagementMetrics.mockResolvedValue({
+        totalResponses: 0,
+        completedResponses: 0,
+        abandonmentRate: 0,
+        averageCompletionTime: null,
+      });
 
       const result = await service.getEngagementMetrics(survey.id, survey.creatorId);
 
@@ -279,6 +315,7 @@ describe("AnalyticsService", () => {
       mockResponseRepo.findBySurvey.mockResolvedValue([
         createTestCompletedResponse(survey.id),
       ]);
+      mockAnalyticsRepo.getQuestionAggregates.mockResolvedValue({});
 
       const result = await service.getQuestionAggregates(survey.id, survey.creatorId);
 

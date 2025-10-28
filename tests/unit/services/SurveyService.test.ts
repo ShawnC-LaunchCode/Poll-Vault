@@ -3,6 +3,14 @@ import { SurveyService } from "../../../server/services/SurveyService";
 import { createTestSurvey, createTestSurveyWithQuestions, createTestPage } from "../../factories/mockFactories";
 import { createTestUser } from "../../factories/userFactory";
 
+// Mock surveyValidation module - canChangeStatus calls database
+const mockCanChangeStatus = vi.hoisted(() => vi.fn());
+
+vi.mock("../../../server/services/surveyValidation", () => ({
+  canChangeStatus: mockCanChangeStatus,
+  validateSurveyForPublish: vi.fn().mockResolvedValue({ valid: true, errors: [] }),
+}));
+
 describe("SurveyService", () => {
   let service: SurveyService;
   let mockSurveyRepo: any;
@@ -11,6 +19,9 @@ describe("SurveyService", () => {
   let mockUserRepo: any;
 
   beforeEach(() => {
+    // Reset mocks
+    vi.clearAllMocks();
+
     // Create mock repositories
     mockSurveyRepo = {
       create: vi.fn(),
@@ -234,10 +245,11 @@ describe("SurveyService", () => {
       mockPageRepo.findBySurvey.mockResolvedValue([createTestPage(survey.id)]);
       mockQuestionRepo.findBySurveyId.mockResolvedValue([]);
       mockSurveyRepo.update.mockResolvedValue({ ...survey, status: "open" });
+      mockCanChangeStatus.mockResolvedValue({ allowed: true });
 
       const result = await service.changeStatus(survey.id, user.id, "open");
 
-      expect(result?.status).toBe("open");
+      expect(result?.survey.status).toBe("open");
     });
 
     it("should throw error for invalid status", async () => {
@@ -288,7 +300,7 @@ describe("SurveyService", () => {
       mockSurveyRepo.findByPublicLink.mockResolvedValue(survey);
 
       await expect(service.getSurveyByPublicLink("abc-123")).rejects.toThrow(
-        "Survey is not currently open"
+        "Survey not available"
       );
     });
 
@@ -302,7 +314,7 @@ describe("SurveyService", () => {
       mockSurveyRepo.findByPublicLink.mockResolvedValue(survey);
 
       await expect(service.getSurveyByPublicLink("abc-123")).rejects.toThrow(
-        "Anonymous access is not enabled"
+        "Survey not available"
       );
     });
   });
