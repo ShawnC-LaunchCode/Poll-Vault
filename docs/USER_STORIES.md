@@ -1,7 +1,7 @@
 # Poll-Vault: User Stories
 
-**Version:** 1.0
-**Last Updated:** 2025-10-23
+**Version:** 1.1
+**Last Updated:** 2025-10-28
 
 This document contains all user stories for the Poll-Vault platform, organized by user type.
 
@@ -354,6 +354,11 @@ The primary user who creates, manages, and analyzes surveys.
 - **I want to** export responses as PDF
 - **So that** I can create formatted reports for sharing
 
+**US-C-072: View Resilient Analytics**
+- **As a** survey creator
+- **I want to** see accurate analytics even when event tracking is incomplete
+- **So that** I always have visibility into response data
+
 ### Dashboard & Overview
 
 **US-C-064: View Dashboard Statistics**
@@ -375,6 +380,28 @@ The primary user who creates, manages, and analyzes surveys.
 - **As a** survey creator
 - **I want to** be directed to the survey builder for drafts and results page for active surveys
 - **So that** I land on the most relevant page for my workflow
+
+### Survey Validation & Quality
+
+**US-C-068: Validate Survey Before Activation**
+- **As a** survey creator
+- **I want to** have my survey validated before I can activate it
+- **So that** I don't publish incomplete or invalid surveys
+
+**US-C-069: Auto-Generate Public Links**
+- **As a** survey creator
+- **I want to** have public links automatically generated when I enable anonymous responses
+- **So that** anonymous respondents can immediately access the survey
+
+**US-C-070: Preview Survey**
+- **As a** survey creator
+- **I want to** preview my survey as a respondent would see it
+- **So that** I can verify the user experience before publishing
+
+**US-C-071: Copy Survey Link**
+- **As a** survey creator
+- **I want to** quickly copy survey links to my clipboard
+- **So that** I can easily share them via various channels
 
 ---
 
@@ -614,6 +641,26 @@ Users with elevated privileges who manage the entire platform.
 - **I want to** search surveys by title, creator, or status
 - **So that** I can quickly find specific surveys
 
+**US-A-023: Preview Any Survey**
+- **As a** system administrator
+- **I want to** preview any survey as a respondent would see it
+- **So that** I can review content and assist users with troubleshooting
+
+**US-A-024: Copy Survey Links**
+- **As a** system administrator
+- **I want to** quickly copy survey links from admin views
+- **So that** I can share links when assisting users
+
+**US-A-025: Delete Surveys from Admin Views**
+- **As a** system administrator
+- **I want to** delete surveys directly from admin list and user survey pages
+- **So that** I can efficiently manage platform content
+
+**US-A-026: Track Cascade Deletions**
+- **As a** system administrator
+- **I want to** see responses deleted via survey cascade deletions
+- **So that** I have complete visibility into data removal
+
 ### Platform Analytics
 
 **US-A-009: View Platform Statistics**
@@ -702,15 +749,18 @@ Users with elevated privileges who manage the entire platform.
 - US-C-045 to US-C-049 (Anonymous surveys)
 - US-C-050 to US-C-055 (Response viewing)
 - US-C-062, US-C-063 (Export capabilities)
+- US-C-068, US-C-069 (Survey validation & auto-generation)
 - US-RA-001 to US-RA-020 (Authenticated responses)
 - US-RN-001 to US-RN-012 (Anonymous responses)
 
 ### Medium Priority (Post-MVP)
 - US-C-028 to US-C-032 (Conditional logic)
 - US-C-040 to US-C-044 (Global recipients)
-- US-C-056 to US-C-061 (Analytics)
-- US-C-064 to US-C-067 (Dashboard)
+- US-C-056 to US-C-061, US-C-072 (Analytics with resilient fallbacks)
+- US-C-064 to US-C-067 (Dashboard with smart navigation)
+- US-C-070, US-C-071 (Preview & copy functionality)
 - US-A-001 to US-A-013 (Basic admin features)
+- US-A-023 to US-A-026 (Enhanced admin capabilities)
 
 ### Low Priority (Future Enhancement)
 - US-A-014 to US-A-022 (Advanced admin features)
@@ -729,6 +779,32 @@ Users with elevated privileges who manage the entire platform.
   - **A** = Administrator
 - Stories are grouped by functional area for better organization
 - Implementation status should be tracked separately in project management tools
+
+---
+
+## Changelog
+
+### Version 1.1 (2025-10-28)
+**Added 8 New User Stories:**
+
+**Survey Creator:**
+- US-C-068: Validate Survey Before Activation
+- US-C-069: Auto-Generate Public Links
+- US-C-070: Preview Survey
+- US-C-071: Copy Survey Link
+- US-C-072: View Resilient Analytics
+
+**System Administrator:**
+- US-A-023: Preview Any Survey
+- US-A-024: Copy Survey Links
+- US-A-025: Delete Surveys from Admin Views
+- US-A-026: Track Cascade Deletions
+
+**Changes:**
+- Updated priority matrix to reflect new features
+- Reorganized admin stories to include enhanced capabilities
+- Added Survey Validation & Quality section for creators
+- Documented recent platform improvements from October 2025 updates
 
 ---
 
