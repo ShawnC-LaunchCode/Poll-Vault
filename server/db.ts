@@ -17,9 +17,13 @@ const isNeonDatabase = process.env.DATABASE_URL.includes('neon.tech') ||
 
 let pool: Pool | NeonPool;
 let db: any;
+let dbInitialized = false;
+let dbInitPromise: Promise<void>;
 
-// Initialize database connection asynchronously
-(async () => {
+// Initialize database connection
+async function initializeDatabase() {
+  if (dbInitialized) return;
+
   if (isNeonDatabase) {
     // Use Neon serverless driver for cloud databases
     const { Pool: NeonPoolClass, neonConfig } = await import('@neondatabase/serverless');
@@ -38,6 +42,19 @@ let db: any;
     const { drizzle: drizzlePg } = await import('drizzle-orm/node-postgres');
     db = drizzlePg(pool as any, { schema });
   }
-})();
 
-export { pool, db };
+  dbInitialized = true;
+}
+
+// Start initialization immediately
+dbInitPromise = initializeDatabase();
+
+// Getter to ensure db is initialized before use
+function getDb() {
+  if (!dbInitialized) {
+    throw new Error("Database not initialized. Call await initializeDatabase() first.");
+  }
+  return db;
+}
+
+export { pool, db, getDb, initializeDatabase, dbInitPromise };
