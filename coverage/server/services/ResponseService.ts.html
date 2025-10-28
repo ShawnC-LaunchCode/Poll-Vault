@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/106</span>
+                <span class='fraction'>0/112</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/89</span>
+                <span class='fraction'>0/101</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/10</span>
+                <span class='fraction'>0/11</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/105</span>
+                <span class='fraction'>0/111</span>
             </div>
         
             
@@ -432,7 +432,30 @@
 <a name='L367'></a><a href='#L367'>367</a>
 <a name='L368'></a><a href='#L368'>368</a>
 <a name='L369'></a><a href='#L369'>369</a>
-<a name='L370'></a><a href='#L370'>370</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L370'></a><a href='#L370'>370</a>
+<a name='L371'></a><a href='#L371'>371</a>
+<a name='L372'></a><a href='#L372'>372</a>
+<a name='L373'></a><a href='#L373'>373</a>
+<a name='L374'></a><a href='#L374'>374</a>
+<a name='L375'></a><a href='#L375'>375</a>
+<a name='L376'></a><a href='#L376'>376</a>
+<a name='L377'></a><a href='#L377'>377</a>
+<a name='L378'></a><a href='#L378'>378</a>
+<a name='L379'></a><a href='#L379'>379</a>
+<a name='L380'></a><a href='#L380'>380</a>
+<a name='L381'></a><a href='#L381'>381</a>
+<a name='L382'></a><a href='#L382'>382</a>
+<a name='L383'></a><a href='#L383'>383</a>
+<a name='L384'></a><a href='#L384'>384</a>
+<a name='L385'></a><a href='#L385'>385</a>
+<a name='L386'></a><a href='#L386'>386</a>
+<a name='L387'></a><a href='#L387'>387</a>
+<a name='L388'></a><a href='#L388'>388</a>
+<a name='L389'></a><a href='#L389'>389</a>
+<a name='L390'></a><a href='#L390'>390</a>
+<a name='L391'></a><a href='#L391'>391</a>
+<a name='L392'></a><a href='#L392'>392</a>
+<a name='L393'></a><a href='#L393'>393</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -452,6 +475,29 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -823,6 +869,29 @@ import type {
  * Handles response creation, answer submission, and completion validation
  */
 export class ResponseService {
+  private responseRepo: typeof this.responseRepo;
+  private surveyRepo: typeof this.surveyRepo;
+  private questionRepo: typeof this.questionRepo;
+  private recipientRepo: typeof this.recipientRepo;
+  private pageRepo: typeof this.pageRepo;
+  private systemStatsRepo: typeof this.systemStatsRepo;
+&nbsp;
+<span class="fstat-no" title="function not covered" >  constructor(</span>
+    responseRepo?: typeof this.responseRepo,
+    surveyRepo?: typeof this.surveyRepo,
+    questionRepo?: typeof this.questionRepo,
+    recipientRepo?: typeof this.recipientRepo,
+    pageRepo?: typeof this.pageRepo,
+    systemStatsRepo?: typeof this.systemStatsRepo
+  ) {
+<span class="cstat-no" title="statement not covered" >    this.responseRepo = responseRepo || this.responseRepo;</span>
+<span class="cstat-no" title="statement not covered" >    this.surveyRepo = surveyRepo || this.surveyRepo;</span>
+<span class="cstat-no" title="statement not covered" >    this.questionRepo = questionRepo || this.questionRepo;</span>
+<span class="cstat-no" title="statement not covered" >    this.recipientRepo = recipientRepo || this.recipientRepo;</span>
+<span class="cstat-no" title="statement not covered" >    this.pageRepo = pageRepo || this.pageRepo;</span>
+<span class="cstat-no" title="statement not covered" >    this.systemStatsRepo = systemStatsRepo || this.systemStatsRepo;</span>
+  }
+&nbsp;
   /**
    * Create authenticated response (token-based or user-based)
    */
@@ -830,7 +899,7 @@ export class ResponseService {
     surveyId: string,
     token?: string
   ): Promise&lt;{ response: Response; message: string }&gt; {
-    const survey = <span class="cstat-no" title="statement not covered" >await surveyRepository.findById(surveyId);</span>
+    const survey = <span class="cstat-no" title="statement not covered" >await this.surveyRepo.findById(surveyId);</span>
 <span class="cstat-no" title="statement not covered" >    if (!survey) {</span>
 <span class="cstat-no" title="statement not covered" >      throw new Error("Survey not found");</span>
     }
@@ -843,13 +912,13 @@ export class ResponseService {
 &nbsp;
     // If token provided, validate it
 <span class="cstat-no" title="statement not covered" >    if (token) {</span>
-      const recipient = <span class="cstat-no" title="statement not covered" >await recipientRepository.findByToken(token);</span>
+      const recipient = <span class="cstat-no" title="statement not covered" >await this.recipientRepo.findByToken(token);</span>
 <span class="cstat-no" title="statement not covered" >      if (!recipient || recipient.surveyId !== surveyId) {</span>
 <span class="cstat-no" title="statement not covered" >        throw new Error("Invalid token for this survey");</span>
       }
 &nbsp;
       // Check if recipient already responded
-      const existingResponse = <span class="cstat-no" title="statement not covered" >await responseRepository.findByRecipient(recipient.id);</span>
+      const existingResponse = <span class="cstat-no" title="statement not covered" >await this.responseRepo.findByRecipient(recipient.id);</span>
 <span class="cstat-no" title="statement not covered" >      if (existingResponse) {</span>
 <span class="cstat-no" title="statement not covered" >        throw new Error(`Response already exists: ${existingResponse.id}`);</span>
       }
@@ -858,7 +927,7 @@ export class ResponseService {
     }
 &nbsp;
     // Create response
-    const response = <span class="cstat-no" title="statement not covered" >await responseRepository.create({</span>
+    const response = <span class="cstat-no" title="statement not covered" >await this.responseRepo.create({</span>
       surveyId,
       recipientId: recipientId || null,
       completed: false,
@@ -866,7 +935,7 @@ export class ResponseService {
     });
 &nbsp;
     // Increment system stats counter
-<span class="cstat-no" title="statement not covered" >    await systemStatsRepository.incrementResponsesCollected();</span>
+<span class="cstat-no" title="statement not covered" >    await this.systemStatsRepo.incrementResponsesCollected();</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    return {</span>
       response,
@@ -888,7 +957,7 @@ export class ResponseService {
       accessInfo?: any;
     }
   ): Promise&lt;{ response: Response; sessionId: string; message: string }&gt; {
-    const survey = <span class="cstat-no" title="statement not covered" >await surveyRepository.findByPublicLink(publicLink);</span>
+    const survey = <span class="cstat-no" title="statement not covered" >await this.surveyRepo.findByPublicLink(publicLink);</span>
 <span class="cstat-no" title="statement not covered" >    if (!survey) {</span>
 <span class="cstat-no" title="statement not covered" >      throw new Error("Survey not found");</span>
     }
@@ -905,7 +974,7 @@ export class ResponseService {
     const sessionId = <span class="cstat-no" title="statement not covered" >clientInfo.sessionId || `session_${Date.now()}_${Math.random().toString(36)}`;</span>
 &nbsp;
     // Check rate limits
-    const canRespond = <span class="cstat-no" title="statement not covered" >await responseRepository.checkAnonymousLimit(</span>
+    const canRespond = <span class="cstat-no" title="statement not covered" >await this.responseRepo.checkAnonymousLimit(</span>
       survey.id,
       clientInfo.ipAddress,
       sessionId,
@@ -933,8 +1002,8 @@ export class ResponseService {
     };
 &nbsp;
     // Create anonymous response and tracking in transaction
-    const response = <span class="cstat-no" title="statement not covered" >await responseRepository.transaction(<span class="fstat-no" title="function not covered" >async (t</span>x) =&gt; {</span>
-      const newResponse = <span class="cstat-no" title="statement not covered" >await responseRepository.createAnonymousResponse(</span>
+    const response = <span class="cstat-no" title="statement not covered" >await this.responseRepo.transaction(<span class="fstat-no" title="function not covered" >async (t</span>x) =&gt; {</span>
+      const newResponse = <span class="cstat-no" title="statement not covered" >await this.responseRepo.createAnonymousResponse(</span>
         {
           surveyId: survey.id,
           ipAddress: clientInfo.ipAddress,
@@ -945,7 +1014,7 @@ export class ResponseService {
         tx
       );
 &nbsp;
-<span class="cstat-no" title="statement not covered" >      await responseRepository.createAnonymousTracking(</span>
+<span class="cstat-no" title="statement not covered" >      await this.responseRepo.createAnonymousTracking(</span>
         {
           surveyId: survey.id,
           ipAddress: clientInfo.ipAddress,
@@ -959,7 +1028,7 @@ export class ResponseService {
     });
 &nbsp;
     // Increment system stats counter
-<span class="cstat-no" title="statement not covered" >    await systemStatsRepository.incrementResponsesCollected();</span>
+<span class="cstat-no" title="statement not covered" >    await this.systemStatsRepo.incrementResponsesCollected();</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    return {</span>
       response,
@@ -981,7 +1050,7 @@ export class ResponseService {
     }
   ): Promise&lt;{ answer: Answer; isUpdate: boolean; message: string }&gt; {
     // Validate response exists and is not completed
-    const response = <span class="cstat-no" title="statement not covered" >await responseRepository.findById(responseId);</span>
+    const response = <span class="cstat-no" title="statement not covered" >await this.responseRepo.findById(responseId);</span>
 <span class="cstat-no" title="statement not covered" >    if (!response) {</span>
 <span class="cstat-no" title="statement not covered" >      throw new Error("Response not found");</span>
     }
@@ -991,32 +1060,32 @@ export class ResponseService {
     }
 &nbsp;
     // Validate survey exists
-    const survey = <span class="cstat-no" title="statement not covered" >await surveyRepository.findById(response.surveyId);</span>
+    const survey = <span class="cstat-no" title="statement not covered" >await this.surveyRepo.findById(response.surveyId);</span>
 <span class="cstat-no" title="statement not covered" >    if (!survey) {</span>
 <span class="cstat-no" title="statement not covered" >      throw new Error("Survey not found");</span>
     }
 &nbsp;
     // Validate question exists and belongs to survey
-    const question = <span class="cstat-no" title="statement not covered" >await questionRepository.findById(answerData.questionId);</span>
+    const question = <span class="cstat-no" title="statement not covered" >await this.questionRepo.findById(answerData.questionId);</span>
 <span class="cstat-no" title="statement not covered" >    if (!question) {</span>
 <span class="cstat-no" title="statement not covered" >      throw new Error("Question not found");</span>
     }
 &nbsp;
-    const page = <span class="cstat-no" title="statement not covered" >await pageRepository.findById(question.pageId);</span>
+    const page = <span class="cstat-no" title="statement not covered" >await this.pageRepo.findById(question.pageId);</span>
 <span class="cstat-no" title="statement not covered" >    if (!page || page.surveyId !== survey.id) {</span>
 <span class="cstat-no" title="statement not covered" >      throw new Error("Question does not belong to this survey");</span>
     }
 &nbsp;
     // Validate subquestion if provided
 <span class="cstat-no" title="statement not covered" >    if (answerData.subquestionId) {</span>
-      const subquestion = <span class="cstat-no" title="statement not covered" >await questionRepository.findSubquestionById(answerData.subquestionId);</span>
+      const subquestion = <span class="cstat-no" title="statement not covered" >await this.questionRepo.findSubquestionById(answerData.subquestionId);</span>
 <span class="cstat-no" title="statement not covered" >      if (!subquestion || subquestion.loopQuestionId !== answerData.questionId) {</span>
 <span class="cstat-no" title="statement not covered" >        throw new Error("Invalid subquestion for this question");</span>
       }
     }
 &nbsp;
     // Check if answer already exists (upsert pattern)
-    const existingAnswers = <span class="cstat-no" title="statement not covered" >await responseRepository.findAnswersByResponse(responseId);</span>
+    const existingAnswers = <span class="cstat-no" title="statement not covered" >await this.responseRepo.findAnswersByResponse(responseId);</span>
     const existingAnswer = <span class="cstat-no" title="statement not covered" >existingAnswers.find(<span class="fstat-no" title="function not covered" >a =&gt;</span></span>
 <span class="cstat-no" title="statement not covered" >      a.questionId === answerData.questionId &amp;&amp;</span>
       a.subquestionId === (answerData.subquestionId || null) &amp;&amp;
@@ -1027,10 +1096,10 @@ export class ResponseService {
     let isUpdate = <span class="cstat-no" title="statement not covered" >false;</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    if (existingAnswer) {</span>
-<span class="cstat-no" title="statement not covered" >      answer = await responseRepository.updateAnswer(existingAnswer.id, { value: answerData.value });</span>
+<span class="cstat-no" title="statement not covered" >      answer = await this.responseRepo.updateAnswer(existingAnswer.id, { value: answerData.value });</span>
 <span class="cstat-no" title="statement not covered" >      isUpdate = true;</span>
     } else {
-<span class="cstat-no" title="statement not covered" >      answer = await responseRepository.createAnswer({</span>
+<span class="cstat-no" title="statement not covered" >      answer = await this.responseRepo.createAnswer({</span>
         responseId,
         questionId: answerData.questionId,
         subquestionId: answerData.subquestionId || null,
@@ -1053,7 +1122,7 @@ export class ResponseService {
     responseId: string
   ): Promise&lt;{ response: Response; message: string }&gt; {
     // Get response
-    const response = <span class="cstat-no" title="statement not covered" >await responseRepository.findById(responseId);</span>
+    const response = <span class="cstat-no" title="statement not covered" >await this.responseRepo.findById(responseId);</span>
 <span class="cstat-no" title="statement not covered" >    if (!response) {</span>
 <span class="cstat-no" title="statement not covered" >      throw new Error("Response not found");</span>
     }
@@ -1063,14 +1132,14 @@ export class ResponseService {
     }
 &nbsp;
     // Get survey
-    const survey = <span class="cstat-no" title="statement not covered" >await surveyRepository.findById(response.surveyId);</span>
+    const survey = <span class="cstat-no" title="statement not covered" >await this.surveyRepo.findById(response.surveyId);</span>
 <span class="cstat-no" title="statement not covered" >    if (!survey) {</span>
 <span class="cstat-no" title="statement not covered" >      throw new Error("Survey not found");</span>
     }
 &nbsp;
     // Get all pages and questions
-    const pages = <span class="cstat-no" title="statement not covered" >await pageRepository.findBySurvey(survey.id);</span>
-    const answers = <span class="cstat-no" title="statement not covered" >await responseRepository.findAnswersByResponse(responseId);</span>
+    const pages = <span class="cstat-no" title="statement not covered" >await this.pageRepo.findBySurvey(survey.id);</span>
+    const answers = <span class="cstat-no" title="statement not covered" >await this.responseRepo.findAnswersByResponse(responseId);</span>
 &nbsp;
     // Build answer map
     const answersMap: Record&lt;string, any&gt; = <span class="cstat-no" title="statement not covered" >{};</span>
@@ -1083,7 +1152,7 @@ export class ResponseService {
     const missingRequired: string[] = <span class="cstat-no" title="statement not covered" >[];</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    for (const page of pages) {</span>
-      const questions = <span class="cstat-no" title="statement not covered" >await questionRepository.findByPageWithSubquestions(page.id);</span>
+      const questions = <span class="cstat-no" title="statement not covered" >await this.questionRepo.findByPageWithSubquestions(page.id);</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >      for (const question of questions) {</span>
 <span class="cstat-no" title="statement not covered" >        if (question.required) {</span>
@@ -1100,7 +1169,7 @@ export class ResponseService {
     }
 &nbsp;
     // Mark as complete
-    const updatedResponse = <span class="cstat-no" title="statement not covered" >await responseRepository.update(responseId, {</span>
+    const updatedResponse = <span class="cstat-no" title="statement not covered" >await this.responseRepo.update(responseId, {</span>
       completed: true,
       submittedAt: new Date()
     });
@@ -1118,7 +1187,7 @@ export class ResponseService {
     surveyId: string,
     userId: string
   ): Promise&lt;Response[]&gt; {
-    const survey = <span class="cstat-no" title="statement not covered" >await surveyRepository.findById(surveyId);</span>
+    const survey = <span class="cstat-no" title="statement not covered" >await this.surveyRepo.findById(surveyId);</span>
 <span class="cstat-no" title="statement not covered" >    if (!survey) {</span>
 <span class="cstat-no" title="statement not covered" >      throw new Error("Survey not found");</span>
     }
@@ -1127,7 +1196,7 @@ export class ResponseService {
 <span class="cstat-no" title="statement not covered" >      throw new Error("Access denied - you do not own this survey");</span>
     }
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    return await responseRepository.findBySurvey(surveyId);</span>
+<span class="cstat-no" title="statement not covered" >    return await this.responseRepo.findBySurvey(surveyId);</span>
   }
 &nbsp;
   /**
@@ -1141,12 +1210,12 @@ export class ResponseService {
     answers: (Answer &amp; { question: Question })[];
     recipient: any | null;
   }&gt; {
-    const response = <span class="cstat-no" title="statement not covered" >await responseRepository.findById(responseId);</span>
+    const response = <span class="cstat-no" title="statement not covered" >await this.responseRepo.findById(responseId);</span>
 <span class="cstat-no" title="statement not covered" >    if (!response) {</span>
 <span class="cstat-no" title="statement not covered" >      throw new Error("Response not found");</span>
     }
 &nbsp;
-    const survey = <span class="cstat-no" title="statement not covered" >await surveyRepository.findById(response.surveyId);</span>
+    const survey = <span class="cstat-no" title="statement not covered" >await this.surveyRepo.findById(response.surveyId);</span>
 <span class="cstat-no" title="statement not covered" >    if (!survey) {</span>
 <span class="cstat-no" title="statement not covered" >      throw new Error("Survey not found");</span>
     }
@@ -1155,9 +1224,9 @@ export class ResponseService {
 <span class="cstat-no" title="statement not covered" >      throw new Error("Access denied - you do not own this survey");</span>
     }
 &nbsp;
-    const answersWithQuestions = <span class="cstat-no" title="statement not covered" >await responseRepository.findAnswersWithQuestionsByResponse(responseId);</span>
+    const answersWithQuestions = <span class="cstat-no" title="statement not covered" >await this.responseRepo.findAnswersWithQuestionsByResponse(responseId);</span>
     const recipient = <span class="cstat-no" title="statement not covered" >response.recipientId</span>
-      ? await recipientRepository.findById(response.recipientId)
+      ? await this.recipientRepo.findById(response.recipientId)
       : null;
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    return {</span>
@@ -1177,7 +1246,7 @@ export const responseService = <span class="cstat-no" title="statement not cover
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-10-28T13:36:28.134Z
+                at 2025-10-28T14:12:23.631Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

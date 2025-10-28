@@ -24,8 +24,8 @@ export class AnalyticsRepository extends BaseRepository<
   AnalyticsEvent,
   InsertAnalyticsEvent
 > {
-  constructor() {
-    super(analyticsEvents);
+  constructor(dbInstance?: any) {
+    super(analyticsEvents, dbInstance);
   }
 
   // ==================== Event Tracking ====================
@@ -715,6 +715,86 @@ export class AnalyticsRepository extends BaseRepository<
       default:
         return null;
     }
+  }
+
+  // ==================== Test-Compatible Aliases ====================
+
+  /**
+   * Alias for createEvent - used by tests
+   */
+  async trackEvent(eventData: InsertAnalyticsEvent, tx?: DbTransaction): Promise<AnalyticsEvent> {
+    return this.createEvent(eventData, tx);
+  }
+
+  /**
+   * Alias for findBySurvey with optional event type filtering - used by tests
+   */
+  async getEventsBySurveyId(surveyId: string, eventType?: string, tx?: DbTransaction): Promise<AnalyticsEvent[]> {
+    if (eventType) {
+      return this.findBySurveyAndEvent(surveyId, eventType, tx);
+    }
+    return this.findBySurvey(surveyId, undefined, tx);
+  }
+
+  /**
+   * Alias for findByResponse - used by tests
+   */
+  async getEventsByResponseId(responseId: string, tx?: DbTransaction): Promise<AnalyticsEvent[]> {
+    return this.findByResponse(responseId, tx);
+  }
+
+  /**
+   * Alias for getQuestionAnalytics - used by tests
+   */
+  async getQuestionMetrics(surveyId: string, tx?: DbTransaction) {
+    return this.getQuestionAnalytics(surveyId, tx);
+  }
+
+  /**
+   * Alias for getPageAnalytics - used by tests
+   */
+  async getPageMetrics(surveyId: string, tx?: DbTransaction) {
+    return this.getPageAnalytics(surveyId, tx);
+  }
+
+  /**
+   * Alias for getSurveyFunnelData - used by tests
+   */
+  async getCompletionFunnel(surveyId: string, tx?: DbTransaction) {
+    return this.getSurveyFunnelData(surveyId, tx);
+  }
+
+  /**
+   * Get average completion time from start to complete - used by tests
+   */
+  async getAverageCompletionTime(surveyId: string, tx?: DbTransaction): Promise<number | null> {
+    const database = this.getDb(tx);
+
+    const result = await database
+      .select({
+        avgTime: sql<number>`
+          AVG(
+            EXTRACT(EPOCH FROM (complete_event.timestamp - start_event.timestamp))
+          )
+        `.as('avgTime')
+      })
+      .from(sql`
+        (SELECT response_id, timestamp
+         FROM ${analyticsEvents}
+         WHERE survey_id = ${surveyId} AND event = 'survey_start'
+        ) AS start_event
+      `)
+      .innerJoin(
+        sql`
+          (SELECT response_id, timestamp
+           FROM ${analyticsEvents}
+           WHERE survey_id = ${surveyId} AND event = 'survey_complete'
+          ) AS complete_event
+        `,
+        sql`start_event.response_id = complete_event.response_id`
+      );
+
+    return result[0]?.avgTime || null;
   }
 }
 

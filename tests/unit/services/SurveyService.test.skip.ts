@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { SurveyService } from "../../../server/services/SurveyService";
-import { createTestSurvey, createTestSurveyWithQuestions } from "../../factories/surveyFactory";
+import { createTestSurvey, createTestSurveyWithQuestions } from "../../factories/mockFactories";
 import { createTestUser } from "../../factories/userFactory";
 
 describe("SurveyService", () => {

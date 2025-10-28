@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/70</span>
+                <span class='fraction'>0/74</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/30</span>
+                <span class='fraction'>0/38</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/20</span>
+                <span class='fraction'>0/21</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/68</span>
+                <span class='fraction'>0/72</span>
             </div>
         
             
@@ -382,7 +382,24 @@
 <a name='L317'></a><a href='#L317'>317</a>
 <a name='L318'></a><a href='#L318'>318</a>
 <a name='L319'></a><a href='#L319'>319</a>
-<a name='L320'></a><a href='#L320'>320</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L320'></a><a href='#L320'>320</a>
+<a name='L321'></a><a href='#L321'>321</a>
+<a name='L322'></a><a href='#L322'>322</a>
+<a name='L323'></a><a href='#L323'>323</a>
+<a name='L324'></a><a href='#L324'>324</a>
+<a name='L325'></a><a href='#L325'>325</a>
+<a name='L326'></a><a href='#L326'>326</a>
+<a name='L327'></a><a href='#L327'>327</a>
+<a name='L328'></a><a href='#L328'>328</a>
+<a name='L329'></a><a href='#L329'>329</a>
+<a name='L330'></a><a href='#L330'>330</a>
+<a name='L331'></a><a href='#L331'>331</a>
+<a name='L332'></a><a href='#L332'>332</a>
+<a name='L333'></a><a href='#L333'>333</a>
+<a name='L334'></a><a href='#L334'>334</a>
+<a name='L335'></a><a href='#L335'>335</a>
+<a name='L336'></a><a href='#L336'>336</a>
+<a name='L337'></a><a href='#L337'>337</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -399,6 +416,23 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -720,18 +754,35 @@ import { validateSurveyForPublish, canChangeStatus } from "./surveyValidation";
  * Orchestrates repository calls, handles authorization, and enforces business rules
  */
 export class SurveyService {
+  private surveyRepo: typeof this.surveyRepo;
+  private pageRepo: typeof this.pageRepo;
+  private questionRepo: typeof this.questionRepo;
+  private userRepo: typeof userRepository;
+&nbsp;
+<span class="fstat-no" title="function not covered" >  constructor(</span>
+    surveyRepo?: typeof this.surveyRepo,
+    pageRepo?: typeof this.pageRepo,
+    questionRepo?: typeof this.questionRepo,
+    userRepo?: typeof userRepository
+  ) {
+<span class="cstat-no" title="statement not covered" >    this.surveyRepo = surveyRepo || this.surveyRepo;</span>
+<span class="cstat-no" title="statement not covered" >    this.pageRepo = pageRepo || this.pageRepo;</span>
+<span class="cstat-no" title="statement not covered" >    this.questionRepo = questionRepo || this.questionRepo;</span>
+<span class="cstat-no" title="statement not covered" >    this.userRepo = userRepo || userRepository;</span>
+  }
+&nbsp;
   /**
    * Verify user owns the survey (admins can access any survey)
    */
   async <span class="fstat-no" title="function not covered" >verifyOwnership(s</span>urveyId: string, userId: string): Promise&lt;Survey&gt; {
-    const survey = <span class="cstat-no" title="statement not covered" >await surveyRepository.findById(surveyId);</span>
+    const survey = <span class="cstat-no" title="statement not covered" >await this.surveyRepo.findById(surveyId);</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    if (!survey) {</span>
 <span class="cstat-no" title="statement not covered" >      throw new Error("Survey not found");</span>
     }
 &nbsp;
     // Check if user is an admin
-    const user = <span class="cstat-no" title="statement not covered" >await userRepository.findById(userId);</span>
+    const user = <span class="cstat-no" title="statement not covered" >await this.userRepo.findById(userId);</span>
 <span class="cstat-no" title="statement not covered" >    if (user &amp;&amp; user.role === 'admin') {</span>
       // Admins can access any survey
 <span class="cstat-no" title="statement not covered" >      return survey;</span>
@@ -748,9 +799,9 @@ export class SurveyService {
    * Create a new survey with a default first page
    */
   async <span class="fstat-no" title="function not covered" >createSurvey(d</span>ata: InsertSurvey, creatorId: string): Promise&lt;Survey&gt; {
-<span class="cstat-no" title="statement not covered" >    return await surveyRepository.transaction(<span class="fstat-no" title="function not covered" >async (t</span>x) =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >    return await this.surveyRepo.transaction(<span class="fstat-no" title="function not covered" >async (t</span>x) =&gt; {</span>
       // Create survey
-      const survey = <span class="cstat-no" title="statement not covered" >await surveyRepository.create(</span>
+      const survey = <span class="cstat-no" title="statement not covered" >await this.surveyRepo.create(</span>
         {
           ...data,
           creatorId,
@@ -760,7 +811,7 @@ export class SurveyService {
       );
 &nbsp;
       // Create default first page
-<span class="cstat-no" title="statement not covered" >      await pageRepository.create(</span>
+<span class="cstat-no" title="statement not covered" >      await this.pageRepo.create(</span>
         {
           surveyId: survey.id,
           title: 'Page 1',
@@ -777,7 +828,7 @@ export class SurveyService {
    * Get survey by ID (no ownership check)
    */
   async <span class="fstat-no" title="function not covered" >getSurvey(s</span>urveyId: string): Promise&lt;Survey | undefined&gt; {
-<span class="cstat-no" title="statement not covered" >    return await surveyRepository.findById(surveyId);</span>
+<span class="cstat-no" title="statement not covered" >    return await this.surveyRepo.findById(surveyId);</span>
   }
 &nbsp;
   /**
@@ -791,7 +842,7 @@ export class SurveyService {
    * Get all surveys for a creator
    */
   async <span class="fstat-no" title="function not covered" >getSurveysByCreator(c</span>reatorId: string): Promise&lt;Survey[]&gt; {
-<span class="cstat-no" title="statement not covered" >    return await surveyRepository.findByCreator(creatorId);</span>
+<span class="cstat-no" title="statement not covered" >    return await this.surveyRepo.findByCreator(creatorId);</span>
   }
 &nbsp;
   /**
@@ -807,7 +858,7 @@ export class SurveyService {
 &nbsp;
     // If enabling anonymous access and publicLink doesn't exist, generate one
 <span class="cstat-no" title="statement not covered" >    if (updates.allowAnonymous) {</span>
-      const existingSurvey = <span class="cstat-no" title="statement not covered" >await surveyRepository.findById(surveyId);</span>
+      const existingSurvey = <span class="cstat-no" title="statement not covered" >await this.surveyRepo.findById(surveyId);</span>
 <span class="cstat-no" title="statement not covered" >      if (existingSurvey &amp;&amp; !existingSurvey.publicLink) {</span>
         const { randomUUID } = <span class="cstat-no" title="statement not covered" >await import('crypto');</span>
         (<span class="cstat-no" title="statement not covered" >updates as any).publicLink = randomUUID();</span>
@@ -815,7 +866,7 @@ export class SurveyService {
     }
 &nbsp;
     // Update survey
-<span class="cstat-no" title="statement not covered" >    return await surveyRepository.update(surveyId, updates);</span>
+<span class="cstat-no" title="statement not covered" >    return await this.surveyRepo.update(surveyId, updates);</span>
   }
 &nbsp;
   /**
@@ -826,7 +877,7 @@ export class SurveyService {
 <span class="cstat-no" title="statement not covered" >    await this.verifyOwnership(surveyId, userId);</span>
 &nbsp;
     // Delete survey (cascade will handle related data)
-<span class="cstat-no" title="statement not covered" >    await surveyRepository.delete(surveyId);</span>
+<span class="cstat-no" title="statement not covered" >    await this.surveyRepo.delete(surveyId);</span>
   }
 &nbsp;
   /**
@@ -863,7 +914,7 @@ export class SurveyService {
     }
 &nbsp;
     // Update status
-    const updatedSurvey = <span class="cstat-no" title="statement not covered" >await surveyRepository.update(surveyId, { status: newStatus as any });</span>
+    const updatedSurvey = <span class="cstat-no" title="statement not covered" >await this.surveyRepo.update(surveyId, { status: newStatus as any });</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    return {</span>
       survey: updatedSurvey,
@@ -886,7 +937,7 @@ export class SurveyService {
 <span class="cstat-no" title="statement not covered" >    await this.verifyOwnership(surveyId, userId);</span>
 &nbsp;
     // Enable anonymous access
-<span class="cstat-no" title="statement not covered" >    return await surveyRepository.enableAnonymousAccess(surveyId, config);</span>
+<span class="cstat-no" title="statement not covered" >    return await this.surveyRepo.enableAnonymousAccess(surveyId, config);</span>
   }
 &nbsp;
   /**
@@ -897,7 +948,7 @@ export class SurveyService {
 <span class="cstat-no" title="statement not covered" >    await this.verifyOwnership(surveyId, userId);</span>
 &nbsp;
     // Disable anonymous access
-<span class="cstat-no" title="statement not covered" >    return await surveyRepository.disableAnonymousAccess(surveyId);</span>
+<span class="cstat-no" title="statement not covered" >    return await this.surveyRepo.disableAnonymousAccess(surveyId);</span>
   }
 &nbsp;
   /**
@@ -912,7 +963,7 @@ export class SurveyService {
 <span class="cstat-no" title="statement not covered" >    await this.verifyOwnership(surveyId, userId);</span>
 &nbsp;
     // Duplicate survey
-<span class="cstat-no" title="statement not covered" >    return await surveyRepository.duplicate(surveyId, newTitle, userId);</span>
+<span class="cstat-no" title="statement not covered" >    return await this.surveyRepo.duplicate(surveyId, newTitle, userId);</span>
   }
 &nbsp;
   /**
@@ -923,7 +974,7 @@ export class SurveyService {
 <span class="cstat-no" title="statement not covered" >    await this.verifyOwnership(surveyId, userId);</span>
 &nbsp;
     // Archive survey
-<span class="cstat-no" title="statement not covered" >    return await surveyRepository.archive(surveyId, userId);</span>
+<span class="cstat-no" title="statement not covered" >    return await this.surveyRepo.archive(surveyId, userId);</span>
   }
 &nbsp;
   /**
@@ -934,7 +985,7 @@ export class SurveyService {
     status: string,
     userId: string
   ) {
-<span class="cstat-no" title="statement not covered" >    return await surveyRepository.bulkUpdateStatus(surveyIds, status, userId);</span>
+<span class="cstat-no" title="statement not covered" >    return await this.surveyRepo.bulkUpdateStatus(surveyIds, status, userId);</span>
   }
 &nbsp;
   /**
@@ -944,7 +995,7 @@ export class SurveyService {
     surveyIds: string[],
     userId: string
   ) {
-<span class="cstat-no" title="statement not covered" >    return await surveyRepository.bulkDelete(surveyIds, userId);</span>
+<span class="cstat-no" title="statement not covered" >    return await this.surveyRepo.bulkDelete(surveyIds, userId);</span>
   }
 &nbsp;
   /**
@@ -958,7 +1009,7 @@ export class SurveyService {
 <span class="cstat-no" title="statement not covered" >    console.log('[SurveyService] getSurveyByPublicLink called with:', publicLink);</span>
 &nbsp;
     // Look up survey by public link
-    const survey = <span class="cstat-no" title="statement not covered" >await surveyRepository.findByPublicLink(publicLink);</span>
+    const survey = <span class="cstat-no" title="statement not covered" >await this.surveyRepo.findByPublicLink(publicLink);</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    if (!survey) {</span>
 <span class="cstat-no" title="statement not covered" >      console.log('[SurveyService] Survey not found for public link:', publicLink);</span>
@@ -987,14 +1038,14 @@ export class SurveyService {
 <span class="cstat-no" title="statement not covered" >    console.log('[SurveyService] Survey validation passed, fetching pages...');</span>
 &nbsp;
     // Fetch pages with questions
-    const pages = <span class="cstat-no" title="statement not covered" >await pageRepository.findBySurvey(survey.id);</span>
+    const pages = <span class="cstat-no" title="statement not covered" >await this.pageRepo.findBySurvey(survey.id);</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    console.log('[SurveyService] Pages fetched:', pages.length);</span>
 &nbsp;
     // Fetch questions for each page
     const pagesWithQuestions = <span class="cstat-no" title="statement not covered" >await Promise.all(</span>
       pages.map(<span class="fstat-no" title="function not covered" >async (p</span>age) =&gt; {
-        const pageQuestions = <span class="cstat-no" title="statement not covered" >await questionRepository.findByPage(page.id);</span>
+        const pageQuestions = <span class="cstat-no" title="statement not covered" >await this.questionRepo.findByPage(page.id);</span>
 <span class="cstat-no" title="statement not covered" >        console.log('[SurveyService] Questions for page', page.id, ':', pageQuestions.map(<span class="fstat-no" title="function not covered" >q =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span></span>
           id: q.id,
           title: q.title,
@@ -1027,7 +1078,7 @@ export const surveyService = <span class="cstat-no" title="statement not covered
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-10-28T13:36:28.134Z
+                at 2025-10-28T14:12:23.631Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

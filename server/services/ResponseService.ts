@@ -20,6 +20,29 @@ import type {
  * Handles response creation, answer submission, and completion validation
  */
 export class ResponseService {
+  private responseRepo: typeof this.responseRepo;
+  private surveyRepo: typeof this.surveyRepo;
+  private questionRepo: typeof this.questionRepo;
+  private recipientRepo: typeof this.recipientRepo;
+  private pageRepo: typeof this.pageRepo;
+  private systemStatsRepo: typeof this.systemStatsRepo;
+
+  constructor(
+    responseRepo?: typeof this.responseRepo,
+    surveyRepo?: typeof this.surveyRepo,
+    questionRepo?: typeof this.questionRepo,
+    recipientRepo?: typeof this.recipientRepo,
+    pageRepo?: typeof this.pageRepo,
+    systemStatsRepo?: typeof this.systemStatsRepo
+  ) {
+    this.responseRepo = responseRepo || this.responseRepo;
+    this.surveyRepo = surveyRepo || this.surveyRepo;
+    this.questionRepo = questionRepo || this.questionRepo;
+    this.recipientRepo = recipientRepo || this.recipientRepo;
+    this.pageRepo = pageRepo || this.pageRepo;
+    this.systemStatsRepo = systemStatsRepo || this.systemStatsRepo;
+  }
+
   /**
    * Create authenticated response (token-based or user-based)
    */
@@ -27,7 +50,7 @@ export class ResponseService {
     surveyId: string,
     token?: string
   ): Promise<{ response: Response; message: string }> {
-    const survey = await surveyRepository.findById(surveyId);
+    const survey = await this.surveyRepo.findById(surveyId);
     if (!survey) {
       throw new Error("Survey not found");
     }
@@ -40,13 +63,13 @@ export class ResponseService {
 
     // If token provided, validate it
     if (token) {
-      const recipient = await recipientRepository.findByToken(token);
+      const recipient = await this.recipientRepo.findByToken(token);
       if (!recipient || recipient.surveyId !== surveyId) {
         throw new Error("Invalid token for this survey");
       }
 
       // Check if recipient already responded
-      const existingResponse = await responseRepository.findByRecipient(recipient.id);
+      const existingResponse = await this.responseRepo.findByRecipient(recipient.id);
       if (existingResponse) {
         throw new Error(`Response already exists: ${existingResponse.id}`);
       }
@@ -55,7 +78,7 @@ export class ResponseService {
     }
 
     // Create response
-    const response = await responseRepository.create({
+    const response = await this.responseRepo.create({
       surveyId,
       recipientId: recipientId || null,
       completed: false,
@@ -63,7 +86,7 @@ export class ResponseService {
     });
 
     // Increment system stats counter
-    await systemStatsRepository.incrementResponsesCollected();
+    await this.systemStatsRepo.incrementResponsesCollected();
 
     return {
       response,
@@ -85,7 +108,7 @@ export class ResponseService {
       accessInfo?: any;
     }
   ): Promise<{ response: Response; sessionId: string; message: string }> {
-    const survey = await surveyRepository.findByPublicLink(publicLink);
+    const survey = await this.surveyRepo.findByPublicLink(publicLink);
     if (!survey) {
       throw new Error("Survey not found");
     }
@@ -102,7 +125,7 @@ export class ResponseService {
     const sessionId = clientInfo.sessionId || `session_${Date.now()}_${Math.random().toString(36)}`;
 
     // Check rate limits
-    const canRespond = await responseRepository.checkAnonymousLimit(
+    const canRespond = await this.responseRepo.checkAnonymousLimit(
       survey.id,
       clientInfo.ipAddress,
       sessionId,
@@ -130,8 +153,8 @@ export class ResponseService {
     };
 
     // Create anonymous response and tracking in transaction
-    const response = await responseRepository.transaction(async (tx) => {
-      const newResponse = await responseRepository.createAnonymousResponse(
+    const response = await this.responseRepo.transaction(async (tx) => {
+      const newResponse = await this.responseRepo.createAnonymousResponse(
         {
           surveyId: survey.id,
           ipAddress: clientInfo.ipAddress,
@@ -142,7 +165,7 @@ export class ResponseService {
         tx
       );
 
-      await responseRepository.createAnonymousTracking(
+      await this.responseRepo.createAnonymousTracking(
         {
           surveyId: survey.id,
           ipAddress: clientInfo.ipAddress,
@@ -156,7 +179,7 @@ export class ResponseService {
     });
 
     // Increment system stats counter
-    await systemStatsRepository.incrementResponsesCollected();
+    await this.systemStatsRepo.incrementResponsesCollected();
 
     return {
       response,
@@ -178,7 +201,7 @@ export class ResponseService {
     }
   ): Promise<{ answer: Answer; isUpdate: boolean; message: string }> {
     // Validate response exists and is not completed
-    const response = await responseRepository.findById(responseId);
+    const response = await this.responseRepo.findById(responseId);
     if (!response) {
       throw new Error("Response not found");
     }
@@ -188,32 +211,32 @@ export class ResponseService {
     }
 
     // Validate survey exists
-    const survey = await surveyRepository.findById(response.surveyId);
+    const survey = await this.surveyRepo.findById(response.surveyId);
     if (!survey) {
       throw new Error("Survey not found");
     }
 
     // Validate question exists and belongs to survey
-    const question = await questionRepository.findById(answerData.questionId);
+    const question = await this.questionRepo.findById(answerData.questionId);
     if (!question) {
       throw new Error("Question not found");
     }
 
-    const page = await pageRepository.findById(question.pageId);
+    const page = await this.pageRepo.findById(question.pageId);
     if (!page || page.surveyId !== survey.id) {
       throw new Error("Question does not belong to this survey");
     }
 
     // Validate subquestion if provided
     if (answerData.subquestionId) {
-      const subquestion = await questionRepository.findSubquestionById(answerData.subquestionId);
+      const subquestion = await this.questionRepo.findSubquestionById(answerData.subquestionId);
       if (!subquestion || subquestion.loopQuestionId !== answerData.questionId) {
         throw new Error("Invalid subquestion for this question");
       }
     }
 
     // Check if answer already exists (upsert pattern)
-    const existingAnswers = await responseRepository.findAnswersByResponse(responseId);
+    const existingAnswers = await this.responseRepo.findAnswersByResponse(responseId);
     const existingAnswer = existingAnswers.find(a =>
       a.questionId === answerData.questionId &&
       a.subquestionId === (answerData.subquestionId || null) &&
@@ -224,10 +247,10 @@ export class ResponseService {
     let isUpdate = false;
 
     if (existingAnswer) {
-      answer = await responseRepository.updateAnswer(existingAnswer.id, { value: answerData.value });
+      answer = await this.responseRepo.updateAnswer(existingAnswer.id, { value: answerData.value });
       isUpdate = true;
     } else {
-      answer = await responseRepository.createAnswer({
+      answer = await this.responseRepo.createAnswer({
         responseId,
         questionId: answerData.questionId,
         subquestionId: answerData.subquestionId || null,
@@ -250,7 +273,7 @@ export class ResponseService {
     responseId: string
   ): Promise<{ response: Response; message: string }> {
     // Get response
-    const response = await responseRepository.findById(responseId);
+    const response = await this.responseRepo.findById(responseId);
     if (!response) {
       throw new Error("Response not found");
     }
@@ -260,14 +283,14 @@ export class ResponseService {
     }
 
     // Get survey
-    const survey = await surveyRepository.findById(response.surveyId);
+    const survey = await this.surveyRepo.findById(response.surveyId);
     if (!survey) {
       throw new Error("Survey not found");
     }
 
     // Get all pages and questions
-    const pages = await pageRepository.findBySurvey(survey.id);
-    const answers = await responseRepository.findAnswersByResponse(responseId);
+    const pages = await this.pageRepo.findBySurvey(survey.id);
+    const answers = await this.responseRepo.findAnswersByResponse(responseId);
 
     // Build answer map
     const answersMap: Record<string, any> = {};
@@ -280,7 +303,7 @@ export class ResponseService {
     const missingRequired: string[] = [];
 
     for (const page of pages) {
-      const questions = await questionRepository.findByPageWithSubquestions(page.id);
+      const questions = await this.questionRepo.findByPageWithSubquestions(page.id);
 
       for (const question of questions) {
         if (question.required) {
@@ -297,7 +320,7 @@ export class ResponseService {
     }
 
     // Mark as complete
-    const updatedResponse = await responseRepository.update(responseId, {
+    const updatedResponse = await this.responseRepo.update(responseId, {
       completed: true,
       submittedAt: new Date()
     });
@@ -315,7 +338,7 @@ export class ResponseService {
     surveyId: string,
     userId: string
   ): Promise<Response[]> {
-    const survey = await surveyRepository.findById(surveyId);
+    const survey = await this.surveyRepo.findById(surveyId);
     if (!survey) {
       throw new Error("Survey not found");
     }
@@ -324,7 +347,7 @@ export class ResponseService {
       throw new Error("Access denied - you do not own this survey");
     }
 
-    return await responseRepository.findBySurvey(surveyId);
+    return await this.responseRepo.findBySurvey(surveyId);
   }
 
   /**
@@ -338,12 +361,12 @@ export class ResponseService {
     answers: (Answer & { question: Question })[];
     recipient: any | null;
   }> {
-    const response = await responseRepository.findById(responseId);
+    const response = await this.responseRepo.findById(responseId);
     if (!response) {
       throw new Error("Response not found");
     }
 
-    const survey = await surveyRepository.findById(response.surveyId);
+    const survey = await this.surveyRepo.findById(response.surveyId);
     if (!survey) {
       throw new Error("Survey not found");
     }
@@ -352,9 +375,9 @@ export class ResponseService {
       throw new Error("Access denied - you do not own this survey");
     }
 
-    const answersWithQuestions = await responseRepository.findAnswersWithQuestionsByResponse(responseId);
+    const answersWithQuestions = await this.responseRepo.findAnswersWithQuestionsByResponse(responseId);
     const recipient = response.recipientId
-      ? await recipientRepository.findById(response.recipientId)
+      ? await this.recipientRepo.findById(response.recipientId)
       : null;
 
     return {

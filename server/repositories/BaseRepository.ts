@@ -17,13 +17,17 @@ export type DbTransaction = PgTransaction<
  * All domain-specific repositories should extend this class
  */
 export abstract class BaseRepository<TTable extends PgTable, TSelect, TInsert> {
-  constructor(protected readonly table: TTable) {}
+  protected readonly dbInstance: typeof db;
+
+  constructor(protected readonly table: TTable, dbInstance?: typeof db) {
+    this.dbInstance = dbInstance || db;
+  }
 
   /**
    * Get database connection (or transaction if provided)
    */
   protected getDb(tx?: DbTransaction) {
-    return tx || db;
+    return tx || this.dbInstance;
   }
 
   /**

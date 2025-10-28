@@ -5,7 +5,7 @@ import {
   createTestQuestionAnalytics,
   createTestAnalyticsEvent,
 } from "../../factories/analyticsFactory";
-import { createTestSurvey } from "../../factories/surveyFactory";
+import { createTestSurvey } from "../../factories/mockFactories";
 
 describe("AnalyticsService", () => {
   let service: AnalyticsService;

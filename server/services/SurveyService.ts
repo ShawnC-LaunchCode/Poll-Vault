@@ -17,18 +17,35 @@ import { validateSurveyForPublish, canChangeStatus } from "./surveyValidation";
  * Orchestrates repository calls, handles authorization, and enforces business rules
  */
 export class SurveyService {
+  private surveyRepo: typeof this.surveyRepo;
+  private pageRepo: typeof this.pageRepo;
+  private questionRepo: typeof this.questionRepo;
+  private userRepo: typeof userRepository;
+
+  constructor(
+    surveyRepo?: typeof this.surveyRepo,
+    pageRepo?: typeof this.pageRepo,
+    questionRepo?: typeof this.questionRepo,
+    userRepo?: typeof userRepository
+  ) {
+    this.surveyRepo = surveyRepo || this.surveyRepo;
+    this.pageRepo = pageRepo || this.pageRepo;
+    this.questionRepo = questionRepo || this.questionRepo;
+    this.userRepo = userRepo || userRepository;
+  }
+
   /**
    * Verify user owns the survey (admins can access any survey)
    */
   async verifyOwnership(surveyId: string, userId: string): Promise<Survey> {
-    const survey = await surveyRepository.findById(surveyId);
+    const survey = await this.surveyRepo.findById(surveyId);
 
     if (!survey) {
       throw new Error("Survey not found");
     }
 
     // Check if user is an admin
-    const user = await userRepository.findById(userId);
+    const user = await this.userRepo.findById(userId);
     if (user && user.role === 'admin') {
       // Admins can access any survey
       return survey;
@@ -45,9 +62,9 @@ export class SurveyService {
    * Create a new survey with a default first page
    */
   async createSurvey(data: InsertSurvey, creatorId: string): Promise<Survey> {
-    return await surveyRepository.transaction(async (tx) => {
+    return await this.surveyRepo.transaction(async (tx) => {
       // Create survey
-      const survey = await surveyRepository.create(
+      const survey = await this.surveyRepo.create(
         {
           ...data,
           creatorId,
@@ -57,7 +74,7 @@ export class SurveyService {
       );
 
       // Create default first page
-      await pageRepository.create(
+      await this.pageRepo.create(
         {
           surveyId: survey.id,
           title: 'Page 1',
@@ -74,7 +91,7 @@ export class SurveyService {
    * Get survey by ID (no ownership check)
    */
   async getSurvey(surveyId: string): Promise<Survey | undefined> {
-    return await surveyRepository.findById(surveyId);
+    return await this.surveyRepo.findById(surveyId);
   }
 
   /**
@@ -88,7 +105,7 @@ export class SurveyService {
    * Get all surveys for a creator
    */
   async getSurveysByCreator(creatorId: string): Promise<Survey[]> {
-    return await surveyRepository.findByCreator(creatorId);
+    return await this.surveyRepo.findByCreator(creatorId);
   }
 
   /**
@@ -104,7 +121,7 @@ export class SurveyService {
 
     // If enabling anonymous access and publicLink doesn't exist, generate one
     if (updates.allowAnonymous) {
-      const existingSurvey = await surveyRepository.findById(surveyId);
+      const existingSurvey = await this.surveyRepo.findById(surveyId);
       if (existingSurvey && !existingSurvey.publicLink) {
         const { randomUUID } = await import('crypto');
         (updates as any).publicLink = randomUUID();
@@ -112,7 +129,7 @@ export class SurveyService {
     }
 
     // Update survey
-    return await surveyRepository.update(surveyId, updates);
+    return await this.surveyRepo.update(surveyId, updates);
   }
 
   /**
@@ -123,7 +140,7 @@ export class SurveyService {
     await this.verifyOwnership(surveyId, userId);
 
     // Delete survey (cascade will handle related data)
-    await surveyRepository.delete(surveyId);
+    await this.surveyRepo.delete(surveyId);
   }
 
   /**
@@ -160,7 +177,7 @@ export class SurveyService {
     }
 
     // Update status
-    const updatedSurvey = await surveyRepository.update(surveyId, { status: newStatus as any });
+    const updatedSurvey = await this.surveyRepo.update(surveyId, { status: newStatus as any });
 
     return {
       survey: updatedSurvey,
@@ -183,7 +200,7 @@ export class SurveyService {
     await this.verifyOwnership(surveyId, userId);
 
     // Enable anonymous access
-    return await surveyRepository.enableAnonymousAccess(surveyId, config);
+    return await this.surveyRepo.enableAnonymousAccess(surveyId, config);
   }
 
   /**
@@ -194,7 +211,7 @@ export class SurveyService {
     await this.verifyOwnership(surveyId, userId);
 
     // Disable anonymous access
-    return await surveyRepository.disableAnonymousAccess(surveyId);
+    return await this.surveyRepo.disableAnonymousAccess(surveyId);
   }
 
   /**
@@ -209,7 +226,7 @@ export class SurveyService {
     await this.verifyOwnership(surveyId, userId);
 
     // Duplicate survey
-    return await surveyRepository.duplicate(surveyId, newTitle, userId);
+    return await this.surveyRepo.duplicate(surveyId, newTitle, userId);
   }
 
   /**
@@ -220,7 +237,7 @@ export class SurveyService {
     await this.verifyOwnership(surveyId, userId);
 
     // Archive survey
-    return await surveyRepository.archive(surveyId, userId);
+    return await this.surveyRepo.archive(surveyId, userId);
   }
 
   /**
@@ -231,7 +248,7 @@ export class SurveyService {
     status: string,
     userId: string
   ) {
-    return await surveyRepository.bulkUpdateStatus(surveyIds, status, userId);
+    return await this.surveyRepo.bulkUpdateStatus(surveyIds, status, userId);
   }
 
   /**
@@ -241,7 +258,7 @@ export class SurveyService {
     surveyIds: string[],
     userId: string
   ) {
-    return await surveyRepository.bulkDelete(surveyIds, userId);
+    return await this.surveyRepo.bulkDelete(surveyIds, userId);
   }
 
   /**
@@ -255,7 +272,7 @@ export class SurveyService {
     console.log('[SurveyService] getSurveyByPublicLink called with:', publicLink);
 
     // Look up survey by public link
-    const survey = await surveyRepository.findByPublicLink(publicLink);
+    const survey = await this.surveyRepo.findByPublicLink(publicLink);
 
     if (!survey) {
       console.log('[SurveyService] Survey not found for public link:', publicLink);
@@ -284,14 +301,14 @@ export class SurveyService {
     console.log('[SurveyService] Survey validation passed, fetching pages...');
 
     // Fetch pages with questions
-    const pages = await pageRepository.findBySurvey(survey.id);
+    const pages = await this.pageRepo.findBySurvey(survey.id);
 
     console.log('[SurveyService] Pages fetched:', pages.length);
 
     // Fetch questions for each page
     const pagesWithQuestions = await Promise.all(
       pages.map(async (page) => {
-        const pageQuestions = await questionRepository.findByPage(page.id);
+        const pageQuestions = await this.questionRepo.findByPage(page.id);
         console.log('[SurveyService] Questions for page', page.id, ':', pageQuestions.map(q => ({
           id: q.id,
           title: q.title,

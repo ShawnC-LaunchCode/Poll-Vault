@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/90</span>
+                <span class='fraction'>0/95</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/75</span>
+                <span class='fraction'>0/85</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/10</span>
+                <span class='fraction'>0/11</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/88</span>
+                <span class='fraction'>0/93</span>
             </div>
         
             
@@ -316,7 +316,27 @@
 <a name='L251'></a><a href='#L251'>251</a>
 <a name='L252'></a><a href='#L252'>252</a>
 <a name='L253'></a><a href='#L253'>253</a>
-<a name='L254'></a><a href='#L254'>254</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L254'></a><a href='#L254'>254</a>
+<a name='L255'></a><a href='#L255'>255</a>
+<a name='L256'></a><a href='#L256'>256</a>
+<a name='L257'></a><a href='#L257'>257</a>
+<a name='L258'></a><a href='#L258'>258</a>
+<a name='L259'></a><a href='#L259'>259</a>
+<a name='L260'></a><a href='#L260'>260</a>
+<a name='L261'></a><a href='#L261'>261</a>
+<a name='L262'></a><a href='#L262'>262</a>
+<a name='L263'></a><a href='#L263'>263</a>
+<a name='L264'></a><a href='#L264'>264</a>
+<a name='L265'></a><a href='#L265'>265</a>
+<a name='L266'></a><a href='#L266'>266</a>
+<a name='L267'></a><a href='#L267'>267</a>
+<a name='L268'></a><a href='#L268'>268</a>
+<a name='L269'></a><a href='#L269'>269</a>
+<a name='L270'></a><a href='#L270'>270</a>
+<a name='L271'></a><a href='#L271'>271</a>
+<a name='L272'></a><a href='#L272'>272</a>
+<a name='L273'></a><a href='#L273'>273</a>
+<a name='L274'></a><a href='#L274'>274</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -329,6 +349,26 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -584,6 +624,26 @@ import { storage } from "../storage";
  * Handles survey results compilation, question breakdowns, and analytics aggregation
  */
 export class AnalyticsService {
+  private analyticsRepo: typeof this.analyticsRepo;
+  private responseRepo: typeof this.responseRepo;
+  private surveyRepo: typeof this.surveyRepo;
+  private questionRepo: typeof this.questionRepo;
+  private pageRepo: typeof this.pageRepo;
+&nbsp;
+<span class="fstat-no" title="function not covered" >  constructor(</span>
+    analyticsRepo?: typeof this.analyticsRepo,
+    responseRepo?: typeof this.responseRepo,
+    surveyRepo?: typeof this.surveyRepo,
+    questionRepo?: typeof this.questionRepo,
+    pageRepo?: typeof this.pageRepo
+  ) {
+<span class="cstat-no" title="statement not covered" >    this.analyticsRepo = analyticsRepo || this.analyticsRepo;</span>
+<span class="cstat-no" title="statement not covered" >    this.responseRepo = responseRepo || this.responseRepo;</span>
+<span class="cstat-no" title="statement not covered" >    this.surveyRepo = surveyRepo || this.surveyRepo;</span>
+<span class="cstat-no" title="statement not covered" >    this.questionRepo = questionRepo || this.questionRepo;</span>
+<span class="cstat-no" title="statement not covered" >    this.pageRepo = pageRepo || this.pageRepo;</span>
+  }
+&nbsp;
   /**
    * Get comprehensive survey results with question breakdowns
    */
@@ -597,7 +657,7 @@ export class AnalyticsService {
     questionBreakdown: Record&lt;string, any&gt;;
   }&gt; {
     // Verify ownership
-    const survey = <span class="cstat-no" title="statement not covered" >await surveyRepository.findById(surveyId);</span>
+    const survey = <span class="cstat-no" title="statement not covered" >await this.surveyRepo.findById(surveyId);</span>
 <span class="cstat-no" title="statement not covered" >    if (!survey) {</span>
 <span class="cstat-no" title="statement not covered" >      throw new Error("Survey not found");</span>
     }
@@ -607,7 +667,7 @@ export class AnalyticsService {
     }
 &nbsp;
     // Get responses
-    const responses = <span class="cstat-no" title="statement not covered" >await responseRepository.findBySurvey(surveyId);</span>
+    const responses = <span class="cstat-no" title="statement not covered" >await this.responseRepo.findBySurvey(surveyId);</span>
     const completedResponses = <span class="cstat-no" title="statement not covered" >responses.filter(<span class="fstat-no" title="function not covered" >r =&gt; <span class="cstat-no" title="statement not covered" >r</span>.completed)</span>;</span>
 &nbsp;
     const totalResponses = <span class="cstat-no" title="statement not covered" >responses.length;</span>
@@ -615,11 +675,11 @@ export class AnalyticsService {
     const completionRate = <span class="cstat-no" title="statement not covered" >totalResponses &gt; 0 ? (completedCount / totalResponses) * 100 : 0;</span>
 &nbsp;
     // Get all questions
-    const pages = <span class="cstat-no" title="statement not covered" >await pageRepository.findBySurvey(surveyId);</span>
+    const pages = <span class="cstat-no" title="statement not covered" >await this.pageRepo.findBySurvey(surveyId);</span>
     const allQuestions: QuestionWithSubquestions[] = <span class="cstat-no" title="statement not covered" >[];</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    for (const page of pages) {</span>
-      const questions = <span class="cstat-no" title="statement not covered" >await questionRepository.findByPageWithSubquestions(page.id);</span>
+      const questions = <span class="cstat-no" title="statement not covered" >await this.questionRepo.findByPageWithSubquestions(page.id);</span>
 <span class="cstat-no" title="statement not covered" >      allQuestions.push(...questions);</span>
     }
 &nbsp;
@@ -637,7 +697,7 @@ export class AnalyticsService {
       };
 &nbsp;
 <span class="cstat-no" title="statement not covered" >      for (const response of completedResponses) {</span>
-        const answers = <span class="cstat-no" title="statement not covered" >await responseRepository.findAnswersByResponse(response.id);</span>
+        const answers = <span class="cstat-no" title="statement not covered" >await this.responseRepo.findAnswersByResponse(response.id);</span>
         const questionAnswers = <span class="cstat-no" title="statement not covered" >answers.filter(<span class="fstat-no" title="function not covered" >a =&gt; <span class="cstat-no" title="statement not covered" >a</span>.questionId === question.id)</span>;</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >        if (questionAnswers.length &gt; 0) {</span>
@@ -712,7 +772,7 @@ export class AnalyticsService {
    */
   async <span class="fstat-no" title="function not covered" >getQuestionAnalytics(s</span>urveyId: string, userId: string) {
     // Verify ownership
-    const survey = <span class="cstat-no" title="statement not covered" >await surveyRepository.findById(surveyId);</span>
+    const survey = <span class="cstat-no" title="statement not covered" >await this.surveyRepo.findById(surveyId);</span>
 <span class="cstat-no" title="statement not covered" >    if (!survey) {</span>
 <span class="cstat-no" title="statement not covered" >      throw new Error("Survey not found");</span>
     }
@@ -721,7 +781,7 @@ export class AnalyticsService {
 <span class="cstat-no" title="statement not covered" >      throw new Error("Access denied - you do not own this survey");</span>
     }
 &nbsp;
-    // Use storage for now (could be moved to analyticsRepository)
+    // Use storage for now (could be moved to this.analyticsRepo)
 <span class="cstat-no" title="statement not covered" >    return await storage.getQuestionAnalytics(surveyId);</span>
   }
 &nbsp;
@@ -730,7 +790,7 @@ export class AnalyticsService {
    */
   async <span class="fstat-no" title="function not covered" >getPageAnalytics(s</span>urveyId: string, userId: string) {
     // Verify ownership
-    const survey = <span class="cstat-no" title="statement not covered" >await surveyRepository.findById(surveyId);</span>
+    const survey = <span class="cstat-no" title="statement not covered" >await this.surveyRepo.findById(surveyId);</span>
 <span class="cstat-no" title="statement not covered" >    if (!survey) {</span>
 <span class="cstat-no" title="statement not covered" >      throw new Error("Survey not found");</span>
     }
@@ -739,7 +799,7 @@ export class AnalyticsService {
 <span class="cstat-no" title="statement not covered" >      throw new Error("Access denied - you do not own this survey");</span>
     }
 &nbsp;
-    // Use storage for now (could be moved to analyticsRepository)
+    // Use storage for now (could be moved to this.analyticsRepo)
 <span class="cstat-no" title="statement not covered" >    return await storage.getPageAnalytics(surveyId);</span>
   }
 &nbsp;
@@ -748,7 +808,7 @@ export class AnalyticsService {
    */
   async <span class="fstat-no" title="function not covered" >getCompletionFunnel(s</span>urveyId: string, userId: string) {
     // Verify ownership
-    const survey = <span class="cstat-no" title="statement not covered" >await surveyRepository.findById(surveyId);</span>
+    const survey = <span class="cstat-no" title="statement not covered" >await this.surveyRepo.findById(surveyId);</span>
 <span class="cstat-no" title="statement not covered" >    if (!survey) {</span>
 <span class="cstat-no" title="statement not covered" >      throw new Error("Survey not found");</span>
     }
@@ -757,7 +817,7 @@ export class AnalyticsService {
 <span class="cstat-no" title="statement not covered" >      throw new Error("Access denied - you do not own this survey");</span>
     }
 &nbsp;
-    // Use storage for now (could be moved to analyticsRepository)
+    // Use storage for now (could be moved to this.analyticsRepo)
 <span class="cstat-no" title="statement not covered" >    return await storage.getCompletionFunnelData(surveyId);</span>
   }
 &nbsp;
@@ -766,7 +826,7 @@ export class AnalyticsService {
    */
   async <span class="fstat-no" title="function not covered" >getTimeSpentData(s</span>urveyId: string, userId: string) {
     // Verify ownership
-    const survey = <span class="cstat-no" title="statement not covered" >await surveyRepository.findById(surveyId);</span>
+    const survey = <span class="cstat-no" title="statement not covered" >await this.surveyRepo.findById(surveyId);</span>
 <span class="cstat-no" title="statement not covered" >    if (!survey) {</span>
 <span class="cstat-no" title="statement not covered" >      throw new Error("Survey not found");</span>
     }
@@ -775,7 +835,7 @@ export class AnalyticsService {
 <span class="cstat-no" title="statement not covered" >      throw new Error("Access denied - you do not own this survey");</span>
     }
 &nbsp;
-    // Use storage for now (could be moved to analyticsRepository)
+    // Use storage for now (could be moved to this.analyticsRepo)
 <span class="cstat-no" title="statement not covered" >    return await storage.getTimeSpentData(surveyId);</span>
   }
 &nbsp;
@@ -784,7 +844,7 @@ export class AnalyticsService {
    */
   async <span class="fstat-no" title="function not covered" >getEngagementMetrics(s</span>urveyId: string, userId: string) {
     // Verify ownership
-    const survey = <span class="cstat-no" title="statement not covered" >await surveyRepository.findById(surveyId);</span>
+    const survey = <span class="cstat-no" title="statement not covered" >await this.surveyRepo.findById(surveyId);</span>
 <span class="cstat-no" title="statement not covered" >    if (!survey) {</span>
 <span class="cstat-no" title="statement not covered" >      throw new Error("Survey not found");</span>
     }
@@ -793,7 +853,7 @@ export class AnalyticsService {
 <span class="cstat-no" title="statement not covered" >      throw new Error("Access denied - you do not own this survey");</span>
     }
 &nbsp;
-    // Use storage for now (could be moved to analyticsRepository)
+    // Use storage for now (could be moved to this.analyticsRepo)
 <span class="cstat-no" title="statement not covered" >    return await storage.getEngagementMetrics(surveyId);</span>
   }
 &nbsp;
@@ -803,7 +863,7 @@ export class AnalyticsService {
    */
   async <span class="fstat-no" title="function not covered" >getQuestionAggregates(s</span>urveyId: string, userId: string) {
     // Verify ownership
-    const survey = <span class="cstat-no" title="statement not covered" >await surveyRepository.findById(surveyId);</span>
+    const survey = <span class="cstat-no" title="statement not covered" >await this.surveyRepo.findById(surveyId);</span>
 <span class="cstat-no" title="statement not covered" >    if (!survey) {</span>
 <span class="cstat-no" title="statement not covered" >      throw new Error("Survey not found");</span>
     }
@@ -813,7 +873,7 @@ export class AnalyticsService {
     }
 &nbsp;
     // Get aggregates from repository
-    const aggregates = <span class="cstat-no" title="statement not covered" >await analyticsRepository.getQuestionAggregates(surveyId);</span>
+    const aggregates = <span class="cstat-no" title="statement not covered" >await this.analyticsRepo.getQuestionAggregates(surveyId);</span>
 &nbsp;
     // Convert Record to Array for easier frontend consumption
 <span class="cstat-no" title="statement not covered" >    return Object.values(aggregates);</span>
@@ -829,7 +889,7 @@ export const analyticsService = <span class="cstat-no" title="statement not cove
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-10-28T13:36:28.134Z
+                at 2025-10-28T14:12:23.631Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

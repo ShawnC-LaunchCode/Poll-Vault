@@ -13,6 +13,26 @@ import { storage } from "../storage";
  * Handles survey results compilation, question breakdowns, and analytics aggregation
  */
 export class AnalyticsService {
+  private analyticsRepo: typeof this.analyticsRepo;
+  private responseRepo: typeof this.responseRepo;
+  private surveyRepo: typeof this.surveyRepo;
+  private questionRepo: typeof this.questionRepo;
+  private pageRepo: typeof this.pageRepo;
+
+  constructor(
+    analyticsRepo?: typeof this.analyticsRepo,
+    responseRepo?: typeof this.responseRepo,
+    surveyRepo?: typeof this.surveyRepo,
+    questionRepo?: typeof this.questionRepo,
+    pageRepo?: typeof this.pageRepo
+  ) {
+    this.analyticsRepo = analyticsRepo || this.analyticsRepo;
+    this.responseRepo = responseRepo || this.responseRepo;
+    this.surveyRepo = surveyRepo || this.surveyRepo;
+    this.questionRepo = questionRepo || this.questionRepo;
+    this.pageRepo = pageRepo || this.pageRepo;
+  }
+
   /**
    * Get comprehensive survey results with question breakdowns
    */
@@ -26,7 +46,7 @@ export class AnalyticsService {
     questionBreakdown: Record<string, any>;
   }> {
     // Verify ownership
-    const survey = await surveyRepository.findById(surveyId);
+    const survey = await this.surveyRepo.findById(surveyId);
     if (!survey) {
       throw new Error("Survey not found");
     }
@@ -36,7 +56,7 @@ export class AnalyticsService {
     }
 
     // Get responses
-    const responses = await responseRepository.findBySurvey(surveyId);
+    const responses = await this.responseRepo.findBySurvey(surveyId);
     const completedResponses = responses.filter(r => r.completed);
 
     const totalResponses = responses.length;
@@ -44,11 +64,11 @@ export class AnalyticsService {
     const completionRate = totalResponses > 0 ? (completedCount / totalResponses) * 100 : 0;
 
     // Get all questions
-    const pages = await pageRepository.findBySurvey(surveyId);
+    const pages = await this.pageRepo.findBySurvey(surveyId);
     const allQuestions: QuestionWithSubquestions[] = [];
 
     for (const page of pages) {
-      const questions = await questionRepository.findByPageWithSubquestions(page.id);
+      const questions = await this.questionRepo.findByPageWithSubquestions(page.id);
       allQuestions.push(...questions);
     }
 
@@ -66,7 +86,7 @@ export class AnalyticsService {
       };
 
       for (const response of completedResponses) {
-        const answers = await responseRepository.findAnswersByResponse(response.id);
+        const answers = await this.responseRepo.findAnswersByResponse(response.id);
         const questionAnswers = answers.filter(a => a.questionId === question.id);
 
         if (questionAnswers.length > 0) {
@@ -141,7 +161,7 @@ export class AnalyticsService {
    */
   async getQuestionAnalytics(surveyId: string, userId: string) {
     // Verify ownership
-    const survey = await surveyRepository.findById(surveyId);
+    const survey = await this.surveyRepo.findById(surveyId);
     if (!survey) {
       throw new Error("Survey not found");
     }
@@ -150,7 +170,7 @@ export class AnalyticsService {
       throw new Error("Access denied - you do not own this survey");
     }
 
-    // Use storage for now (could be moved to analyticsRepository)
+    // Use storage for now (could be moved to this.analyticsRepo)
     return await storage.getQuestionAnalytics(surveyId);
   }
 
@@ -159,7 +179,7 @@ export class AnalyticsService {
    */
   async getPageAnalytics(surveyId: string, userId: string) {
     // Verify ownership
-    const survey = await surveyRepository.findById(surveyId);
+    const survey = await this.surveyRepo.findById(surveyId);
     if (!survey) {
       throw new Error("Survey not found");
     }
@@ -168,7 +188,7 @@ export class AnalyticsService {
       throw new Error("Access denied - you do not own this survey");
     }
 
-    // Use storage for now (could be moved to analyticsRepository)
+    // Use storage for now (could be moved to this.analyticsRepo)
     return await storage.getPageAnalytics(surveyId);
   }
 
@@ -177,7 +197,7 @@ export class AnalyticsService {
    */
   async getCompletionFunnel(surveyId: string, userId: string) {
     // Verify ownership
-    const survey = await surveyRepository.findById(surveyId);
+    const survey = await this.surveyRepo.findById(surveyId);
     if (!survey) {
       throw new Error("Survey not found");
     }
@@ -186,7 +206,7 @@ export class AnalyticsService {
       throw new Error("Access denied - you do not own this survey");
     }
 
-    // Use storage for now (could be moved to analyticsRepository)
+    // Use storage for now (could be moved to this.analyticsRepo)
     return await storage.getCompletionFunnelData(surveyId);
   }
 
@@ -195,7 +215,7 @@ export class AnalyticsService {
    */
   async getTimeSpentData(surveyId: string, userId: string) {
     // Verify ownership
-    const survey = await surveyRepository.findById(surveyId);
+    const survey = await this.surveyRepo.findById(surveyId);
     if (!survey) {
       throw new Error("Survey not found");
     }
@@ -204,7 +224,7 @@ export class AnalyticsService {
       throw new Error("Access denied - you do not own this survey");
     }
 
-    // Use storage for now (could be moved to analyticsRepository)
+    // Use storage for now (could be moved to this.analyticsRepo)
     return await storage.getTimeSpentData(surveyId);
   }
 
@@ -213,7 +233,7 @@ export class AnalyticsService {
    */
   async getEngagementMetrics(surveyId: string, userId: string) {
     // Verify ownership
-    const survey = await surveyRepository.findById(surveyId);
+    const survey = await this.surveyRepo.findById(surveyId);
     if (!survey) {
       throw new Error("Survey not found");
     }
@@ -222,7 +242,7 @@ export class AnalyticsService {
       throw new Error("Access denied - you do not own this survey");
     }
 
-    // Use storage for now (could be moved to analyticsRepository)
+    // Use storage for now (could be moved to this.analyticsRepo)
     return await storage.getEngagementMetrics(surveyId);
   }
 
@@ -232,7 +252,7 @@ export class AnalyticsService {
    */
   async getQuestionAggregates(surveyId: string, userId: string) {
     // Verify ownership
-    const survey = await surveyRepository.findById(surveyId);
+    const survey = await this.surveyRepo.findById(surveyId);
     if (!survey) {
       throw new Error("Survey not found");
     }
@@ -242,7 +262,7 @@ export class AnalyticsService {
     }
 
     // Get aggregates from repository
-    const aggregates = await analyticsRepository.getQuestionAggregates(surveyId);
+    const aggregates = await this.analyticsRepo.getQuestionAggregates(surveyId);
 
     // Convert Record to Array for easier frontend consumption
     return Object.values(aggregates);

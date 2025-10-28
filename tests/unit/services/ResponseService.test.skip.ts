@@ -6,7 +6,7 @@ import {
   createTestAnonymousResponse,
   createTestAnswer,
 } from "../../factories/responseFactory";
-import { createTestSurvey, createTestQuestion } from "../../factories/surveyFactory";
+import { createTestSurvey, createTestQuestion } from "../../factories/mockFactories";
 
 describe("ResponseService", () => {
   let service: ResponseService;
