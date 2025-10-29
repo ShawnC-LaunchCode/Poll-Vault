@@ -15,7 +15,7 @@ export default defineConfig({
     },
     coverage: {
       provider: "v8",
-      reporter: ["text", "json", "html"],
+      reporter: ["text", "json", "html", "lcov", "text-summary"],
       include: [
         "server/**/*.ts",
         "shared/**/*.ts",
@@ -29,14 +29,12 @@ export default defineConfig({
         "**/*.config.ts",
         "**/types/**",
       ],
-      // Thresholds temporarily disabled while tests are in template/skeleton state
-      // Re-enable once proper mocking is implemented
-      // thresholds: {
-      //   lines: 80,
-      //   functions: 80,
-      //   branches: 75,
-      //   statements: 80,
-      // },
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 75,
+        statements: 80,
+      },
     },
     testTimeout: 30000,
     hookTimeout: 30000,
