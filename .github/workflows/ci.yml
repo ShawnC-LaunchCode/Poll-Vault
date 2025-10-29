@@ -188,7 +188,7 @@ jobs:
 
   notify-slack:
     name: Slack Notification
-    needs: [test, test-coverage, test-e2e, deploy]
+    needs: [test, test-coverage, test-e2e]
     runs-on: ubuntu-latest
     if: always()
 
