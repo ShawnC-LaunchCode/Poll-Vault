@@ -2,12 +2,95 @@ import type { Express } from "express";
 import { isAuthenticated } from "../googleAuth";
 import { geminiService } from "../services/geminiService";
 import { surveyService } from "../services";
+import { SurveyAIService } from "../services/SurveyAIService";
+
+// Initialize AI service for survey generation
+const surveyAIService = new SurveyAIService();
 
 /**
  * Register AI-powered analytics routes
  * Handles AI insights, analysis, and recommendations
  */
 export function registerAiRoutes(app: Express): void {
+
+  /**
+   * POST /api/ai/generate
+   * Generate a new survey using AI based on a topic
+   *
+   * Body: { topic: string, prompt?: string }
+   * Returns: Created survey object (status: draft)
+   */
+  app.post('/api/ai/generate', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { topic, prompt } = req.body || {};
+
+      // Validate topic
+      if (!topic || !String(topic).trim()) {
+        return res.status(400).json({ message: "Topic is required" });
+      }
+
+      // Check if Gemini API is configured
+      if (!process.env.GEMINI_API_KEY) {
+        return res.status(503).json({
+          message: "AI survey generation not available",
+          error: "GEMINI_API_KEY not configured on server"
+        });
+      }
+
+      console.log(`[AI] Generating survey for topic: ${String(topic).substring(0, 100)}`);
+
+      // Generate and create survey
+      const survey = await surveyAIService.generateAndCreateSurvey(
+        userId,
+        String(topic),
+        prompt ? String(prompt) : undefined
+      );
+
+      console.log(`[AI] Survey generated successfully: ${survey.id}`);
+
+      return res.status(201).json(survey);
+
+    } catch (error) {
+      console.error("[AI] Error generating survey:", error);
+
+      if (error instanceof Error) {
+        // Handle specific error cases
+        if (error.message.includes("GEMINI_API_KEY")) {
+          return res.status(503).json({
+            message: "AI service not configured",
+            error: error.message
+          });
+        }
+
+        if (error.message.includes("invalid JSON") || error.message.includes("invalid question type")) {
+          return res.status(400).json({
+            message: "Failed to generate valid survey",
+            error: error.message
+          });
+        }
+
+        if (error.message.includes("quota") || error.message.includes("RATE_LIMIT")) {
+          return res.status(429).json({
+            message: "AI service rate limit exceeded",
+            error: "Please try again in a few minutes"
+          });
+        }
+
+        return res.status(500).json({
+          message: "Failed to generate survey",
+          error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+      }
+
+      res.status(500).json({ message: "Failed to generate survey" });
+    }
+  });
 
   /**
    * POST /api/ai/analyze-survey/:surveyId

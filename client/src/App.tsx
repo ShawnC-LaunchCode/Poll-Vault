@@ -21,6 +21,7 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminUserSurveys from "@/pages/AdminUserSurveys";
 import AdminSurveys from "@/pages/AdminSurveys";
+import AISurveyCreator from "@/pages/AISurveyCreator";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -42,6 +43,7 @@ function Router() {
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/surveys" component={SurveysList} />
           <Route path="/surveys/new" component={SurveyBuilder} />
+          <Route path="/ai-survey" component={AISurveyCreator} />
           <Route path="/builder/:surveyId" component={SurveyBuilder} />
           <Route path="/builder/:surveyId/preview" component={SurveyPreview} />
           <Route path="/surveys/:id/preview" component={SurveyPreview} />

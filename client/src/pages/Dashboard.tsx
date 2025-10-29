@@ -19,7 +19,7 @@ import { Link } from "wouter";
 import {
   FileText, PlayCircle, TrendingUp, Percent, History,
   Home, PieChart, Settings, Zap, Plus,
-  BarChart3, Download, Clock, ExternalLink
+  BarChart3, Download, Clock, ExternalLink, Sparkles
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -179,6 +179,15 @@ export default function Dashboard() {
                       iconBgColor="bg-primary/10"
                       label="Create New Survey"
                       testId="button-quick-create-survey"
+                    />
+
+                    <QuickActionButton
+                      href="/ai-survey"
+                      icon={Sparkles}
+                      iconColor="text-indigo-600"
+                      iconBgColor="bg-indigo-50"
+                      label="Generate with AI"
+                      testId="button-quick-ai-survey"
                     />
 
                     <QuickActionButton
