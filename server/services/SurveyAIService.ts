@@ -43,7 +43,7 @@ export class SurveyAIService {
     surveyRepo?: typeof surveyRepository,
     pageRepo?: typeof pageRepository,
     questionRepo?: typeof questionRepository,
-    modelName: string = "gemini-1.5-pro"
+    modelName: string = "gemini-2.5-flash"
   ) {
     this.surveyRepo = surveyRepo || surveyRepository;
     this.pageRepo = pageRepo || pageRepository;
