@@ -11,10 +11,11 @@ import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { SkeletonCard } from "@/components/shared/SkeletonCard";
 import { Link } from "wouter";
-import { Plus, Edit, BarChart, Users, Trash2, FileText, Copy, Sparkles, Wand2, PenSquare } from "lucide-react";
+import { Plus, Edit, BarChart, Users, Trash2, FileText, Copy, Sparkles, Wand2, PenSquare, ChevronDown } from "lucide-react";
 
 export default function SurveysList() {
   const { toast } = useToast();
@@ -107,16 +108,40 @@ export default function SurveysList() {
       <Sidebar />
       
       <main className="flex-1 flex flex-col overflow-hidden">
-        <Header 
-          title="My Surveys" 
+        <Header
+          title="My Surveys"
           description="Create, manage, and analyze your surveys"
           actions={
-            <Link href="/surveys/new">
-              <Button data-testid="button-create-survey">
-                <Plus className="w-4 h-4 mr-2" />
-                Create New Survey
-              </Button>
-            </Link>
+            <div className="flex items-center gap-0">
+              <Link href="/ai-survey">
+                <Button
+                  data-testid="button-create-survey"
+                  className="rounded-r-none bg-indigo-600 hover:bg-indigo-700"
+                >
+                  <Wand2 className="w-4 h-4 mr-2" />
+                  Generate with AI
+                </Button>
+              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="default"
+                    className="rounded-l-none border-l border-indigo-500 px-2 bg-indigo-600 hover:bg-indigo-700"
+                    data-testid="button-create-survey-dropdown"
+                  >
+                    <ChevronDown className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <Link href="/surveys/new">
+                    <DropdownMenuItem data-testid="button-create-blank-survey">
+                      <PenSquare className="w-4 h-4 mr-2" />
+                      Start Blank
+                    </DropdownMenuItem>
+                  </Link>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           }
         />
         
