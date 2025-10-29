@@ -20,27 +20,27 @@ import type {
  * Handles response creation, answer submission, and completion validation
  */
 export class ResponseService {
-  private responseRepo: typeof this.responseRepo;
-  private surveyRepo: typeof this.surveyRepo;
-  private questionRepo: typeof this.questionRepo;
-  private recipientRepo: typeof this.recipientRepo;
-  private pageRepo: typeof this.pageRepo;
-  private systemStatsRepo: typeof this.systemStatsRepo;
+  private responseRepo: typeof responseRepository;
+  private surveyRepo: typeof surveyRepository;
+  private questionRepo: typeof questionRepository;
+  private recipientRepo: typeof recipientRepository;
+  private pageRepo: typeof pageRepository;
+  private systemStatsRepo: typeof systemStatsRepository;
 
   constructor(
-    responseRepo?: typeof this.responseRepo,
-    surveyRepo?: typeof this.surveyRepo,
-    questionRepo?: typeof this.questionRepo,
-    recipientRepo?: typeof this.recipientRepo,
-    pageRepo?: typeof this.pageRepo,
-    systemStatsRepo?: typeof this.systemStatsRepo
+    responseRepo?: typeof responseRepository,
+    surveyRepo?: typeof surveyRepository,
+    questionRepo?: typeof questionRepository,
+    recipientRepo?: typeof recipientRepository,
+    pageRepo?: typeof pageRepository,
+    systemStatsRepo?: typeof systemStatsRepository
   ) {
-    this.responseRepo = responseRepo || this.responseRepo;
-    this.surveyRepo = surveyRepo || this.surveyRepo;
-    this.questionRepo = questionRepo || this.questionRepo;
-    this.recipientRepo = recipientRepo || this.recipientRepo;
-    this.pageRepo = pageRepo || this.pageRepo;
-    this.systemStatsRepo = systemStatsRepo || this.systemStatsRepo;
+    this.responseRepo = responseRepo || responseRepository;
+    this.surveyRepo = surveyRepo || surveyRepository;
+    this.questionRepo = questionRepo || questionRepository;
+    this.recipientRepo = recipientRepo || recipientRepository;
+    this.pageRepo = pageRepo || pageRepository;
+    this.systemStatsRepo = systemStatsRepo || systemStatsRepository;
   }
 
   /**

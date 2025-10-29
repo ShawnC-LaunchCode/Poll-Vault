@@ -13,24 +13,24 @@ import { storage } from "../storage";
  * Handles survey results compilation, question breakdowns, and analytics aggregation
  */
 export class AnalyticsService {
-  private analyticsRepo: typeof this.analyticsRepo;
-  private responseRepo: typeof this.responseRepo;
-  private surveyRepo: typeof this.surveyRepo;
-  private questionRepo: typeof this.questionRepo;
-  private pageRepo: typeof this.pageRepo;
+  private analyticsRepo: typeof analyticsRepository;
+  private responseRepo: typeof responseRepository;
+  private surveyRepo: typeof surveyRepository;
+  private questionRepo: typeof questionRepository;
+  private pageRepo: typeof pageRepository;
 
   constructor(
-    analyticsRepo?: typeof this.analyticsRepo,
-    responseRepo?: typeof this.responseRepo,
-    surveyRepo?: typeof this.surveyRepo,
-    questionRepo?: typeof this.questionRepo,
-    pageRepo?: typeof this.pageRepo
+    analyticsRepo?: typeof analyticsRepository,
+    responseRepo?: typeof responseRepository,
+    surveyRepo?: typeof surveyRepository,
+    questionRepo?: typeof questionRepository,
+    pageRepo?: typeof pageRepository
   ) {
-    this.analyticsRepo = analyticsRepo || this.analyticsRepo;
-    this.responseRepo = responseRepo || this.responseRepo;
-    this.surveyRepo = surveyRepo || this.surveyRepo;
-    this.questionRepo = questionRepo || this.questionRepo;
-    this.pageRepo = pageRepo || this.pageRepo;
+    this.analyticsRepo = analyticsRepo || analyticsRepository;
+    this.responseRepo = responseRepo || responseRepository;
+    this.surveyRepo = surveyRepo || surveyRepository;
+    this.questionRepo = questionRepo || questionRepository;
+    this.pageRepo = pageRepo || pageRepository;
   }
 
   /**

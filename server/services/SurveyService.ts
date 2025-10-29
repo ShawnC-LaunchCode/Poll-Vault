@@ -17,20 +17,20 @@ import { validateSurveyForPublish, canChangeStatus } from "./surveyValidation";
  * Orchestrates repository calls, handles authorization, and enforces business rules
  */
 export class SurveyService {
-  private surveyRepo: typeof this.surveyRepo;
-  private pageRepo: typeof this.pageRepo;
-  private questionRepo: typeof this.questionRepo;
+  private surveyRepo: typeof surveyRepository;
+  private pageRepo: typeof pageRepository;
+  private questionRepo: typeof questionRepository;
   private userRepo: typeof userRepository;
 
   constructor(
-    surveyRepo?: typeof this.surveyRepo,
-    pageRepo?: typeof this.pageRepo,
-    questionRepo?: typeof this.questionRepo,
+    surveyRepo?: typeof surveyRepository,
+    pageRepo?: typeof pageRepository,
+    questionRepo?: typeof questionRepository,
     userRepo?: typeof userRepository
   ) {
-    this.surveyRepo = surveyRepo || this.surveyRepo;
-    this.pageRepo = pageRepo || this.pageRepo;
-    this.questionRepo = questionRepo || this.questionRepo;
+    this.surveyRepo = surveyRepo || surveyRepository;
+    this.pageRepo = pageRepo || pageRepository;
+    this.questionRepo = questionRepo || questionRepository;
     this.userRepo = userRepo || userRepository;
   }
 
