@@ -73,6 +73,20 @@ jobs:
       - name: Run tests with coverage
         run: npm run test:coverage
 
+      - name: Extract coverage summary
+        if: always()
+        run: |
+          npx c8 report --reporter=text-summary > coverage-summary.txt 2>&1 || echo "Coverage: N/A" > coverage-summary.txt
+          cat coverage-summary.txt
+
+      - name: Upload coverage summary artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-summary
+          path: coverage-summary.txt
+          retention-days: 1
+
       - name: Upload coverage reports
         uses: codecov/codecov-action@v4
         if: success()
@@ -139,3 +153,218 @@ jobs:
         run: railway up --service ${{ secrets.RAILWAY_SERVICE_ID }}
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  notify-slack:
+    name: Slack Notification
+    needs: [test, test-coverage, test-e2e, deploy]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download coverage artifact
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: coverage-summary
+          path: ./
+
+      - name: Build Slack notification payload
+        id: slack-payload
+        run: |
+          # Determine overall status
+          TEST_RESULT="${{ needs.test.result }}"
+          COVERAGE_RESULT="${{ needs.test-coverage.result }}"
+          E2E_RESULT="${{ needs.test-e2e.result }}"
+          DEPLOY_RESULT="${{ needs.deploy.result }}"
+
+          if [[ "$TEST_RESULT" == "success" && "$COVERAGE_RESULT" == "success" && "$E2E_RESULT" == "success" ]]; then
+            STATUS_ICON="✅"
+            STATUS_TEXT="Build Passed"
+            COLOR="#36A64F"
+            OVERALL_STATUS="success"
+          else
+            STATUS_ICON="❌"
+            STATUS_TEXT="Build Failed"
+            COLOR="#FF0000"
+            OVERALL_STATUS="failure"
+          fi
+
+          # Extract metadata
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          COMMIT_SHORT="${GITHUB_SHA:0:7}"
+          COMMIT_MSG=$(git log -1 --pretty=%s)
+          AUTHOR=$(git log -1 --pretty=format:'%an')
+          REPO="${GITHUB_REPOSITORY}"
+          RUN_URL="https://github.com/${REPO}/actions/runs/${GITHUB_RUN_ID}"
+
+          # Extract coverage percentage
+          if [ -f coverage-summary.txt ]; then
+            COVERAGE=$(grep -oP '\d+\.\d+(?=%)' coverage-summary.txt | head -1 || echo "N/A")
+            if [ -n "$COVERAGE" ]; then
+              COVERAGE="${COVERAGE}%"
+            else
+              COVERAGE="N/A"
+            fi
+          else
+            COVERAGE="N/A"
+          fi
+
+          # Determine environment
+          if [[ "$BRANCH" == "main" ]]; then
+            ENVIRONMENT="Production"
+            DEPLOY_URL="https://poll-vault-production.up.railway.app"
+          elif [[ "$BRANCH" == "develop" ]]; then
+            ENVIRONMENT="Staging"
+            DEPLOY_URL="https://poll-vault-staging.up.railway.app"
+          else
+            ENVIRONMENT="Preview"
+            DEPLOY_URL="N/A"
+          fi
+
+          # Test result emojis
+          if [[ "$TEST_RESULT" == "success" ]]; then
+            UNIT_STATUS="✅"
+          else
+            UNIT_STATUS="❌"
+          fi
+
+          if [[ "$COVERAGE_RESULT" == "success" ]]; then
+            COV_STATUS="✅"
+          else
+            COV_STATUS="⚠️"
+          fi
+
+          if [[ "$E2E_RESULT" == "success" ]]; then
+            E2E_STATUS="✅"
+          else
+            E2E_STATUS="❌"
+          fi
+
+          # Deployment status
+          if [[ "$DEPLOY_RESULT" == "success" ]]; then
+            DEPLOY_TEXT="🚀 *Deployed:* <$DEPLOY_URL|View Live App>"
+          elif [[ "$DEPLOY_RESULT" == "skipped" ]]; then
+            DEPLOY_TEXT="⏭️ *Deployment:* Skipped (not main branch)"
+          else
+            DEPLOY_TEXT="❌ *Deployment:* Failed"
+          fi
+
+          # Build Slack Block Kit JSON payload
+          cat << EOF > payload.json
+          {
+            "attachments": [
+              {
+                "color": "$COLOR",
+                "blocks": [
+                  {
+                    "type": "header",
+                    "text": {
+                      "type": "plain_text",
+                      "text": "🚀 Poll-Vault CI/CD Report",
+                      "emoji": true
+                    }
+                  },
+                  {
+                    "type": "section",
+                    "fields": [
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Status:*\\n$STATUS_ICON $STATUS_TEXT"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Environment:*\\n$ENVIRONMENT"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Branch:*\\n\`$BRANCH\`"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Commit:*\\n\`$COMMIT_SHORT\`"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Author:*\\n$AUTHOR"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Coverage:*\\n$COVERAGE"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "*Commit Message:*\\n> $COMMIT_MSG"
+                    }
+                  },
+                  {
+                    "type": "divider"
+                  },
+                  {
+                    "type": "context",
+                    "elements": [
+                      {
+                        "type": "mrkdwn",
+                        "text": "🧪 *Test Results Summary*"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "section",
+                    "fields": [
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Unit & Integration:* $UNIT_STATUS"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Coverage:* $COV_STATUS"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*E2E (Playwright):* $E2E_STATUS"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "divider"
+                  },
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "$DEPLOY_TEXT\\n📊 *Workflow Details:* <$RUN_URL|View on GitHub>"
+                    }
+                  },
+                  {
+                    "type": "context",
+                    "elements": [
+                      {
+                        "type": "plain_text",
+                        "text": "GitHub Actions • Railway CI • Poll-Vault",
+                        "emoji": true
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+          EOF
+
+          cat payload.json
+
+      - name: Send Slack notification
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload-file-path: ./payload.json
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
