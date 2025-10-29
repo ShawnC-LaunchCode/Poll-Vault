@@ -5,9 +5,11 @@ import { userRepository } from "../repositories/UserRepository";
 import { surveyRepository } from "../repositories/SurveyRepository";
 import { responseRepository } from "../repositories/ResponseRepository";
 import { systemStatsRepository } from "../repositories/SystemStatsRepository";
+import { ActivityLogService } from "../services/ActivityLogService";
 import { createLogger } from "../logger";
 
 const logger = createLogger({ module: 'admin-routes' });
+const activityLogService = new ActivityLogService();
 
 /**
  * Register admin-only routes
@@ -362,6 +364,125 @@ export function registerAdminRoutes(app: Express): void {
     } catch (error) {
       logger.error({ err: error, adminId: req.adminUser.id }, 'Error fetching admin stats');
       res.status(500).json({ message: "Failed to fetch statistics" });
+    }
+  });
+
+  // ============================================================================
+  // Activity Logs
+  // ============================================================================
+
+  /**
+   * GET /api/admin/logs
+   * Get activity logs with filtering and pagination
+   */
+  app.get('/api/admin/logs', isAdmin, async (req: any, res) => {
+    try {
+      const query = {
+        q: req.query.q as string | undefined,
+        event: req.query.event as string | undefined,
+        actor: req.query.actor as string | undefined,
+        entityType: req.query.entityType as string | undefined,
+        entityId: req.query.entityId as string | undefined,
+        status: req.query.status as string | undefined,
+        from: req.query.from as string | undefined,
+        to: req.query.to as string | undefined,
+        limit: req.query.limit ? Number(req.query.limit) : 50,
+        offset: req.query.offset ? Number(req.query.offset) : 0,
+        sort: (req.query.sort as "timestamp_desc" | "timestamp_asc") || "timestamp_desc",
+      };
+
+      const result = await activityLogService.list(query);
+
+      logger.info(
+        {
+          adminId: req.adminUser.id,
+          query,
+          resultCount: result.rows.length,
+          total: result.total
+        },
+        'Admin fetched activity logs'
+      );
+
+      res.json(result);
+    } catch (error) {
+      logger.error({ err: error, adminId: req.adminUser.id }, 'Error fetching activity logs');
+      res.status(500).json({ message: "Failed to fetch activity logs" });
+    }
+  });
+
+  /**
+   * GET /api/admin/logs/export
+   * Export activity logs to CSV
+   */
+  app.get('/api/admin/logs/export', isAdmin, async (req: any, res) => {
+    try {
+      const query = {
+        q: req.query.q as string | undefined,
+        event: req.query.event as string | undefined,
+        actor: req.query.actor as string | undefined,
+        entityType: req.query.entityType as string | undefined,
+        entityId: req.query.entityId as string | undefined,
+        status: req.query.status as string | undefined,
+        from: req.query.from as string | undefined,
+        to: req.query.to as string | undefined,
+        sort: (req.query.sort as "timestamp_desc" | "timestamp_asc") || "timestamp_desc",
+        limit: 5000, // Export limit
+        offset: 0,
+      };
+
+      const { filename, csv } = await activityLogService.exportCsv(query);
+
+      logger.info(
+        { adminId: req.adminUser.id, query, filename },
+        'Admin exported activity logs to CSV'
+      );
+
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.send(csv);
+    } catch (error) {
+      logger.error({ err: error, adminId: req.adminUser.id }, 'Error exporting activity logs');
+      res.status(500).json({ message: "Failed to export activity logs" });
+    }
+  });
+
+  /**
+   * GET /api/admin/logs/events
+   * Get unique event types for filter dropdowns
+   */
+  app.get('/api/admin/logs/events', isAdmin, async (req: any, res) => {
+    try {
+      const events = await activityLogService.getUniqueEvents();
+
+      logger.info(
+        { adminId: req.adminUser.id, eventCount: events.length },
+        'Admin fetched unique event types'
+      );
+
+      res.json(events);
+    } catch (error) {
+      logger.error({ err: error, adminId: req.adminUser.id }, 'Error fetching event types');
+      res.status(500).json({ message: "Failed to fetch event types" });
+    }
+  });
+
+  /**
+   * GET /api/admin/logs/actors
+   * Get unique actors for filter dropdowns
+   */
+  app.get('/api/admin/logs/actors', isAdmin, async (req: any, res) => {
+    try {
+      const actors = await activityLogService.getUniqueActors();
+
+      logger.info(
+        { adminId: req.adminUser.id, actorCount: actors.length },
+        'Admin fetched unique actors'
+      );
+
+      res.json(actors);
+    } catch (error) {
+      logger.error({ err: error, adminId: req.adminUser.id }, 'Error fetching actors');
+      res.status(500).json({ message: "Failed to fetch actors" });
     }
   });
 }

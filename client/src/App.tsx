@@ -21,6 +21,7 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminUserSurveys from "@/pages/AdminUserSurveys";
 import AdminSurveys from "@/pages/AdminSurveys";
+import AdminLogs from "@/pages/AdminLogs";
 import AISurveyCreator from "@/pages/AISurveyCreator";
 
 function Router() {
@@ -60,6 +61,7 @@ function Router() {
           <Route path="/admin/users" component={AdminUsers} />
           <Route path="/admin/users/:userId/surveys" component={AdminUserSurveys} />
           <Route path="/admin/surveys" component={AdminSurveys} />
+          <Route path="/admin/logs" component={AdminLogs} />
           {/* 404 for authenticated users only */}
           <Route component={NotFound} />
         </>

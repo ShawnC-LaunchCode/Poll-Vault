@@ -45,6 +45,7 @@ export default function Sidebar() {
   const adminNavigation = [
     { name: "Admin Dashboard", href: "/admin", icon: "fas fa-shield-alt" },
     { name: "Manage Users", href: "/admin/users", icon: "fas fa-users-cog" },
+    { name: "Activity Logs", href: "/admin/logs", icon: "fas fa-clipboard-list" },
   ];
 
   const isActive = (href: string) => {
