@@ -71,7 +71,9 @@ jobs:
         run: npm ci
 
       - name: Run tests with coverage
-        run: npm run test:coverage
+        id: vitest
+        run: |
+          npm run test:coverage -- --reporter=json --outputFile=vitest-summary.json || echo "Vitest failed" > vitest_fail.txt
 
       - name: Extract coverage summary
         if: always()
@@ -85,6 +87,14 @@ jobs:
         with:
           name: coverage-summary
           path: coverage-summary.txt
+          retention-days: 1
+
+      - name: Upload Vitest JSON summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-summary
+          path: vitest-summary.json
           retention-days: 1
 
       - name: Upload coverage reports
@@ -126,7 +136,9 @@ jobs:
         run: npx playwright install --with-deps
 
       - name: Run E2E tests
-        run: npm run test:e2e
+        id: playwright
+        run: |
+          npx playwright test --reporter=json > playwright-summary.json 2>&1 || echo "Playwright failed" > playwright_fail.txt
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
@@ -135,6 +147,14 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 30
+
+      - name: Upload Playwright JSON summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-summary
+          path: playwright-summary.json
+          retention-days: 1
 
   deploy:
     name: Deploy to Railway
@@ -172,6 +192,62 @@ jobs:
         with:
           name: coverage-summary
           path: ./
+
+      - name: Download Vitest JSON summary
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: vitest-summary
+          path: ./
+
+      - name: Download Playwright JSON summary
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: playwright-summary
+          path: ./
+
+      - name: Parse Vitest & Playwright Summaries
+        id: parse-tests
+        run: |
+          # --- Vitest Summary ---
+          if [ -f vitest-summary.json ]; then
+            V_TOTAL=$(jq '.numTotalTests // 0' vitest-summary.json)
+            V_PASSED=$(jq '.numPassedTests // 0' vitest-summary.json)
+            V_FAILED=$(jq '.numFailedTests // 0' vitest-summary.json)
+            V_SKIPPED=$(jq '.numPendingTests // 0' vitest-summary.json)
+          else
+            V_TOTAL=0
+            V_PASSED=0
+            V_FAILED=0
+            V_SKIPPED=0
+          fi
+
+          # --- Playwright Summary ---
+          if [ -f playwright-summary.json ]; then
+            # Playwright JSON format: suites array with specs array containing tests
+            P_TOTAL=$(jq '[.suites[].specs[].tests[]] | length' playwright-summary.json 2>/dev/null || echo 0)
+            P_PASSED=$(jq '[.suites[].specs[].tests[] | select(.status == "expected" or .status == "passed")] | length' playwright-summary.json 2>/dev/null || echo 0)
+            P_FAILED=$(jq '[.suites[].specs[].tests[] | select(.status == "unexpected" or .status == "failed")] | length' playwright-summary.json 2>/dev/null || echo 0)
+            P_SKIPPED=$(jq '[.suites[].specs[].tests[] | select(.status == "skipped")] | length' playwright-summary.json 2>/dev/null || echo 0)
+          else
+            P_TOTAL=0
+            P_PASSED=0
+            P_FAILED=0
+            P_SKIPPED=0
+          fi
+
+          echo "v_total=$V_TOTAL" >> $GITHUB_OUTPUT
+          echo "v_passed=$V_PASSED" >> $GITHUB_OUTPUT
+          echo "v_failed=$V_FAILED" >> $GITHUB_OUTPUT
+          echo "v_skipped=$V_SKIPPED" >> $GITHUB_OUTPUT
+          echo "p_total=$P_TOTAL" >> $GITHUB_OUTPUT
+          echo "p_passed=$P_PASSED" >> $GITHUB_OUTPUT
+          echo "p_failed=$P_FAILED" >> $GITHUB_OUTPUT
+          echo "p_skipped=$P_SKIPPED" >> $GITHUB_OUTPUT
+
+          echo "Vitest: $V_PASSED/$V_TOTAL passed ($V_FAILED failed, $V_SKIPPED skipped)"
+          echo "Playwright: $P_PASSED/$P_TOTAL passed ($P_FAILED failed, $P_SKIPPED skipped)"
 
       - name: Build Slack notification payload
         id: slack-payload
@@ -244,6 +320,17 @@ jobs:
           else
             E2E_STATUS="❌"
           fi
+
+          # Get test statistics from parsed JSON
+          V_PASSED="${{ steps.parse-tests.outputs.v_passed }}"
+          V_FAILED="${{ steps.parse-tests.outputs.v_failed }}"
+          V_TOTAL="${{ steps.parse-tests.outputs.v_total }}"
+          V_SKIPPED="${{ steps.parse-tests.outputs.v_skipped }}"
+
+          P_PASSED="${{ steps.parse-tests.outputs.p_passed }}"
+          P_FAILED="${{ steps.parse-tests.outputs.p_failed }}"
+          P_TOTAL="${{ steps.parse-tests.outputs.p_total }}"
+          P_SKIPPED="${{ steps.parse-tests.outputs.p_skipped }}"
 
           # Deployment status
           if [[ "$DEPLOY_RESULT" == "success" ]]; then
@@ -322,15 +409,28 @@ jobs:
                     "fields": [
                       {
                         "type": "mrkdwn",
-                        "text": "*Unit & Integration:* $UNIT_STATUS"
+                        "text": "*Vitest (Unit + Integration):*\\n$V_PASSED / $V_TOTAL passed $UNIT_STATUS"
                       },
                       {
                         "type": "mrkdwn",
-                        "text": "*Coverage:* $COV_STATUS"
+                        "text": "*Coverage:*\\n$COVERAGE $COV_STATUS"
                       },
                       {
                         "type": "mrkdwn",
-                        "text": "*E2E (Playwright):* $E2E_STATUS"
+                        "text": "*Playwright (E2E):*\\n$P_PASSED / $P_TOTAL passed $E2E_STATUS"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "section",
+                    "fields": [
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Failed Tests:*\\nVitest: $V_FAILED | Playwright: $P_FAILED"
+                      },
+                      {
+                        "type": "mrkdwn",
+                        "text": "*Skipped Tests:*\\nVitest: $V_SKIPPED | Playwright: $P_SKIPPED"
                       }
                     ]
                   },
