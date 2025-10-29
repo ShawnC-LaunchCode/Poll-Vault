@@ -1,334 +1,52 @@
 # Poll-Vault: Developer Reference Guide
 
 **Last Updated:** 2025-10-23
-**Project Type:** Survey/Polling Platform (formerly DevPulse)
+**Project Type:** Survey/Polling Platform
 **Tech Stack:** Node.js/Express, React, PostgreSQL (Neon), Drizzle ORM
 
 ---
 
-## Recent Fixes & Updates
+## Recent Updates
 
-### 2025-10-22: Historical Statistics Tracking System
-**Achievement:** Implemented comprehensive historical metrics to track all-time system usage
+### 2025-10-22: Historical Statistics & Admin Enhancements
+- Added `systemStats` table tracking lifetime totals (surveys/responses created/deleted)
+- Added survey deletion buttons to admin pages with confirmation dialogs
+- Implemented status-based navigation (drafts → builder, active → results)
+- Fixed anonymous response creation by auto-generating `publicLink`
+- Fixed analytics fallback to use actual answer data when events missing
 
-**Changes:**
-- **New Database Table:** `systemStats` - Single-row table tracking lifetime totals
-  - `totalSurveysCreated` - All surveys ever created
-  - `totalSurveysDeleted` - Surveys that have been permanently deleted
-  - `totalResponsesCollected` - All responses ever submitted
-  - `totalResponsesDeleted` - Responses deleted via survey cascade
+### 2025-10-20: Railway Migration & Cleanup
+- Removed legacy Replit and Docker configurations
+- Simplified CORS to use `ALLOWED_ORIGIN` only
+- Verified production-ready architecture (monolithic full-stack deployment)
 
-- **New Repository:** `SystemStatsRepository.ts`
-  - `incrementSurveysCreated()` - Called on survey creation
-  - `incrementSurveysDeleted()` - Called on survey deletion
-  - `incrementResponsesCollected()` - Called on response submission
-  - Automatically tracks cascade-deleted responses
-
-- **Backend Updates:**
-  - Survey creation endpoint increments creation counter
-  - Response creation (authenticated & anonymous) increments response counter
-  - Survey deletion endpoint counts and tracks deleted responses
-  - Admin stats endpoint returns historical totals
-
-- **Admin Dashboard UI:**
-  - New "Historical Statistics (All Time)" section
-  - 4 new metric cards: Total Surveys Created, Surveys Deleted, Total Responses Collected, Responses Deleted
-  - Color-coded cards with visual indicators
-  - Clear labeling: "Including deleted items" and "Via survey deletions"
-
-**Benefits:**
-- Complete visibility into system usage over time
-- Track deleted data for audit and reporting purposes
-- Better understanding of user engagement and data lifecycle
-
-**Commits:**
-- `c0741fb` - "feat(admin): Add historical statistics tracking for surveys and responses"
-
-### 2025-10-22: Admin Panel Enhancements
-**Achievement:** Enhanced admin capabilities for survey management and user oversight
-
-**Changes:**
-- **Survey Deletion from Admin Views:**
-  - Added delete button with confirmation dialog to AdminSurveys page (`/admin/surveys`)
-  - Added delete button with confirmation dialog to AdminUserSurveys page (`/admin/users/:id/surveys`)
-  - Delete buttons include trash icon, loading states, and toast notifications
-  - Automatic cache invalidation after deletion
-
-- **Sidebar Navigation Cleanup:**
-  - Removed Analytics link from main sidebar navigation
-  - Simplified to: Dashboard, My Surveys, Recipients
-
-**Files Modified:**
-- `client/src/components/layout/Sidebar.tsx` - Removed Analytics navigation
-- `client/src/pages/AdminSurveys.tsx` - Added delete functionality
-- `client/src/pages/AdminUserSurveys.tsx` - Added delete functionality
-- `server/routes/admin.routes.ts` - Added response counting before deletion
-
-**Commits:**
-- `744eb8b` - "feat(admin): Add survey deletion and remove Analytics navigation"
-- `926e4c8` - "feat(admin): Add survey deletion to user-specific surveys page"
-
-### 2025-10-22: UX Improvements & Bug Fixes
-**Achievement:** Enhanced user experience with smart navigation and critical bug fixes
-
-**Changes:**
-- **Status-Based Dashboard Navigation:**
-  - Recent surveys now route based on status
-  - Draft surveys → `/builder/:id` (edit mode)
-  - Active/Closed surveys → `/surveys/:id/results` (results page)
-  - Improves workflow by directing users to most relevant page
-
-- **Anonymous Response Fix:**
-  - Auto-generate `publicLink` when `allowAnonymous` is enabled
-  - Fixes issue where anonymous responses couldn't be created
-  - Modified `SurveyService.updateSurvey()` to generate UUID publicLink if missing
-  - Resolves problem where survey results didn't include anonymous responses
-
-- **Question Analytics Fix:**
-  - Modified `getQuestionAnalytics()` to use actual answer data as fallback
-  - Queries both `analyticsEvents` table AND `answers` table
-  - Uses `Math.max()` to pick higher count (handles missing event tracking)
-  - Falls back to answer count for views when focus events don't exist
-  - Fixes issue where analytics showed no results despite having responses
-
-**Files Modified:**
-- `client/src/pages/Dashboard.tsx` - Status-based navigation
-- `server/services/SurveyService.ts` - publicLink auto-generation
-- `server/storage.ts` - Analytics fallback logic
-
-**Commits:**
-- `c7249b5` - "feat(ui): Add status-based navigation for recent surveys on dashboard"
-- `6e833cd` - "fix(survey): Auto-generate publicLink when enabling anonymous responses"
-- `6b987db` - "fix(analytics): Use actual answer data when analytics events are missing"
-
-### 2025-10-20: Post-Deployment Cleanup
-**Achievement:** Removed legacy Replit and Docker configurations after successful Railway migration
-
-**Changes:**
-- **Removed Replit Dependencies:**
-  - Deleted `.replit` configuration file
-  - Removed `@replit/vite-plugin-cartographer`, `@replit/vite-plugin-dev-banner`, and `@replit/vite-plugin-runtime-error-modal` from package.json
-  - Cleaned up `vite.config.ts` to remove Replit plugin imports and async logic
-  - Removed Replit domain patterns from `server/production.ts` CORS configuration
-
-- **Simplified CORS Configuration:**
-  - Removed outdated Railway environment variables (`RAILWAY_STATIC_URL`, `RAILWAY_STATIC_DOMAIN`)
-  - Unified CORS logic in `server/index.ts` to match the cleaner approach in `server/production.ts`
-  - Now uses only `ALLOWED_ORIGIN` environment variable for production
-
-- **Removed Docker Configuration:**
-  - Deleted `Dockerfile`, `docker-compose.yml`, `.dockerignore`, and `.env.docker`
-  - Railway deployment doesn't require Docker configuration
-
-**Current State:**
-- Codebase is now Railway-specific with no legacy platform dependencies
-- CORS configuration is simplified and consistent across files
-- Google Client ID remains hardcoded temporarily (TODO: migrate to proper env injection)
-
-**Files Modified:**
-- `package.json` - Removed 3 Replit dependencies
-- `vite.config.ts` - Simplified from async to sync config, removed Replit plugins
-- `server/production.ts` - Removed Replit CORS patterns
-- `server/index.ts` - Simplified CORS to use ALLOWED_ORIGIN only
-
-**Files Deleted:**
-- `.replit`, `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `.env.docker`
-
-### 2025-10-20: Railway Deployment Preparation
-**Achievement:** Verified and documented Railway deployment readiness with minimal configuration updates
-
-**Changes:**
-- **Updated .env.example**: Added comprehensive production configuration section with Railway-specific examples
-  - Clear separation between development and production settings
-  - Google OAuth setup instructions for production domains
-  - Environment variable reference for Railway deployment
-
-- **Created .dockerignore**: Build optimization file to reduce deployment size
-  - Excludes development files, test files, and documentation
-  - Reduces Docker image size for faster deployments
-
-- **Added Railway Deployment Guide** to CLAUDE.md:
-  - Step-by-step deployment instructions
-  - Google OAuth configuration for production
-  - Database setup with Neon PostgreSQL
-  - Environment variable configuration
-  - Troubleshooting guide for common issues
-  - Custom domain setup instructions
-
-**Verification:**
-- ✅ Production serving already configured (`server/vite.ts:70`)
-- ✅ Build output correctly set to `dist/public` (`vite.config.ts:31`)
-- ✅ API calls use relative paths (no hardcoded URLs)
-- ✅ PORT binding uses `process.env.PORT || 5000`
-- ✅ CORS properly configured with `ALLOWED_ORIGIN` env variable
-- ✅ Build scripts ready: `npm run build` → `npm start`
-
-**Architecture Notes:**
-- App is a **monolithic full-stack deployment** (not serverless functions)
-- Single Node.js process serves both frontend (static) and backend (API)
-- Production mode: Express serves built Vite output from `dist/public`
-- Development mode: Vite dev server with HMR via middleware
-- Railway automatically detects build/start commands from `package.json`
-
-**No Code Changes Required:**
-The existing architecture was already production-ready. Only documentation and configuration examples were added.
-
-### 2025-10-15: Phase 2 Refactoring - Repository & Service Layer Architecture
-**Achievement:** Implemented 3-tier architecture with Repository and Service layers for clean separation of concerns
-
-**Changes:**
-- **Repository Layer** (`server/repositories/`): Data access abstraction
-  - `BaseRepository.ts` - Base class with transaction support
-  - `UserRepository.ts` - User data access
-  - `SurveyRepository.ts` - Survey CRUD, duplication, anonymous access
-  - `PageRepository.ts` - Survey page operations
-  - `QuestionRepository.ts` - Questions, subquestions, conditional rules
-  - `RecipientRepository.ts` - Recipients and global recipients
-  - `ResponseRepository.ts` - Responses, answers, anonymous tracking
-  - `AnalyticsRepository.ts` - Analytics event tracking
-  - `FileRepository.ts` - File metadata operations
-
-- **Service Layer** (`server/services/`): Business logic and orchestration
-  - `SurveyService.ts` - Survey business logic with ownership checks
-  - `ResponseService.ts` - Response creation, validation, completion
-  - `RecipientService.ts` - Recipient management, email invitations
-  - `AnalyticsService.ts` - Analytics aggregation and reporting
-
-- **Refactored Storage** (`server/storage.ts`):
-  - Reduced from ~2,500 lines to ~1,480 lines (41% reduction)
-  - Now delegates to repositories instead of direct database calls
-  - Maintains IStorage interface for backward compatibility
-
-- **Updated Routes**: All route modules now use service layer for clean separation
-
-**Architecture Pattern:**
-```
-Routes → Services → Repositories → Database
-  ↓         ↓           ↓
-Auth     Business    Data Access
-Logic    Logic       Layer
-```
-
-**Benefits:**
-- **Separation of Concerns:** Clear boundaries between routes, business logic, and data access
-- **Testability:** Services and repositories can be unit tested independently
-- **Reusability:** Business logic can be shared across different routes
-- **Maintainability:** Changes to database queries don't affect business logic
-- **Transaction Support:** Built-in transaction handling in BaseRepository
-- **Type Safety:** Full TypeScript support with proper type exports
-
-**Code Metrics:**
-- Repository Layer: 10 files, ~50KB
-- Service Layer: 4 files, ~35KB
-- Storage reduction: -1,020 lines (from 2,500 to 1,480)
-- Total new architecture: ~85KB of well-organized, testable code
-
-### 2025-10-13: Phase 1 Refactoring - Modular Route Architecture
-**Achievement:** Successfully refactored monolithic routes file into modular, domain-specific modules
-
-**Changes:**
-- **Modularization:** Split single 2,753-line `server/routes.ts` into 8 domain-specific modules:
-  - `server/routes/auth.routes.ts` - Authentication endpoints
-  - `server/routes/surveys.routes.ts` - Survey CRUD and management
-  - `server/routes/pages.routes.ts` - Survey page operations
-  - `server/routes/questions.routes.ts` - Question and conditional logic
-  - `server/routes/recipients.routes.ts` - Recipient management
-  - `server/routes/responses.routes.ts` - Response collection
-  - `server/routes/analytics.routes.ts` - Analytics and reporting
-  - `server/routes/files.routes.ts` - File upload and management
-- **Type Safety:** Added `server/types/express.d.ts` for Express type augmentation
-- **Code Quality:** Fixed all 25 TypeScript errors
-- **Architecture:** Centralized route registration in `server/routes/index.ts`
-
-**Benefits:**
-- Improved code organization and maintainability
-- Easier navigation and debugging
-- Better separation of concerns
-- Reduced cognitive load when working on specific features
-- Clearer ownership of functionality
-
-**Commit History:**
-- `e369cc9` - "Complete Phase 1 refactoring: Modularize routes architecture"
-- `14450c5` - "feat(refactor): Phase 1 - Extract auth and survey routes into modular structure"
-
-### 2025-10-12: Survey Route Authentication Bug Fix
-**Issue:** Authenticated users received 404 errors when accessing survey response links (e.g., `/survey/[uuid]`)
-
-**Root Cause:** The `/survey/:identifier` route was defined within the authentication conditional block in `client/src/App.tsx`, making it only accessible to unauthenticated users.
-
-**Fix Applied:** (client/src/App.tsx:25)
-- Moved the `/survey/:identifier` route outside the authentication conditional
-- Added comment: "Survey response route - available to everyone (authenticated or not)"
-- Now both authenticated and unauthenticated users can access survey response pages
-
-**Commit:** `df8c6d7` - "Fix survey route accessibility for authenticated users"
+### 2025-10-15: 3-Tier Architecture Refactoring
+- Implemented Repository layer for data access abstraction
+- Implemented Service layer for business logic orchestration
+- Refactored storage.ts (reduced from 2,500 to 1,480 lines)
+- Pattern: Routes → Services → Repositories → Database
 
 ---
 
-## Project Architecture Overview
+## Architecture
 
 ### Tech Stack
 - **Frontend:** React, Vite, TanStack Query, Radix UI, Tailwind CSS
 - **Backend:** Node.js, Express, Drizzle ORM
-- **Database:** PostgreSQL (Neon serverless)
-- **Auth:** Google OAuth2, express-session
+- **Database:** PostgreSQL (Neon), express-session
+- **Auth:** Google OAuth2
 - **Services:** SendGrid (email), Multer (file upload)
-- **Future:** Redis (caching), S3/MinIO (file storage)
 
 ### Directory Structure
 ```
-Poll-Vault/
-├── client/               # React frontend
-│   ├── src/
-│   │   ├── components/   # UI components (Radix UI)
-│   │   ├── pages/        # Page components
-│   │   ├── hooks/        # Custom React hooks
-│   │   └── lib/          # Utilities & helpers
-├── server/               # Express backend
-│   ├── index.ts          # Entry point & CORS config
-│   ├── routes.ts         # Main route registration
-│   ├── storage.ts        # Storage layer (delegates to repositories)
-│   ├── db.ts             # Database connection
-│   ├── googleAuth.ts     # OAuth2 authentication
-│   ├── routes/           # Modular route handlers (Phase 1 refactor)
-│   │   ├── index.ts      # Route aggregator
-│   │   ├── auth.routes.ts       # Authentication endpoints
-│   │   ├── surveys.routes.ts    # Survey CRUD operations
-│   │   ├── pages.routes.ts      # Survey page management
-│   │   ├── questions.routes.ts  # Question & conditional logic
-│   │   ├── recipients.routes.ts # Recipient management
-│   │   ├── responses.routes.ts  # Response collection
-│   │   ├── analytics.routes.ts  # Analytics & reporting
-│   │   └── files.routes.ts      # File upload & management
-│   ├── services/         # Business logic services (Phase 2 refactor)
-│   │   ├── index.ts             # Service exports
-│   │   ├── SurveyService.ts     # Survey business logic
-│   │   ├── ResponseService.ts   # Response operations
-│   │   ├── RecipientService.ts  # Recipient management
-│   │   ├── AnalyticsService.ts  # Analytics aggregation
-│   │   ├── emailService.ts      # Email operations
-│   │   ├── exportService.ts     # CSV/PDF export
-│   │   ├── fileService.ts       # File handling
-│   │   ├── sendgrid.ts          # SendGrid integration
-│   │   └── surveyValidation.ts  # Survey validation
-│   ├── repositories/     # Data access layer (Phase 2 refactor)
-│   │   ├── index.ts             # Repository exports
-│   │   ├── BaseRepository.ts    # Base class with transactions
-│   │   ├── UserRepository.ts    # User data access
-│   │   ├── SurveyRepository.ts  # Survey data access
-│   │   ├── PageRepository.ts    # Page data access
-│   │   ├── QuestionRepository.ts # Question data access
-│   │   ├── RecipientRepository.ts # Recipient data access
-│   │   ├── ResponseRepository.ts # Response data access
-│   │   ├── AnalyticsRepository.ts # Analytics data access
-│   │   ├── FileRepository.ts    # File data access
-│   │   └── SystemStatsRepository.ts # Historical stats tracking
-│   └── types/            # TypeScript declarations
-│       └── express.d.ts  # Express type augmentation
-├── shared/               # Shared types & schemas
-│   ├── schema.ts         # Drizzle schema definitions
-│   └── conditionalLogic.ts
-└── docs/                 # Project documentation
+client/src/          # React frontend (components, pages, hooks)
+server/
+  ├── routes/        # Modular route handlers (auth, surveys, responses, etc.)
+  ├── services/      # Business logic (SurveyService, ResponseService, etc.)
+  ├── repositories/  # Data access layer (BaseRepository + domain repos)
+  ├── index.ts       # Entry point & CORS
+  └── storage.ts     # Legacy interface (delegates to repositories)
+shared/              # Drizzle schema & shared utilities
 ```
 
 ---
@@ -336,186 +54,49 @@ Poll-Vault/
 ## Database Schema
 
 ### Core Tables
-
-**1. users** - User Authentication
-- id (PK, UUID), email (unique), firstName, lastName, profileImageUrl
-- role: enum('admin', 'creator')
-- timestamps: createdAt, updatedAt
-
-**2. surveys** - Survey Metadata
-- id (PK, UUID), title, description, creatorId (FK → users)
-- status: enum('draft', 'open', 'closed')
-- allowAnonymous, anonymousAccessType: enum('disabled', 'unlimited', 'one_per_ip', 'one_per_session')
-- publicLink (unique), anonymousConfig (jsonb)
-- timestamps: createdAt, updatedAt
-
-**3. surveyPages** - Multi-page Surveys
-- id (PK, UUID), surveyId (FK → surveys, cascade), title, order
-- timestamp: createdAt
-
-**4. questions** - Survey Questions
-- id (PK, UUID), pageId (FK → surveyPages, cascade), type, title, description
-- type: enum('short_text', 'long_text', 'multiple_choice', 'radio', 'yes_no', 'date_time', 'file_upload', 'loop_group')
-- required, options (jsonb), loopConfig (jsonb), conditionalLogic (jsonb), order
-- timestamp: createdAt
-
-**5. loopGroupSubquestions** - Repeating Question Groups
-- id (PK, UUID), loopQuestionId (FK → questions, cascade), type, title, description
-- required, options (jsonb), order
-- timestamp: createdAt
-
-**6. conditionalRules** - Conditional Logic
-- id (PK, UUID), surveyId (FK → surveys, cascade)
-- conditionQuestionId (FK → questions), operator, conditionValue (jsonb)
-- operator: enum('equals', 'not_equals', 'contains', 'not_contains', 'greater_than', 'less_than', 'between', 'is_empty', 'is_not_empty')
-- targetQuestionId (FK → questions), targetPageId (FK → surveyPages)
-- action: enum('show', 'hide', 'require', 'make_optional')
-- logicalOperator (default: 'AND'), order
-- timestamp: createdAt
-
-**7. recipients** - Survey Recipients
-- id (PK, UUID), surveyId (FK → surveys, cascade), name, email
-- token (unique, personalized access), sentAt
-- timestamp: createdAt
-
-**8. globalRecipients** - Reusable Contact List
-- id (PK, UUID), creatorId (FK → users), name, email, tags (text[])
-- timestamps: createdAt, updatedAt
-
-**9. responses** - Survey Submissions
-- id (PK, UUID), surveyId (FK → surveys, cascade), recipientId (FK → recipients)
-- completed, submittedAt, isAnonymous
-- ipAddress, userAgent, sessionId, anonymousMetadata (jsonb)
-- timestamp: createdAt
-
-**10. answers** - Individual Answers
-- id (PK, UUID), responseId (FK → responses, cascade), questionId (FK → questions)
-- subquestionId (FK → loopGroupSubquestions), loopIndex, value (jsonb)
-- timestamp: createdAt
-
-**11. files** - Uploaded Files
-- id (PK, UUID), answerId (FK → answers, cascade)
-- filename, originalName, mimeType, size
-- timestamp: uploadedAt
-
-**12. analyticsEvents** - Detailed Analytics
-- id (PK, UUID), responseId (FK → responses, cascade), surveyId (FK → surveys, cascade)
-- pageId (FK → surveyPages, cascade), questionId (FK → questions, cascade)
-- event: enum('page_view', 'page_leave', 'question_focus', 'question_blur', 'question_answer', 'question_skip', 'survey_start', 'survey_complete', 'survey_abandon')
-- data (jsonb), duration, timestamp
-
-**13. anonymousResponseTracking** - Anonymous Rate Limiting
-- id (PK, UUID), surveyId (FK → surveys, cascade)
-- ipAddress, sessionId, responseId (FK → responses, cascade)
-- timestamp: createdAt
-
-**14. sessions** - Session Storage
-- sid (PK), sess (jsonb), expire
-
-**15. systemStats** - Historical System Statistics
-- id (PK, default: 1) - Single-row table
-- totalSurveysCreated (default: 0), totalSurveysDeleted (default: 0)
-- totalResponsesCollected (default: 0), totalResponsesDeleted (default: 0)
-- timestamp: updatedAt
-
-### Key Indices
-- surveys.publicLink (unique)
-- globalRecipients: creatorId, email, (creatorId, email)
-- analyticsEvents: (surveyId, event), (responseId, event), (questionId, event), (pageId, event), timestamp, duration
-- anonymousResponseTracking: (surveyId, ipAddress), (surveyId, sessionId)
+1. **users** - UUID, email (unique), role enum('admin', 'creator')
+2. **surveys** - UUID, title, creatorId (FK), status enum('draft', 'open', 'closed'), allowAnonymous, publicLink (unique)
+3. **surveyPages** - UUID, surveyId (FK cascade), title, order
+4. **questions** - UUID, pageId (FK cascade), type enum(short_text, long_text, multiple_choice, radio, yes_no, date_time, file_upload, loop_group), required, options (jsonb), conditionalLogic (jsonb)
+5. **loopGroupSubquestions** - UUID, loopQuestionId (FK cascade), nested questions for loop groups
+6. **conditionalRules** - UUID, surveyId (FK), conditionQuestionId, operator enum(equals, not_equals, contains, greater_than, less_than, between, is_empty, etc.), targetQuestionId/targetPageId, action enum(show, hide, require, make_optional)
+7. **recipients** - UUID, surveyId (FK cascade), email, token (unique)
+8. **globalRecipients** - UUID, creatorId (FK), email, tags (text[])
+9. **responses** - UUID, surveyId (FK cascade), recipientId, completed, isAnonymous, ipAddress, sessionId
+10. **answers** - UUID, responseId (FK cascade), questionId, subquestionId, value (jsonb)
+11. **files** - UUID, answerId (FK cascade), filename, mimeType, size
+12. **analyticsEvents** - UUID, surveyId/responseId/pageId/questionId (FK cascade), event enum(page_view, question_focus, survey_complete, etc.), data (jsonb), duration
+13. **anonymousResponseTracking** - UUID, surveyId (FK), ipAddress, sessionId (for rate limiting)
+14. **sessions** - sid (PK), sess (jsonb), expire
+15. **systemStats** - Single-row table: totalSurveysCreated, totalSurveysDeleted, totalResponsesCollected, totalResponsesDeleted
 
 ---
 
-## Implementation Strategy
+## Implementation Status
 
-### Phase 1: Foundation (Week 1)
-**Status:** ✅ Complete
-- [x] Database setup (`npm run db:push`)
-- [x] Google OAuth2 authentication (server/googleAuth.ts)
-- [x] Session management (PostgreSQL storage)
-- [x] CORS configuration (server/index.ts:9-65)
-- [ ] Rate limiting (implement in server/routes.ts)
+**✅ Complete:**
+- Database setup & migrations
+- Google OAuth2 + session management
+- CORS configuration
+- Survey CRUD (create, list, update, delete, duplicate, status management)
+- Multi-page surveys with reordering
+- Question types: short_text, long_text, multiple_choice, radio, yes_no, date_time, file_upload, loop_group
+- Conditional logic (show/hide, require/optional)
+- Recipient management (add, bulk, global list, import)
+- Email service (SendGrid invitations)
+- Response collection (authenticated & anonymous with rate limiting)
+- File uploads (max 10MB, MIME validation)
+- Analytics event tracking & reporting
+- Export service (CSV, PDF)
 
-### Phase 2: Survey Management (Week 2)
-**Status:** ✅ Complete (Routes Implemented)
-**Endpoints:** See API Reference section
-- [x] Survey CRUD (create, list, get, update, delete, duplicate)
-- [x] Survey pages (add, update, delete, reorder)
-- [x] Questions (add, update, delete, reorder, subquestions)
-- [x] Validation: Question types, options, loop configs
-- [x] Modular route architecture (Phase 1 refactoring)
+**🚧 In Progress:**
+- Dashboard UI components
+- Advanced analytics visualization
 
-**Key Files:**
-- `server/routes/surveys.routes.ts` - Survey API endpoints
-- `server/routes/pages.routes.ts` - Page management endpoints
-- `server/routes/questions.routes.ts` - Question endpoints
-- `server/services/surveyValidation.ts` - Validation logic
-- `shared/schema.ts` - Database schema
-- `client/src/pages/SurveyBuilder.tsx` - UI
-
-### Phase 3: Recipients & Distribution (Week 3)
-**Status:** ✅ Complete (Routes Implemented)
-**Endpoints:** See API Reference section
-- [x] Recipient management (add, bulk add, list, delete, resend)
-- [x] Global recipients (CRUD, import to surveys)
-- [x] Email service (server/services/emailService.ts)
-- [x] SendGrid integration (invitations, reminders, confirmations)
-
-**Key Files:**
-- `server/routes/recipients.routes.ts` - Recipient endpoints
-- `server/services/emailService.ts` - Email operations
-- `server/services/sendgrid.ts` - SendGrid integration
-
-### Phase 4: Response Collection (Week 4)
-**Status:** ✅ Complete (Routes Implemented)
-**Endpoints:** See API Reference section
-- [x] Response submission (authenticated & anonymous)
-- [x] Answer submission (single & bulk)
-- [x] Response completion & validation
-- [x] File upload (multer configuration)
-- [x] Conditional logic evaluation (shared/conditionalLogic.ts)
-
-**Implementation:**
-- File uploads: Max 10MB, MIME validation, UUID filenames
-- Anonymous limiting: IP-based or session-based via anonymousResponseTracking
-- Conditional logic: Evaluate on client (UX) and server (validation)
-
-**Key Files:**
-- `server/routes/responses.routes.ts` - Response collection endpoints
-- `server/routes/files.routes.ts` - File upload management
-- `server/services/fileService.ts` - File handling utilities
-- `shared/conditionalLogic.ts` - Conditional logic evaluation
-
-### Phase 5: Analytics & Reporting (Week 5)
-**Status:** ✅ Complete (Routes Implemented)
-**Endpoints:** See API Reference section
-- [x] Analytics event tracking (fire-and-forget)
-- [x] Survey analytics (completion rate, times, drop-off)
-- [x] Question analytics (answer rate, time spent)
-- [x] Funnel analysis (page-level engagement)
-- [x] Export service (CSV, PDF via server/services/exportService.ts)
-
-**Analytics Events:**
-- survey_start, page_view, page_leave, question_focus, question_blur
-- question_answer, question_skip, survey_complete, survey_abandon
-
-**Key Files:**
-- `server/routes/analytics.routes.ts` - Analytics endpoints
-- `server/services/exportService.ts` - CSV/PDF export functionality
-
-### Phase 6: Dashboard & UI (Week 6)
-**Components:** See client/src/pages/ and client/src/components/
-- [ ] Dashboard stats API
-- [ ] SurveyBuilder (drag-drop, multi-page, preview)
-- [ ] QuestionEditor (type-specific, conditional logic UI)
-- [ ] ResponseViewer (grouped by pages, file downloads)
-- [ ] AnalyticsDashboard (charts, funnels, exports)
-- [ ] RecipientManager (bulk upload, invitations)
-
-### Phase 7: Testing & QA (Week 7)
-- [ ] Unit tests (Vitest) - conditional logic, validation, file handling
-- [ ] Integration tests (Supertest) - API flows
-- [ ] E2E tests (Playwright) - user journeys
+**📋 Todo:**
+- Rate limiting implementation
+- Unit & E2E test coverage
+- Email reminders for incomplete responses
 
 ---
 
@@ -624,442 +205,131 @@ Poll-Vault/
 
 ## Authentication & Security
 
-### Google OAuth2 Flow
-1. Frontend: User clicks "Sign in with Google" → Google One Tap UI
-2. Google returns ID token to frontend
-3. Frontend: POST /api/login with { idToken }
-4. Backend: Verify token with Google (OAuth2Client.verifyIdToken)
-5. Backend: Create/update user in database → Create session
-6. Backend: Return user object
-7. Frontend: Store user in state, redirect to dashboard
+**Google OAuth2 Flow:** Frontend sends Google ID token → Backend verifies with OAuth2Client → Create/update user + session → Return user object
 
-**Implementation:** server/googleAuth.ts
+**Session Management:** PostgreSQL storage, express-session, httpOnly cookies, 365-day expiration
 
-### Session Management
-- **Storage:** PostgreSQL (sessions table)
-- **Library:** express-session
-- **Cookie:** httpOnly, secure (production), sameSite='lax'
-- **Expiration:** 365 days (1 year - maximum lifespan)
-- **Token Validation:** Session-based authentication (Google OAuth token not re-validated after initial login)
-- **Cleanup:** Automatic via expire column index
+**CORS:** Development allows localhost variants, Production validates against `ALLOWED_ORIGIN` env var (hostname-based matching)
 
-### CORS Configuration (server/index.ts:9-65)
-**Development:**
-- Allows: localhost, 127.0.0.1, 0.0.0.0, *.replit.*, *.repl.co
-- Credentials: true
+**Rate Limiting:**
+- API: 15min window, 100 req/IP (todo: implement express-rate-limit)
+- Anonymous responses: 1hr window, 10 submissions/IP (via anonymousResponseTracking table)
 
-**Production:**
-- Validates against ALLOWED_ORIGIN environment variable
-- Hostname-based matching (no protocols/ports)
-- Supports subdomain wildcarding
-
-### Rate Limiting
-**API Endpoints:**
-- Window: 15 minutes, Max: 100 requests per IP
-- Implement using express-rate-limit in server/routes.ts
-
-**Anonymous Responses:**
-- Window: 1 hour, Max: 10 submissions per IP
-- Database-level tracking via anonymousResponseTracking table
-- Enforced based on anonymousAccessType: 'one_per_ip' or 'one_per_session'
-
-### File Upload Security
-- **Max Size:** 10MB (configurable via MAX_FILE_SIZE)
-- **Allowed Types:** MIME validation (images, PDFs, docs)
-- **Storage:** Local filesystem (./uploads) or S3 (future)
-- **Filename:** Sanitized with UUID prefix
-- **Access Control:** Token or session validation required
-
-**Allowed MIME Types:**
-```
-image/jpeg, image/png, image/gif
-application/pdf
-application/msword
-application/vnd.openxmlformats-officedocument.wordprocessingml.document
-```
+**File Uploads:** Max 10MB, MIME validation (images/PDFs/docs), UUID-prefixed filenames, token/session required
 
 ---
 
 ## Environment Setup
 
-### Required Environment Variables
+### Required Variables
 ```bash
-# CRITICAL - Application will not start without these
 NODE_ENV=development|production
-PORT=5000
-DATABASE_URL=<your-neon-postgres-url>  # Neon PostgreSQL connection string
-GOOGLE_CLIENT_ID=<server-side-client-id>
-VITE_GOOGLE_CLIENT_ID=<client-side-client-id>
-SESSION_SECRET=<strong-random-secret-32+chars>
-ALLOWED_ORIGIN=localhost,127.0.0.1  # hostnames only, no protocols
+DATABASE_URL=<neon-postgres-url>
+GOOGLE_CLIENT_ID=<server-oauth-id>
+VITE_GOOGLE_CLIENT_ID=<client-oauth-id>
+SESSION_SECRET=<32-char-random>  # Generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+ALLOWED_ORIGIN=localhost,127.0.0.1  # hostnames only, comma-separated
+```
 
-# OPTIONAL - Features will be disabled without these
-SENDGRID_API_KEY=<sendgrid-key>
+### Optional Variables
+```bash
+SENDGRID_API_KEY=<key>
 SENDGRID_FROM_EMAIL=noreply@yourdomain.com
-MAX_FILE_SIZE=10485760  # 10MB in bytes
+MAX_FILE_SIZE=10485760  # 10MB default
 UPLOAD_DIR=./uploads
 ```
 
-### Development Setup
-
-**Prerequisites:**
-- Neon PostgreSQL database (create at https://neon.tech - free tier available)
-- Google OAuth credentials (from Google Cloud Console)
-
-**Setup Steps:**
+### Quick Start
 ```bash
-# 1. Install dependencies
 npm install
-
-# 2. Copy environment file
-cp .env.example .env
-
-# 3. Edit .env with your values
-#    - Add DATABASE_URL from your Neon database
-#    - Add Google OAuth credentials
-#    - Generate SESSION_SECRET: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-
-# 4. Push database schema to Neon
-npm run db:push
-
-# 5. Start development server
-npm run dev
-
-# Server runs on: http://localhost:5000
-```
-
-**Note:** Both development and production use Neon PostgreSQL - no local database required.
-
----
-
-## Conditional Logic Implementation
-
-### Location
-- **Shared:** shared/conditionalLogic.ts
-- **Backend:** server/routes.ts (validation on response completion)
-- **Frontend:** Client-side evaluation for UX
-
-### Operators
-- **equals, not_equals:** Exact match
-- **contains, not_contains:** String or array inclusion
-- **greater_than, less_than:** Numeric comparison
-- **between:** Numeric range [min, max]
-- **is_empty, is_not_empty:** Null/empty check
-
-### Actions
-- **show, hide:** Control question visibility
-- **require, make_optional:** Control question requirement
-
-### Functions
-```typescript
-evaluateCondition(condition: ConditionalRule, context: EvaluationContext): boolean
-evaluateConditionalLogic(questionId: string, context: EvaluationContext): { visible: boolean; required: boolean }
-```
-
-### Usage
-**Backend (Validation):**
-```typescript
-// Before marking response complete, evaluate all conditions
-// to determine which questions are required
-const context = {
-  answers: new Map(response.answers.map(a => [a.questionId, a.value])),
-  conditions: response.survey.conditionalRules
-};
-
-for (const question of allQuestions) {
-  const { visible, required } = evaluateConditionalLogic(question.id, context);
-  if (visible && (required || question.required)) {
-    // Check if answered
-  }
-}
-```
-
-**Frontend (UX):**
-```typescript
-// Evaluate conditions on every answer change to show/hide questions
-const { visible, required } = evaluateConditionalLogic(question.id, context);
+cp .env.example .env  # Edit with your values
+npm run db:push       # Push schema to Neon
+npm run dev           # http://localhost:5000
 ```
 
 ---
 
-## Testing Strategy
+## Conditional Logic
 
-### Unit Tests (Vitest)
-**Coverage Targets:**
-- Conditional logic evaluation: 100%
-- File upload validation: 100%
-- Anonymous access controls: 100%
-- Response validation: 90%
-- Export utilities: 80%
+**Location:** `shared/conditionalLogic.ts` (shared between frontend UX & backend validation)
 
-**Command:** `npm run test`
+**Operators:** equals, not_equals, contains, not_contains, greater_than, less_than, between, is_empty, is_not_empty
 
-**Critical Suites:**
-- tests/conditionalLogic.test.ts
-- tests/fileUpload.test.ts
-- tests/anonymousAccess.test.ts
-- tests/validation.test.ts
+**Actions:** show, hide, require, make_optional
 
-### Integration Tests (Supertest)
-**Critical Flows:**
-- Survey creation → pages → questions → publish
-- Recipient management → send invitations
-- Response submission → answers → complete
-- Analytics queries → export
-
-**Command:** `npm run test:integration`
-
-### E2E Tests (Playwright)
-**User Journeys:**
-- Creator: Sign in → create survey → add questions → send invitations → view responses
-- Respondent: Open link → complete survey → submit
-- Anonymous: Open public link → complete survey → rate-limited on retry
-
-**Command:** `npm run test:e2e`
+**Usage:** Evaluate on client-side for real-time UX, re-evaluate on server before marking response complete to determine required fields
 
 ---
 
-## Deployment Strategy
+## Testing
 
-### Production Checklist
+**Unit Tests (Vitest):** `npm run test` - Targets: conditional logic (100%), file upload (100%), anonymous access (100%), validation (90%)
 
-**Environment:**
-- [ ] Set NODE_ENV=production
-- [ ] Use HTTPS for BASE_URL
-- [ ] Set strong SESSION_SECRET (32+ chars)
-- [ ] Configure ALLOWED_ORIGIN with actual domain
-- [ ] Enable PostgreSQL SSL (if required by host)
-- [ ] Set up error monitoring (Sentry)
-- [ ] Set up automated backups
+**Integration Tests (Supertest):** `npm run test:integration` - Survey flows, recipient management, response submission
 
-**Database:**
-- [ ] Run migrations: `npm run db:push`
-- [ ] Verify all indices exist
-- [ ] Neon handles connection pooling automatically
+**E2E Tests (Playwright):** `npm run test:e2e` - Creator & respondent journeys
 
-**Security:**
-- [ ] Rotate all API keys and secrets
-- [ ] Use environment-specific Google OAuth2 credentials
-- [ ] Enable rate limiting
-- [ ] Configure CORS strictly
-- [ ] Set secure cookie flags
-- [ ] Enable HSTS headers
-- [ ] Implement CSP headers
+---
 
-**Performance:**
-- [ ] Enable gzip compression
-- [ ] Configure CDN for static assets
-- [ ] Set up Redis for session storage (optional)
-- [ ] Implement database query caching
-- [ ] Optimize bundle size (code splitting)
+## Deployment
 
-### Railway Deployment (Recommended)
+### Railway (Recommended)
 
-**Prerequisites:**
-- GitHub repository with Poll-Vault code
-- Railway account (free tier available)
-- Google Cloud Console project for OAuth
-- Neon PostgreSQL database (same one you use for development)
+**Prerequisites:** GitHub repo, Railway account, Google OAuth credentials, Neon PostgreSQL database
 
-**Step-by-Step Guide:**
+**Steps:**
+1. **Deploy:** Railway Dashboard → "Deploy from GitHub repo" → Select repository (auto-detects Node.js)
+2. **Environment Variables** (Railway → Variables):
+   ```bash
+   NODE_ENV=production
+   DATABASE_URL=<neon-postgres-url>
+   GOOGLE_CLIENT_ID=<server-oauth-id>
+   VITE_GOOGLE_CLIENT_ID=<client-oauth-id>
+   SESSION_SECRET=<32-char-random>
+   ALLOWED_ORIGIN=your-app.up.railway.app  # no https://
+   SENDGRID_API_KEY=<optional>
+   ```
+3. **Run Migration:** `railway run npm run db:push` (or via Railway dashboard one-off command)
+4. **Configure Google OAuth:** Add Railway URL to authorized origins in Google Cloud Console
+5. **Verify:** Visit `https://your-app.up.railway.app`, test OAuth login
 
-**1. Database Setup**
-```bash
-# Use your existing Neon database from development OR create a new production database
-# Create at https://neon.tech (free tier available)
-# Copy the DATABASE_URL (PostgreSQL connection string)
-#
-# TIP: You can use the same Neon database for dev and production (with separate schemas)
-#      or create separate databases for each environment
-```
-
-**2. Google OAuth Configuration**
-- Go to [Google Cloud Console](https://console.cloud.google.com) → Credentials
-- Create OAuth 2.0 Client ID (Web Application)
-- Add authorized JavaScript origins:
-  - Development: `http://localhost:5000`
-  - Production: `https://your-app.up.railway.app` (add after Railway deployment)
-- Add authorized redirect URIs:
-  - `https://your-app.up.railway.app/auth/google/callback`
-- Note down both client IDs (you need TWO - one for server, one for client)
-
-**3. Deploy to Railway**
-
-**Option A: Using Railway CLI**
-```bash
-# Install Railway CLI
-npm install -g @railway/cli
-
-# Login to Railway
-railway login
-
-# Initialize project
-railway init
-
-# Add environment variables (see below)
-
-# Deploy
-railway up
-```
-
-**Option B: Using Railway Dashboard (Easier)**
-1. Go to [Railway](https://railway.app)
-2. Click "New Project" → "Deploy from GitHub repo"
-3. Select your Poll-Vault repository
-4. Railway will auto-detect Node.js and configure build settings
-
-**4. Configure Environment Variables**
-
-In Railway Dashboard → Your Project → Variables, add:
-
-```bash
-NODE_ENV=production
-DATABASE_URL=<your-neon-postgres-url>
-GOOGLE_CLIENT_ID=<your-server-oauth-client-id>
-VITE_GOOGLE_CLIENT_ID=<your-client-web-oauth-client-id>
-SESSION_SECRET=<generate-strong-32-char-secret>
-ALLOWED_ORIGIN=your-app.up.railway.app
-SENDGRID_API_KEY=<optional>
-SENDGRID_FROM_EMAIL=noreply@yourdomain.com
-```
-
-**Generate strong SESSION_SECRET:**
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
-
-**5. Run Database Migration**
-
-After first deployment, run migrations via Railway CLI:
-```bash
-railway run npm run db:push
-```
-
-Or connect to your Railway project and run:
-```bash
-# In Railway dashboard → your-project → Settings → set up a one-off command
-npm run db:push
-```
-
-**6. Verify Deployment**
-- Visit `https://your-app.up.railway.app`
-- Test Google OAuth login
-- Create a test survey
-- Verify database connectivity
-
-**7. Update Google OAuth URLs**
-- Go back to Google Cloud Console → Credentials
-- Update authorized JavaScript origins with your Railway URL
-- Update redirect URIs with production URL
-- This enables production OAuth to work
-
-**Railway Build Configuration:**
-Railway auto-detects the following from `package.json`:
-- Build Command: `npm run build` (builds Vite + esbuild server bundle)
-- Start Command: `npm start` (runs production server)
-- Port: Auto-assigned by Railway (app uses `process.env.PORT`)
+**Railway auto-detects:** Build: `npm run build`, Start: `npm start`, Port: `process.env.PORT`
 
 **Troubleshooting:**
-- **OAuth errors**: Verify Google OAuth URLs match your Railway domain exactly
-- **Database connection errors**: Check DATABASE_URL format and Neon database status
-- **CORS errors**: Ensure ALLOWED_ORIGIN matches your Railway domain (no https://)
-- **Build failures**: Check Railway build logs for missing dependencies
-- **Session issues**: Verify SESSION_SECRET is set and at least 32 characters
+- OAuth errors → Check Google OAuth URLs match Railway domain exactly
+- CORS errors → Ensure ALLOWED_ORIGIN matches domain (no protocol/port)
+- View logs: `railway logs` or Railway Dashboard → Deployments → Logs
 
-**Monitoring & Logs:**
-```bash
-# View logs via CLI
-railway logs
-
-# Or view in Railway dashboard → Deployments → Logs
-```
-
-**Custom Domain (Optional):**
-1. Railway Dashboard → Settings → Domains
-2. Add custom domain
-3. Update DNS records as instructed
-4. Update ALLOWED_ORIGIN and Google OAuth URLs
-
-### Supported Platforms
-- **Railway:** Auto-deploy from GitHub (use Neon for database)
-- **Heroku:** Automatic PORT binding (use Neon for database)
-- **Google Cloud Run:** Serverless containers (use Neon for database)
-- **Vercel/Netlify:** Serverless functions (requires adaptation)
-
-**Platform Notes:**
-- Always use `process.env.PORT` for port binding
-- Use Neon PostgreSQL for database (DATABASE_URL environment variable)
-- Set environment variables in platform dashboard
-- Build command: `npm run build`
-- Start command: `npm start`
+### Other Platforms
+Compatible with Heroku, Google Cloud Run (use Neon for database, `process.env.PORT` for binding)
 
 ---
 
-## Known Issues & Technical Debt
+## Technical Debt & Future Work
 
-### Security Vulnerabilities
-**esbuild (transitive dependency via drizzle-kit):**
-- Severity: Moderate
-- Impact: Development-only (devDependency)
-- Issue: Cross-origin request vulnerability in dev server
-- Status: Waiting for drizzle-kit update
-- Mitigation: Ensure dev server runs on localhost only
+**Known Issues:**
+- esbuild vulnerability (moderate, dev-only, waiting for drizzle-kit update)
 
-### Technical Debt
-
-**Database Schema:**
-- No soft deletes (consider for surveys with responses)
-- No audit log (consider for compliance)
-- No survey versioning (consider for tracking changes)
+**Database:**
+- Missing: soft deletes, audit logs, survey versioning
 
 **Authentication:**
-- Only Google OAuth2 supported (consider email/password, other providers)
-- No MFA support
-- No user deactivation/suspension
+- Only Google OAuth2 (consider email/password, MFA, other providers)
 
-**File Storage:**
-- Local filesystem only (migrate to S3/MinIO for production)
-- No CDN integration
-- No image optimization/thumbnails
-
-**Analytics:**
-- No real-time dashboard (consider WebSockets)
-- Limited data retention policies
-- No data aggregation/archiving strategy
-
-**Performance:**
+**Storage & Performance:**
+- Local filesystem only (migrate to S3/MinIO)
 - No query caching (consider Redis)
-- No response pagination on large datasets
-- No lazy loading for file uploads
+- No response pagination for large datasets
 
 **Testing:**
-- Missing E2E test coverage (implement Playwright suite)
-- No load testing (implement k6 or Artillery)
-- No security testing (implement OWASP ZAP or similar)
+- Incomplete E2E coverage
+- No load/security testing
 
-### Future Enhancements
-
-**Priority 1 (MVP+):**
-- Email reminders for incomplete responses
-- Survey templates library
-- Response quotas
-- Survey scheduling (open/close dates)
-- Advanced question types (matrix, ranking, scale)
-
-**Priority 2 (Growth):**
-- Multi-language support (i18n)
-- Survey themes & branding
-- Real-time collaboration (multiple creators)
-- API webhooks (response notifications)
-- Zapier/Make.com integrations
-
-**Priority 3 (Enterprise):**
-- White-label solutions
-- Custom domains
-- SAML/SSO authentication
-- Advanced role-based permissions
-- Audit logs & compliance reports
-- Data residency options
+**Priority Enhancements:**
+- Email reminders, survey templates, response quotas, scheduling
+- Multi-language support, themes/branding
+- Real-time collaboration, webhooks, Zapier integration
+- SAML/SSO, advanced RBAC, audit logs, white-label
 
 ---
 
@@ -1086,78 +356,6 @@ npm run test:e2e         # Run end-to-end tests
 
 ---
 
-## Core Features Status
+**Version:** 4.0 | **Last Updated:** 2025-10-29
 
-**Authentication & User Management:**
-- [x] Google OAuth2 login (server/googleAuth.ts)
-- [x] Session management (express-session + PostgreSQL)
-- [x] User profile endpoints
-- [ ] Role-based access control (admin vs creator)
-- [ ] User settings & preferences
-
-**Survey Management:**
-- [ ] Create/edit/delete surveys
-- [ ] Multi-page surveys
-- [ ] Question types: short_text, long_text, multiple_choice, radio, yes_no, date_time, file_upload, loop_group
-- [ ] Drag-and-drop reordering
-- [ ] Survey status: draft, open, closed
-- [ ] Duplicate survey functionality
-- [ ] Survey templates
-
-**Conditional Logic:**
-- [ ] Conditional visibility (show/hide questions)
-- [ ] Conditional requirements (require/make optional)
-- [ ] All operators: equals, not_equals, contains, not_contains, greater_than, less_than, between, is_empty, is_not_empty
-- [ ] Multi-condition rules (AND/OR logic)
-- [ ] Page-level conditional logic
-
-**Recipients & Distribution:**
-- [ ] Add recipients to survey
-- [ ] Bulk upload recipients (CSV)
-- [ ] Global recipient list (reusable contacts)
-- [ ] Email invitations (SendGrid)
-- [ ] Personalized response links (tokens)
-- [ ] Anonymous survey links
-- [ ] Anonymous access controls (unlimited, one_per_ip, one_per_session)
-- [ ] Email reminders
-
-**Response Collection:**
-- [ ] Authenticated response submission
-- [ ] Anonymous response submission
-- [ ] File upload support
-- [ ] Auto-save drafts
-- [ ] Resume incomplete responses
-- [ ] Response validation (required questions, data types)
-- [ ] Conditional logic evaluation (client & server)
-
-**Analytics & Reporting:**
-- [ ] Response count & completion rate
-- [ ] Completion time analytics (avg, median)
-- [ ] Question-level analytics (answer rate, time spent)
-- [ ] Page-level analytics (drop-off rates)
-- [ ] Completion funnel visualization
-- [ ] Response trends over time
-- [ ] Export responses (CSV, PDF)
-- [ ] Individual response viewer
-
-**Advanced Features:**
-- [ ] Loop groups (repeating question sets)
-- [ ] Advanced analytics events tracking
-- [ ] Real-time response notifications (WebSockets)
-- [ ] Survey scheduling (open/close dates)
-- [ ] Response quotas
-- [ ] Survey themes & branding
-- [ ] Multi-language support
-
----
-
-**Document Version:** 3.1
-**Last Updated:** 2025-10-23
-
-**Recent Documentation Updates:**
-- Clarified that Neon PostgreSQL is used for both development and production
-- Removed local database setup references
-- Simplified environment setup instructions
-- Updated deployment guide to emphasize Neon as the primary database solution
-
-This document serves as a comprehensive reference for the Poll-Vault platform. For detailed implementation examples, see the actual codebase files referenced throughout this document.
+This condensed reference guide provides essential technical documentation for Poll-Vault. For detailed commit history, see git log.
