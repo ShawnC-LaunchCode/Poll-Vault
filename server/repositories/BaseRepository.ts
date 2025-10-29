@@ -17,17 +17,29 @@ export type DbTransaction = PgTransaction<
  * All domain-specific repositories should extend this class
  */
 export abstract class BaseRepository<TTable extends PgTable, TSelect, TInsert> {
-  protected readonly dbInstance: typeof db;
+  protected readonly dbInstance: typeof db | undefined;
 
   constructor(protected readonly table: TTable, dbInstance?: typeof db) {
-    this.dbInstance = dbInstance || db;
+    // Store the provided instance, but if none provided, leave undefined
+    // to use the getter pattern below
+    this.dbInstance = dbInstance;
   }
 
   /**
    * Get database connection (or transaction if provided)
+   * Always references the current value of db to avoid initialization race conditions
    */
   protected getDb(tx?: DbTransaction) {
-    return tx || this.dbInstance;
+    // If transaction provided, use it
+    if (tx) return tx;
+
+    // If explicit db instance was provided in constructor (for tests), use it
+    if (this.dbInstance !== undefined) return this.dbInstance;
+
+    // Otherwise, use the current value of the db module variable
+    // This ensures we always get the initialized db, even if repository
+    // was instantiated before database initialization completed
+    return db;
   }
 
   /**
