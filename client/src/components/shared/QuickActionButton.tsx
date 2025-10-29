@@ -43,12 +43,18 @@ export function QuickActionButton({
   label,
   testId
 }: QuickActionButtonProps) {
+  const handleClick = () => {
+    if (onClick) {
+      onClick();
+    }
+  };
+
   const buttonContent = (
     <Button
       variant="ghost"
       className="w-full justify-between"
       data-testid={testId}
-      onClick={!href ? onClick : undefined}
+      onClick={handleClick}
     >
       <div className="flex items-center space-x-3">
         <div className={`w-8 h-8 ${iconBgColor} rounded-lg flex items-center justify-center`}>

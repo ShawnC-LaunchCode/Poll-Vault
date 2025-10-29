@@ -29,6 +29,18 @@ export default function AISurveyCreator() {
   const [preview, setPreview] = useState<GeneratedSurvey | null>(null);
   const [, setLocation] = useLocation();
 
+  // Analytics tracking helper
+  const track = (name: string, props?: Record<string, any>) => {
+    try {
+      fetch("/api/analytics/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ event: name, data: props || {} })
+      }).catch(() => {}); // Silent fail for analytics
+    } catch {}
+  };
+
   const generateMutation = useMutation({
     mutationFn: async (data: { topic: string; prompt?: string }) => {
       const response = await apiRequest("POST", "/api/ai/generate", data);
@@ -36,11 +48,21 @@ export default function AISurveyCreator() {
     },
     onSuccess: (data) => {
       setPreview(data);
+      track("ai_survey_generated", {
+        surveyId: data.id,
+        pageCount: data.pages?.length || 0,
+        questionCount: data.pages?.reduce((acc, p) => acc + (p.questions?.length || 0), 0) || 0
+      });
     },
   });
 
   const handleGenerate = () => {
     if (!topic.trim()) return;
+
+    track("ai_survey_generate_clicked", {
+      topicLength: topic.trim().length,
+      hasCustomPrompt: !!prompt.trim()
+    });
 
     generateMutation.mutate({
       topic: topic.trim(),
@@ -50,6 +72,7 @@ export default function AISurveyCreator() {
 
   const acceptAndEdit = () => {
     if (preview?.id) {
+      track("ai_survey_accept_edit_clicked", { surveyId: preview.id });
       setLocation(`/builder/${preview.id}`);
     }
   };

@@ -15,17 +15,30 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AnalyticsCharts } from "@/components/dashboard/AnalyticsCharts";
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
 import { SurveyManagement } from "@/components/dashboard/SurveyManagement";
+import AIHeroCard from "@/components/AIHeroCard";
 import { Link } from "wouter";
 import {
   FileText, PlayCircle, TrendingUp, Percent, History,
   Home, PieChart, Settings, Zap, Plus,
-  BarChart3, Download, Clock, ExternalLink, Sparkles
+  BarChart3, Download, Clock, ExternalLink, Sparkles, Wand2
 } from "lucide-react";
 
 export default function Dashboard() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Analytics tracking helper
+  const track = (name: string, props?: Record<string, any>) => {
+    try {
+      fetch("/api/analytics/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ event: name, data: props || {} })
+      }).catch(() => {}); // Silent fail for analytics
+    } catch {}
+  };
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -88,6 +101,12 @@ export default function Dashboard() {
         />
 
         <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
+          {/* AI Hero Card */}
+          <AIHeroCard
+            onAIClick={() => track("ai_survey_entry_clicked", { source: "dashboard_hero" })}
+            onBlankClick={() => track("new_survey_blank_clicked", { source: "dashboard_hero" })}
+          />
+
           {/* Enhanced Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6">
             <StatsCard
@@ -173,21 +192,23 @@ export default function Dashboard() {
                   </CardHeader>
                   <CardContent className="space-y-2 sm:space-y-3">
                     <QuickActionButton
+                      href="/ai-survey"
+                      icon={Wand2}
+                      iconColor="text-indigo-600"
+                      iconBgColor="bg-indigo-50"
+                      label="Generate with AI"
+                      testId="button-quick-ai-survey"
+                      onClick={() => track("ai_survey_entry_clicked", { source: "quick_actions" })}
+                    />
+
+                    <QuickActionButton
                       href="/surveys/new"
                       icon={Plus}
                       iconColor="text-primary"
                       iconBgColor="bg-primary/10"
                       label="Create New Survey"
                       testId="button-quick-create-survey"
-                    />
-
-                    <QuickActionButton
-                      href="/ai-survey"
-                      icon={Sparkles}
-                      iconColor="text-indigo-600"
-                      iconBgColor="bg-indigo-50"
-                      label="Generate with AI"
-                      testId="button-quick-ai-survey"
+                      onClick={() => track("new_survey_blank_clicked", { source: "quick_actions" })}
                     />
 
                     <QuickActionButton

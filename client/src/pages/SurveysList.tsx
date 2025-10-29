@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { SkeletonCard } from "@/components/shared/SkeletonCard";
 import { Link } from "wouter";
-import { Plus, Edit, BarChart, Users, Trash2, FileText, Copy, Sparkles } from "lucide-react";
+import { Plus, Edit, BarChart, Users, Trash2, FileText, Copy, Sparkles, Wand2, PenSquare } from "lucide-react";
 
 export default function SurveysList() {
   const { toast } = useToast();
@@ -235,22 +235,31 @@ export default function SurveysList() {
               // Empty State
               <div className="col-span-full">
                 <Card className="border-dashed">
-                  <CardContent className="flex flex-col items-center justify-center py-12">
-                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-                      <FileText className="w-8 h-8 text-muted-foreground" />
+                  <CardContent className="flex flex-col items-center justify-center py-16">
+                    <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-full flex items-center justify-center mb-4">
+                      <Wand2 className="w-8 h-8 text-white" />
                     </div>
-                    <h3 className="text-lg font-semibold text-foreground mb-2" data-testid="text-no-surveys">
-                      No surveys yet
+                    <h3 className="text-xl font-semibold text-foreground mb-2" data-testid="text-no-surveys">
+                      Start your first survey with AI
                     </h3>
-                    <p className="text-muted-foreground text-center mb-6 max-w-sm">
-                      Get started by creating your first survey to collect responses from your audience.
+                    <p className="text-muted-foreground text-center mb-6 max-w-md text-sm">
+                      Describe your topic, and we'll generate grouped pages with 3–4 questions each.
+                      Or start from scratch with a blank canvas.
                     </p>
-                    <Link href="/surveys/new">
-                      <Button data-testid="button-create-first-survey">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Create Your First Survey
-                      </Button>
-                    </Link>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <Link href="/ai-survey">
+                        <Button data-testid="button-create-first-ai-survey" className="bg-indigo-600 hover:bg-indigo-700">
+                          <Wand2 className="w-4 h-4 mr-2" />
+                          Generate with AI
+                        </Button>
+                      </Link>
+                      <Link href="/surveys/new">
+                        <Button variant="outline" data-testid="button-create-first-survey">
+                          <PenSquare className="w-4 h-4 mr-2" />
+                          Start Blank
+                        </Button>
+                      </Link>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
