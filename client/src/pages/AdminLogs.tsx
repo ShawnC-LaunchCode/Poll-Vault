@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { getQueryFn } from "@/lib/queryClient";
 import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -59,7 +60,8 @@ export default function AdminLogs() {
 
   // Fetch logs
   const { data, isLoading, error } = useQuery<ActivityLogResult>({
-    queryKey: ["/api/admin/logs", queryParams.toString()],
+    queryKey: [`/api/admin/logs?${queryParams.toString()}`],
+    queryFn: getQueryFn({ on401: "returnNull" }),
     enabled: !!isAuthenticated,
     retry: false,
   });
@@ -81,14 +83,21 @@ export default function AdminLogs() {
   // Show error if access denied (not admin)
   useEffect(() => {
     if (error) {
-      toast({
-        title: "Access Denied",
-        description: "You must be an admin to access this page",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/";
-      }, 1000);
+      // Only show access denied for actual 403 errors
+      const is403 = error instanceof Error && error.message.includes("403");
+      if (is403) {
+        toast({
+          title: "Access Denied",
+          description: "You must be an admin to access this page",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/";
+        }, 1000);
+      } else {
+        // For other errors, just log them
+        console.error("Error loading activity logs:", error);
+      }
     }
   }, [error, toast]);
 

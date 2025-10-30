@@ -18,3 +18,4 @@ vite.config.ts.*
 
 # Claude Code settings
 .claude/settings.local.json
+cookies.txt
