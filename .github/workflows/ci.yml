@@ -249,14 +249,14 @@ jobs:
             P_SKIPPED=0
           fi
 
-          echo "v_total=$V_TOTAL" >> $GITHUB_OUTPUT
-          echo "v_passed=$V_PASSED" >> $GITHUB_OUTPUT
-          echo "v_failed=$V_FAILED" >> $GITHUB_OUTPUT
-          echo "v_skipped=$V_SKIPPED" >> $GITHUB_OUTPUT
-          echo "p_total=$P_TOTAL" >> $GITHUB_OUTPUT
-          echo "p_passed=$P_PASSED" >> $GITHUB_OUTPUT
-          echo "p_failed=$P_FAILED" >> $GITHUB_OUTPUT
-          echo "p_skipped=$P_SKIPPED" >> $GITHUB_OUTPUT
+          echo "v_total=${V_TOTAL:-0}" >> "$GITHUB_OUTPUT"
+          echo "v_passed=${V_PASSED:-0}" >> "$GITHUB_OUTPUT"
+          echo "v_failed=${V_FAILED:-0}" >> "$GITHUB_OUTPUT"
+          echo "v_skipped=${V_SKIPPED:-0}" >> "$GITHUB_OUTPUT"
+          echo "p_total=${P_TOTAL:-0}" >> "$GITHUB_OUTPUT"
+          echo "p_passed=${P_PASSED:-0}" >> "$GITHUB_OUTPUT"
+          echo "p_failed=${P_FAILED:-0}" >> "$GITHUB_OUTPUT"
+          echo "p_skipped=${P_SKIPPED:-0}" >> "$GITHUB_OUTPUT"
 
           echo "Vitest: $V_PASSED/$V_TOTAL passed ($V_FAILED failed, $V_SKIPPED skipped)"
           echo "Playwright: $P_PASSED/$P_TOTAL passed ($P_FAILED failed, $P_SKIPPED skipped)"
@@ -285,9 +285,11 @@ jobs:
           echo "Failed tests extracted:"
           cat failed-tests.txt
 
-          # Store for later use
+          # Store for later use - ensure numeric value without trailing whitespace
           FAILED_TESTS_COUNT=$(grep -c "^\-" failed-tests.txt 2>/dev/null || echo 0)
-          echo "failed_count=$FAILED_TESTS_COUNT" >> $GITHUB_OUTPUT
+          # Trim whitespace and ensure valid output format
+          FAILED_TESTS_COUNT=$(echo "$FAILED_TESTS_COUNT" | tr -d '[:space:]')
+          echo "failed_count=${FAILED_TESTS_COUNT:-0}" >> "$GITHUB_OUTPUT"
 
       - name: Build Slack notification payload
         id: slack-payload

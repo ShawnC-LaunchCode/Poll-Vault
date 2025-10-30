@@ -41,11 +41,11 @@ async function ensureUploadDir() {
 
 // Configure multer storage
 const storage = multerInstance.diskStorage({
-  destination: async (req, file, cb) => {
+  destination: async (req: Express.Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
     await ensureUploadDir();
     cb(null, UPLOAD_DIR);
   },
-  filename: (req, file, cb) => {
+  filename: (req: Express.Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
     // Generate unique filename while preserving extension
     const ext = path.extname(file.originalname);
     const filename = `${randomUUID()}${ext}`;

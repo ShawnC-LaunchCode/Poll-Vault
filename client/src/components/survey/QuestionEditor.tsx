@@ -161,10 +161,11 @@ export default function QuestionEditor({ pageId, selectedQuestion, onQuestionSel
   const createQuestionMutation = useMutation({
     mutationFn: async (data: any) => {
       const questionCount = questions ? questions.length : 0;
-      return await apiRequest("POST", `/api/pages/${pageId}/questions`, {
+      const response = await apiRequest("POST", `/api/pages/${pageId}/questions`, {
         ...data,
         order: questionCount + 1
       });
+      return await response.json();
     },
     onSuccess: (newQuestion: Question) => {
       queryClient.invalidateQueries({ queryKey: ["/api/pages", pageId, "questions"] });

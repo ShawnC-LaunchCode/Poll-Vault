@@ -23,7 +23,7 @@ export async function setupVite(app: Express, server: Server) {
 
   // Resolve vite config (it's a function that needs to be called)
   const resolvedConfig = typeof viteConfig === 'function'
-    ? viteConfig({ mode: process.env.NODE_ENV || 'development', command: 'serve', ssrBuild: false, isSsrBuild: false, isPreview: false })
+    ? viteConfig({ mode: process.env.NODE_ENV || 'development', command: 'serve', isSsrBuild: false, isPreview: false })
     : viteConfig;
 
   const vite = await createViteServer({
