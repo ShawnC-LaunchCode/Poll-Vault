@@ -386,6 +386,7 @@ jobs:
           # Build Slack Block Kit JSON payload
           cat << EOF > payload.json
           {
+            "text": "Poll-Vault CI/CD Report: $STATUS_TEXT",
             "attachments": [
               {
                 "color": "$COLOR",
