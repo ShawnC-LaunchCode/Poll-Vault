@@ -23,6 +23,7 @@ import AdminUserSurveys from "@/pages/AdminUserSurveys";
 import AdminSurveys from "@/pages/AdminSurveys";
 import AdminLogs from "@/pages/AdminLogs";
 import AISurveyCreator from "@/pages/AISurveyCreator";
+import FeedbackWidget from "@/components/FeedbackWidget";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -64,6 +65,8 @@ function Router() {
           <Route path="/admin/logs" component={AdminLogs} />
           {/* 404 for authenticated users only */}
           <Route component={NotFound} />
+          {/* Feedback widget - visible on all authenticated pages */}
+          <FeedbackWidget />
         </>
       )}
     </Switch>
