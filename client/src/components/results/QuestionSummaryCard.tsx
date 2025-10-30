@@ -204,7 +204,7 @@ export function QuestionSummaryCard({ question }: QuestionSummaryCardProps) {
           </Badge>
         </div>
         <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
-          <span>{question.totalResponses} responses</span>
+          <span>{question.totalAnswers} {question.totalAnswers === 1 ? 'response' : 'responses'}</span>
           <span>{Math.round(question.answerRate)}% answered</span>
         </div>
       </CardHeader>
