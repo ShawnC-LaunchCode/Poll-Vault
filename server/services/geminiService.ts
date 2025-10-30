@@ -9,8 +9,8 @@ import { extractTextValue } from "../utils/answerFormatting";
  * Handles AI-powered analytics and insights
  */
 export class GeminiService {
-  private genAI: GoogleGenerativeAI;
-  private model: any;
+  private genAI!: GoogleGenerativeAI;
+  private model!: any;
 
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
