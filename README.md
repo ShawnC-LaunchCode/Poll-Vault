@@ -26,13 +26,34 @@
 
 ---
 
+## Recent Updates
+
+### 2025-10-22: Historical Statistics & Admin Enhancements
+- Added `systemStats` table tracking lifetime totals (surveys/responses created/deleted)
+- Added survey deletion buttons to admin pages with confirmation dialogs
+- Implemented status-based navigation (drafts → builder, active → results)
+- Fixed anonymous response creation by auto-generating `publicLink`
+
+### 2025-10-20: Railway Migration & Cleanup
+- Removed legacy Replit and Docker configurations
+- Simplified CORS to use `ALLOWED_ORIGIN` only
+- Verified production-ready architecture (monolithic full-stack deployment)
+
+### 2025-10-15: 3-Tier Architecture Refactoring
+- Implemented Repository layer for data access abstraction
+- Implemented Service layer for business logic orchestration
+- Refactored storage.ts (reduced from 2,500 to 1,480 lines)
+- Pattern: Routes → Services → Repositories → Database
+
+---
+
 ## Local Development Setup
 
 ### Prerequisites
 
 Before you begin, make sure you have:
 - **Node.js** (v18 or higher) - [Download here](https://nodejs.org/)
-- **PostgreSQL** (v14 or higher) - [Download here](https://www.postgresql.org/download/) OR use Docker
+- **PostgreSQL** database - Use [Neon](https://neon.tech/) (recommended) or local PostgreSQL
 - **Git** (for cloning if needed)
 
 ### Step 1: Install Dependencies
@@ -86,7 +107,14 @@ SENDGRID_FROM_EMAIL=noreply@yourdomain.com
 
 ### Step 3: Set Up PostgreSQL Database
 
-**Option A: Local PostgreSQL Installation**
+**Option A: Neon (Recommended - Free & Easy)**
+
+1. Go to [Neon](https://neon.tech/) and sign up
+2. Create a new project
+3. Copy the connection string (looks like `postgresql://user:pass@ep-xyz.region.aws.neon.tech/dbname`)
+4. Paste into `DATABASE_URL` in your `.env` file
+
+**Option B: Local PostgreSQL Installation**
 
 ```bash
 # Create a database named 'poll_vault'
@@ -97,24 +125,6 @@ CREATE DATABASE poll_vault;
 
 # Update DATABASE_URL in .env:
 # DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/poll_vault
-```
-
-**Option B: Using Docker (Easier)**
-
-```bash
-# Windows
-copy .env.example .env.docker
-
-# macOS/Linux
-cp .env.example .env.docker
-
-# Edit .env.docker with your passwords
-
-# Start PostgreSQL container
-docker-compose up -d postgres
-
-# Update DATABASE_URL in .env:
-# DATABASE_URL=postgresql://pollvault_user:your-password@localhost:5433/pollvault
 ```
 
 ### Step 4: Set Up Google OAuth2 (REQUIRED for login)
@@ -234,9 +244,11 @@ Poll-Vault/
 │   │   ├── responses.routes.ts  # Response collection
 │   │   ├── analytics.routes.ts  # Analytics & reporting
 │   │   └── files.routes.ts      # File upload & management
-│   ├── services/         # Business logic services
+│   ├── services/         # Business logic layer (3-tier architecture)
+│   ├── repositories/     # Data access layer (3-tier architecture)
+│   ├── storage.ts        # Legacy interface (delegates to repositories)
 │   └── types/            # TypeScript declarations
-├── shared/               # Shared types & schemas
+├── shared/               # Shared types & Drizzle schema
 └── docs/                 # Project documentation
 ```
 
@@ -263,6 +275,29 @@ MIT
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
+## Deployment
+
+### Railway (Recommended)
+
+**Prerequisites:** GitHub repo, Railway account, Google OAuth credentials, Neon PostgreSQL database
+
+**Quick Deploy:**
+
+1. **Deploy:** Go to [Railway](https://railway.app/) → "Deploy from GitHub repo" → Select this repository
+2. **Environment Variables:** Add these in Railway → Variables:
+   ```bash
+   NODE_ENV=production
+   DATABASE_URL=<neon-postgres-url>
+   GOOGLE_CLIENT_ID=<server-oauth-id>
+   VITE_GOOGLE_CLIENT_ID=<client-oauth-id>
+   SESSION_SECRET=<32-char-random>
+   ALLOWED_ORIGIN=your-app.up.railway.app  # no https://
+   ```
+3. **Configure Google OAuth:** Add Railway URL to authorized origins in Google Cloud Console
+4. **Verify:** Visit `https://your-app.up.railway.app`
+
+Railway auto-detects the build and start commands. View deployment logs in the Railway dashboard.
+
 ---
 
-**Last Updated:** 2025-10-14
+**Last Updated:** 2025-10-29
