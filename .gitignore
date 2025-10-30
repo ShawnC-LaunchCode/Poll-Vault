@@ -6,6 +6,10 @@ server/public
 vite.config.ts.*
 *.tar.gz
 
+# Test outputs
+playwright-report/
+test-results/
+
 # Environment files
 .env
 .env.local
