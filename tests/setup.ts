@@ -49,18 +49,27 @@ vi.mock("../server/services/sendgrid", () => ({
   sendReminder: vi.fn().mockResolvedValue({ success: true }),
 }));
 
-// Mock Google OAuth
-vi.mock("google-auth-library", () => ({
-  OAuth2Client: vi.fn().mockImplementation(() => ({
-    verifyIdToken: vi.fn().mockResolvedValue({
-      getPayload: () => ({
-        email: "test@example.com",
-        given_name: "Test",
-        family_name: "User",
-        picture: "https://example.com/avatar.jpg",
-      }),
+// Note: Google OAuth is mocked in individual test files for fine-grained control
+
+// Mock database storage operations for tests
+// Use a Map to store users in memory for tests
+const testUsersMap = new Map();
+
+vi.mock("../server/storage", () => ({
+  storage: {
+    upsertUser: vi.fn().mockImplementation(async (user: any) => {
+      testUsersMap.set(user.id, user);
+      return user;
     }),
-  })),
+    getUser: vi.fn().mockImplementation(async (userId: string) => {
+      const user = testUsersMap.get(userId);
+      if (!user) {
+        throw new Error(`User not found: ${userId}`);
+      }
+      return user;
+    }),
+    ping: vi.fn().mockResolvedValue(true),
+  },
 }));
 
 // Mock file upload - multer is a CommonJS module

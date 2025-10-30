@@ -2,6 +2,7 @@ import { OAuth2Client, type TokenPayload } from "google-auth-library";
 import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
+import createMemoryStore from "memorystore";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { createLogger } from "./logger";
@@ -21,20 +22,35 @@ function getGoogleClient(): OAuth2Client {
   return googleClient;
 }
 
+// For testing: allow injecting a custom OAuth client
+export function __setGoogleClient(client: OAuth2Client | null) {
+  googleClient = client;
+}
+
 export function getSession() {
   const sessionTtl = 365 * 24 * 60 * 60 * 1000; // 1 year (maximum lifespan)
-  const pgStore = connectPg(session);
-  const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
-    createTableIfMissing: false,
-    ttl: sessionTtl,
-    tableName: "sessions",
-  });
+
+  // Use in-memory session store for tests to avoid database connection issues
+  let sessionStore;
+  if (process.env.NODE_ENV === 'test') {
+    const MemoryStore = createMemoryStore(session);
+    sessionStore = new MemoryStore({
+      checkPeriod: sessionTtl,
+    });
+  } else {
+    const pgStore = connectPg(session);
+    sessionStore = new pgStore({
+      conString: process.env.DATABASE_URL,
+      createTableIfMissing: false,
+      ttl: sessionTtl,
+      tableName: "sessions",
+    });
+  }
 
   // Detect cross-origin deployment scenario
   // This occurs when ALLOWED_ORIGIN is set and differs from the current app domain
-  const isCrossOrigin = process.env.NODE_ENV === 'production' && 
-                       process.env.ALLOWED_ORIGIN && 
+  const isCrossOrigin = process.env.NODE_ENV === 'production' &&
+                       process.env.ALLOWED_ORIGIN &&
                        !process.env.ALLOWED_ORIGIN.includes('localhost') &&
                        !process.env.ALLOWED_ORIGIN.includes('127.0.0.1') &&
                        !process.env.ALLOWED_ORIGIN.includes('0.0.0.0');
@@ -154,9 +170,10 @@ export async function verifyGoogleToken(token: string): Promise<TokenPayload> {
 }
 
 // Rate limiting for authentication endpoint
+// Disable rate limiting in test mode to allow integration tests to run
 const authRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // limit each IP to 10 auth requests per windowMs
+  max: process.env.NODE_ENV === 'test' ? 1000 : 10, // much higher limit in test mode
   message: {
     message: 'Too many authentication attempts, please try again later.'
   },
