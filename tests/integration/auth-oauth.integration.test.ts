@@ -22,12 +22,15 @@ import type { TokenPayload } from "google-auth-library";
  * scenarios without requiring actual Google credentials.
  */
 
+// Create a shared mock function that all instances will use
+const mockVerifyIdTokenFn = vi.fn();
+
 // Mock Google OAuth2Client for all tests
 vi.mock("google-auth-library", () => {
   return {
-    OAuth2Client: vi.fn().mockImplementation(() => ({
-      verifyIdToken: vi.fn(),
-    })),
+    OAuth2Client: class {
+      verifyIdToken = mockVerifyIdTokenFn;
+    },
   };
 });
 
@@ -66,10 +69,8 @@ describe("OAuth2 Integration Tests", () => {
 
     baseURL = `http://localhost:${port}`;
 
-    // Get reference to mocked verifyIdToken
-    const MockedOAuth2Client = OAuth2Client as any;
-    const clientInstance = new MockedOAuth2Client();
-    mockVerifyIdToken = clientInstance.verifyIdToken;
+    // Use the shared mock function
+    mockVerifyIdToken = mockVerifyIdTokenFn;
   });
 
   afterAll(async () => {

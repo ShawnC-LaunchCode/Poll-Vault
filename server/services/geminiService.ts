@@ -15,12 +15,26 @@ export class GeminiService {
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error("GEMINI_API_KEY not configured in environment variables");
+      // In test environment, allow instantiation without API key
+      // Methods will throw errors if called without proper configuration
+      if (process.env.NODE_ENV !== 'test') {
+        throw new Error("GEMINI_API_KEY not configured in environment variables");
+      }
+      return;
     }
 
     this.genAI = new GoogleGenerativeAI(apiKey);
     // Use gemini-2.5-flash for speed and cost efficiency
     this.model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  }
+
+  /**
+   * Check if the service is properly initialized
+   */
+  private ensureInitialized(): void {
+    if (!this.model) {
+      throw new Error("GEMINI_API_KEY not configured - AI features are unavailable");
+    }
   }
 
   /**
@@ -35,6 +49,8 @@ export class GeminiService {
       analysisDate: Date;
     };
   }> {
+    this.ensureInitialized();
+
     // 1. Fetch survey data
     const survey = await surveyRepository.findById(surveyId);
     if (!survey) {
@@ -236,6 +252,8 @@ export class GeminiService {
     confidence: number;
     reasoning: string;
   }> {
+    this.ensureInitialized();
+
     const prompt = `Analyze the sentiment of this text and respond in JSON format:
 
 Text: "${text}"
