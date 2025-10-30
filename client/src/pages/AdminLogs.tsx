@@ -44,7 +44,8 @@ export default function AdminLogs() {
 
   // Pagination state
   const [page, setPage] = useState(0);
-  const limit = 50;
+  const [pageSize, setPageSize] = useState(50);
+  const limit = pageSize;
 
   // Build query params
   const queryParams = new URLSearchParams();
@@ -101,10 +102,10 @@ export default function AdminLogs() {
     }
   }, [error, toast]);
 
-  // Reset to first page when filters change
+  // Reset to first page when filters or page size change
   useEffect(() => {
     setPage(0);
-  }, [searchQuery, eventFilter, actorFilter, statusFilter, fromDate, toDate, sortOrder]);
+  }, [searchQuery, eventFilter, actorFilter, statusFilter, fromDate, toDate, sortOrder, pageSize]);
 
   if (authLoading || !isAuthenticated || error) {
     return null;
@@ -222,6 +223,16 @@ export default function AdminLogs() {
             </div>
             <div className="flex items-center gap-2">
               <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="border rounded-lg px-3 py-2 text-sm bg-white"
+              >
+                <option value="10">10 per page</option>
+                <option value="50">50 per page</option>
+                <option value="100">100 per page</option>
+                <option value="1000">1000 per page</option>
+              </select>
+              <select
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value as any)}
                 className="border rounded-lg px-3 py-2 text-sm bg-white"
@@ -240,13 +251,15 @@ export default function AdminLogs() {
           <Card>
             <CardContent className="p-0">
               <div className="overflow-auto">
-                <table className="min-w-[900px] w-full text-sm">
+                <table className="min-w-[1400px] w-full text-sm">
                   <thead className="bg-gray-50 border-b">
                     <tr className="text-left">
                       <th className="px-4 py-3 font-medium text-gray-700">Time</th>
                       <th className="px-4 py-3 font-medium text-gray-700">Event</th>
-                      <th className="px-4 py-3 font-medium text-gray-700">Actor</th>
+                      <th className="px-4 py-3 font-medium text-gray-700">Actor Email</th>
                       <th className="px-4 py-3 font-medium text-gray-700">Entity</th>
+                      <th className="px-4 py-3 font-medium text-gray-700">IP Address</th>
+                      <th className="px-4 py-3 font-medium text-gray-700">User Agent</th>
                       <th className="px-4 py-3 font-medium text-gray-700">Status</th>
                       <th className="px-4 py-3 font-medium text-gray-700">Metadata</th>
                     </tr>
@@ -261,7 +274,13 @@ export default function AdminLogs() {
                           {log.event}
                         </td>
                         <td className="px-4 py-3">
-                          {log.actorEmail || log.actorId || <span className="text-gray-400">—</span>}
+                          {log.actorEmail ? (
+                            <span className="font-medium">{log.actorEmail}</span>
+                          ) : log.actorId ? (
+                            <span className="text-xs text-gray-500">{log.actorId.substring(0, 8)}...</span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           {log.entityType && log.entityId ? (
@@ -273,6 +292,12 @@ export default function AdminLogs() {
                           ) : (
                             <span className="text-gray-400">—</span>
                           )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-xs">
+                          {log.ipAddress || <span className="text-gray-400">—</span>}
+                        </td>
+                        <td className="px-4 py-3 max-w-xs truncate text-xs" title={log.userAgent || ''}>
+                          {log.userAgent || <span className="text-gray-400">—</span>}
                         </td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusBadgeClass(log.status)}`}>
@@ -297,14 +322,14 @@ export default function AdminLogs() {
                     ))}
                     {logs.length === 0 && !isLoading && (
                       <tr>
-                        <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                        <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                           No activity logs found
                         </td>
                       </tr>
                     )}
                     {isLoading && (
                       <tr>
-                        <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                        <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                           Loading...
                         </td>
                       </tr>

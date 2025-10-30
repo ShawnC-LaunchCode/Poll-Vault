@@ -65,12 +65,17 @@ export class ActivityLogRepository {
       conditions.push(sql`${sql.raw(this.columns.event)} = ${event}`);
     }
 
-    // Actor filter (try email first, fallback to ID)
+    // Actor filter (use ILIKE for partial email matching, only use ID if it looks like a UUID)
     if (actor) {
       if (this.columns.actorEmail) {
-        conditions.push(sql`${sql.raw(this.columns.actorEmail)} = ${actor}`);
+        // Use ILIKE for partial matching (e.g., "scooter" matches "scooter4356@gmail.com")
+        conditions.push(sql`${sql.raw(this.columns.actorEmail)} ILIKE ${"%" + actor + "%"}`);
       } else if (this.columns.actorId) {
-        conditions.push(sql`${sql.raw(this.columns.actorId)} = ${actor}`);
+        // Only try to match by ID if the input looks like a valid UUID
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(actor)) {
+          conditions.push(sql`${sql.raw(this.columns.actorId)} = ${actor}`);
+        }
       }
     }
 

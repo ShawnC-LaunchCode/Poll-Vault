@@ -19,15 +19,17 @@ export default function Hero() {
             Tell Poll-Vault what you want to learn — our AI designs, organizes, and personalizes your survey in seconds.
           </p>
           <div className="mt-6 flex flex-col sm:flex-row gap-3">
-            <Link href="/ai-survey">
-              <a className="inline-flex items-center justify-center rounded-xl bg-white text-indigo-700 hover:bg-white/90 px-4 py-2.5 font-medium transition">
-                <Wand2 className="h-5 w-5 mr-2" /> Generate with AI
-              </a>
+            <Link
+              href="/ai-survey"
+              className="inline-flex items-center justify-center rounded-xl bg-white text-indigo-700 hover:bg-white/90 px-4 py-2.5 font-medium transition"
+            >
+              <Wand2 className="h-5 w-5 mr-2" /> Generate with AI
             </Link>
-            <Link href="/survey/demo">
-              <a className="inline-flex items-center justify-center rounded-xl border border-white/40 hover:bg-white/10 px-4 py-2.5 font-medium transition">
-                <Play className="h-5 w-5 mr-2" /> See Example Survey
-              </a>
+            <Link
+              href="/survey/demo"
+              className="inline-flex items-center justify-center rounded-xl border border-white/40 hover:bg-white/10 px-4 py-2.5 font-medium transition"
+            >
+              <Play className="h-5 w-5 mr-2" /> See Example Survey
             </Link>
           </div>
         </motion.div>
