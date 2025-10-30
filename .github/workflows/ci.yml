@@ -168,25 +168,6 @@ jobs:
           path: playwright-summary.json
           retention-days: 1
 
-  deploy:
-    name: Deploy to Railway
-    needs: [test, test-coverage, test-e2e]
-    if: success() && github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Railway CLI
-        run: npm i -g @railway/cli
-
-      - name: Deploy to Railway
-        run: railway up
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE_NAME }}
-
   notify-slack:
     name: Slack Notification
     needs: [test, test-coverage, test-e2e]
@@ -299,7 +280,6 @@ jobs:
           TEST_RESULT="${{ needs.test.result }}"
           COVERAGE_RESULT="${{ needs.test-coverage.result }}"
           E2E_RESULT="${{ needs.test-e2e.result }}"
-          DEPLOY_RESULT="${{ needs.deploy.result }}"
 
           if [[ "$TEST_RESULT" == "success" && "$COVERAGE_RESULT" == "success" && "$E2E_RESULT" == "success" ]]; then
             STATUS_ICON="✅"
@@ -375,13 +355,13 @@ jobs:
           P_TOTAL="${{ steps.parse-tests.outputs.p_total }}"
           P_SKIPPED="${{ steps.parse-tests.outputs.p_skipped }}"
 
-          # Deployment status
-          if [[ "$DEPLOY_RESULT" == "success" ]]; then
-            DEPLOY_TEXT="🚀 *Deployed:* <$DEPLOY_URL|View Live App>"
-          elif [[ "$DEPLOY_RESULT" == "skipped" ]]; then
-            DEPLOY_TEXT="⏭️ *Deployment:* Skipped (not main branch)"
+          # Deployment status (Railway auto-deploys via GitHub integration)
+          if [[ "$BRANCH" == "main" ]]; then
+            DEPLOY_TEXT="🚀 *Deployment:* Auto-deployed by Railway | <$DEPLOY_URL|View Live App>"
+          elif [[ "$BRANCH" == "develop" ]]; then
+            DEPLOY_TEXT="🚀 *Deployment:* Auto-deployed by Railway | <$DEPLOY_URL|View Live App>"
           else
-            DEPLOY_TEXT="❌ *Deployment:* Failed"
+            DEPLOY_TEXT="⏭️ *Deployment:* Preview only (not deployed)"
           fi
 
           # Build Slack Block Kit JSON payload
