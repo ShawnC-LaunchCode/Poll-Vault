@@ -27,6 +27,7 @@ export class UserRepository extends BaseRepository<typeof users, User, UpsertUse
   /**
    * Upsert user (create or update based on email)
    * Used for Google OAuth authentication
+   * IMPORTANT: Only updates fields provided in userData to preserve existing fields like 'role'
    */
   async upsert(userData: UpsertUser, tx?: DbTransaction): Promise<User> {
     const database = this.getDb(tx);
@@ -37,13 +38,21 @@ export class UserRepository extends BaseRepository<typeof users, User, UpsertUse
         const existingUser = await this.findByEmail(userData.email, tx);
 
         if (existingUser) {
-          // Update existing user with new data
+          // Update existing user with new data, but only update provided fields
+          // This preserves fields like 'role' that aren't included in Google OAuth userData
+          const updateData: any = {
+            updatedAt: new Date(),
+          };
+
+          // Only include fields that are explicitly provided
+          if (userData.firstName !== undefined) updateData.firstName = userData.firstName;
+          if (userData.lastName !== undefined) updateData.lastName = userData.lastName;
+          if (userData.profileImageUrl !== undefined) updateData.profileImageUrl = userData.profileImageUrl;
+          // Note: We intentionally don't update email or role here to preserve existing values
+
           const [updatedUser] = await database
             .update(users)
-            .set({
-              ...userData,
-              updatedAt: new Date(),
-            })
+            .set(updateData)
             .where(eq(users.email, userData.email))
             .returning();
           return updatedUser;
@@ -58,7 +67,9 @@ export class UserRepository extends BaseRepository<typeof users, User, UpsertUse
         .onConflictDoUpdate({
           target: users.id,
           set: {
-            ...userData,
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+            profileImageUrl: userData.profileImageUrl,
             updatedAt: new Date(),
           },
         })
@@ -71,12 +82,18 @@ export class UserRepository extends BaseRepository<typeof users, User, UpsertUse
         const existingUser = await this.findByEmail(userData.email, tx);
 
         if (existingUser) {
+          // Only update provided fields to preserve existing role
+          const updateData: any = {
+            updatedAt: new Date(),
+          };
+
+          if (userData.firstName !== undefined) updateData.firstName = userData.firstName;
+          if (userData.lastName !== undefined) updateData.lastName = userData.lastName;
+          if (userData.profileImageUrl !== undefined) updateData.profileImageUrl = userData.profileImageUrl;
+
           const [updatedUser] = await database
             .update(users)
-            .set({
-              ...userData,
-              updatedAt: new Date(),
-            })
+            .set(updateData)
             .where(eq(users.email, userData.email))
             .returning();
           return updatedUser;
