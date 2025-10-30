@@ -29,47 +29,49 @@ function Router() {
   const { isAuthenticated, isLoading } = useAuth();
 
   return (
-    <Switch>
-      {/* Survey response route - available to everyone (authenticated or not) */}
-      <Route path="/survey/:identifier" component={SurveyPlayer} />
+    <>
+      <Switch>
+        {/* Survey response route - available to everyone (authenticated or not) */}
+        <Route path="/survey/:identifier" component={SurveyPlayer} />
 
-      {isLoading || !isAuthenticated ? (
-        <>
-          <Route path="/" component={Landing} />
-          {/* Redirect all other routes to landing for unauthenticated users */}
-          <Route component={Landing} />
-        </>
-      ) : (
-        <>
-          <Route path="/" component={Dashboard} />
-          <Route path="/dashboard" component={Dashboard} />
-          <Route path="/surveys" component={SurveysList} />
-          <Route path="/surveys/new" component={SurveyBuilder} />
-          <Route path="/ai-survey" component={AISurveyCreator} />
-          <Route path="/builder/:surveyId" component={SurveyBuilder} />
-          <Route path="/builder/:surveyId/preview" component={SurveyPreview} />
-          <Route path="/surveys/:id/preview" component={SurveyPreview} />
-          <Route path="/surveys/:surveyId/results" component={SurveyResults} />
-          <Route path="/surveys/:id/responses" component={Responses} />
-          <Route path="/surveys/:id/recipients" component={Recipients} />
-          <Route path="/surveys/:surveyId/analytics" component={SurveyAnalytics} />
-          <Route path="/responses/:id" component={ResponseDetails} />
-          <Route path="/responses" component={Responses} />
-          <Route path="/recipients" component={Recipients} />
-          <Route path="/analytics" component={Dashboard} />
-          {/* Admin routes */}
-          <Route path="/admin" component={AdminDashboard} />
-          <Route path="/admin/users" component={AdminUsers} />
-          <Route path="/admin/users/:userId/surveys" component={AdminUserSurveys} />
-          <Route path="/admin/surveys" component={AdminSurveys} />
-          <Route path="/admin/logs" component={AdminLogs} />
-          {/* 404 for authenticated users only */}
-          <Route component={NotFound} />
-          {/* Feedback widget - visible on all authenticated pages */}
-          <FeedbackWidget />
-        </>
-      )}
-    </Switch>
+        {isLoading || !isAuthenticated ? (
+          <>
+            <Route path="/" component={Landing} />
+            {/* Redirect all other routes to landing for unauthenticated users */}
+            <Route component={Landing} />
+          </>
+        ) : (
+          <>
+            <Route path="/" component={Dashboard} />
+            <Route path="/dashboard" component={Dashboard} />
+            <Route path="/surveys" component={SurveysList} />
+            <Route path="/surveys/new" component={SurveyBuilder} />
+            <Route path="/ai-survey" component={AISurveyCreator} />
+            <Route path="/builder/:surveyId" component={SurveyBuilder} />
+            <Route path="/builder/:surveyId/preview" component={SurveyPreview} />
+            <Route path="/surveys/:id/preview" component={SurveyPreview} />
+            <Route path="/surveys/:surveyId/results" component={SurveyResults} />
+            <Route path="/surveys/:id/responses" component={Responses} />
+            <Route path="/surveys/:id/recipients" component={Recipients} />
+            <Route path="/surveys/:surveyId/analytics" component={SurveyAnalytics} />
+            <Route path="/responses/:id" component={ResponseDetails} />
+            <Route path="/responses" component={Responses} />
+            <Route path="/recipients" component={Recipients} />
+            <Route path="/analytics" component={Dashboard} />
+            {/* Admin routes */}
+            <Route path="/admin" component={AdminDashboard} />
+            <Route path="/admin/users" component={AdminUsers} />
+            <Route path="/admin/users/:userId/surveys" component={AdminUserSurveys} />
+            <Route path="/admin/surveys" component={AdminSurveys} />
+            <Route path="/admin/logs" component={AdminLogs} />
+            {/* 404 for authenticated users only */}
+            <Route component={NotFound} />
+          </>
+        )}
+      </Switch>
+      {/* Feedback widget - visible on all authenticated pages */}
+      {!isLoading && isAuthenticated && <FeedbackWidget />}
+    </>
   );
 }
 
