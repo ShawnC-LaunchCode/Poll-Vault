@@ -1,20 +1,6 @@
 import { QuestionSummaryCard } from "./QuestionSummaryCard";
 import { IndividualAnswersList } from "./IndividualAnswersList";
-
-interface QuestionAnalytics {
-  questionId: string;
-  questionTitle: string;
-  questionType: string;
-  totalResponses: number;
-  answerRate: number;
-  avgTimeSpent: number | null;
-  aggregates?: {
-    option: string;
-    count: number;
-    percentage: number;
-  }[];
-  textAnswers?: string[];
-}
+import type { QuestionAnalytics } from "@shared/schema";
 
 interface Answer {
   id: string;
