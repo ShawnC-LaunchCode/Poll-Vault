@@ -74,7 +74,11 @@ export default function FeedbackWidget() {
             className="max-w-lg w-[90vw] h-[80vh] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden border border-gray-200 dark:border-gray-700 p-0"
           >
             <iframe
-              src="https://poll-vault-production.up.railway.app/survey/b121d194-29b2-48d2-a2b0-7f50504bc3d8"
+              src={
+                import.meta.env.DEV
+                  ? "http://localhost:5000/survey/b121d194-29b2-48d2-a2b0-7f50504bc3d8"
+                  : "https://poll-vault-production.up.railway.app/survey/b121d194-29b2-48d2-a2b0-7f50504bc3d8"
+              }
               className="w-full h-full"
               title="Feedback Survey"
             />

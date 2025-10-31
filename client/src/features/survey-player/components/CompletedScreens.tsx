@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface AlreadyCompletedScreenProps {
@@ -34,6 +35,13 @@ export function AlreadyCompletedScreen({ submittedAt }: AlreadyCompletedScreenPr
 }
 
 export function SubmittedScreen() {
+  // Notify parent window when survey is submitted (for FeedbackWidget confetti)
+  useEffect(() => {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage("surveySubmitted", "*");
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
       <Card className="w-full max-w-md mx-4">
