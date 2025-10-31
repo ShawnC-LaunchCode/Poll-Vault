@@ -1,21 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
-
-interface QuestionAnalytics {
-  questionId: string;
-  questionTitle: string;
-  questionType: string;
-  totalResponses: number;
-  answerRate: number;
-  avgTimeSpent: number | null;
-  aggregates?: {
-    option: string;
-    count: number;
-    percentage: number;
-  }[];
-  textAnswers?: string[];
-}
+import type { QuestionAnalytics } from "@shared/schema";
 
 interface QuestionSummaryCardProps {
   question: QuestionAnalytics;
