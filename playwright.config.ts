@@ -80,16 +80,11 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: "npm run dev",
+    // Use dev:test which sets NODE_ENV=test
+    // cross-env will inherit other env vars from the parent process
+    command: "npm run dev:test",
     url: "http://localhost:5173",
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
-    env: {
-      DATABASE_URL: process.env.DATABASE_URL || '',
-      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
-      VITE_GOOGLE_CLIENT_ID: process.env.VITE_GOOGLE_CLIENT_ID || '',
-      SESSION_SECRET: process.env.SESSION_SECRET || '',
-      NODE_ENV: process.env.NODE_ENV || 'test',
-    },
   },
 });

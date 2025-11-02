@@ -136,6 +136,14 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
 
+      - name: Verify environment variables
+        run: |
+          echo "🔍 Checking environment variables..."
+          echo "DATABASE_URL set: $( [ -n "$DATABASE_URL" ] && echo 'YES' || echo 'NO' )"
+          echo "GOOGLE_CLIENT_ID set: $( [ -n "$GOOGLE_CLIENT_ID" ] && echo 'YES' || echo 'NO' )"
+          echo "SESSION_SECRET set: $( [ -n "$SESSION_SECRET" ] && echo 'YES' || echo 'NO' )"
+          echo "NODE_ENV: $NODE_ENV"
+
       - name: Run E2E tests
         id: playwright
         continue-on-error: true
