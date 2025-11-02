@@ -34,8 +34,9 @@ Bot tokens provide more capabilities than webhooks:
 1. In your app settings, go to **"OAuth & Permissions"** (left sidebar)
 2. Scroll to **"Scopes"** → **"Bot Token Scopes"**
 3. Add the following scopes:
-   - `chat:write` - Post messages
-   - `chat:write.public` - Post to public channels without joining
+   - `chat:write` - Post messages (required)
+   - `chat:write.public` - Post to public channels without joining (required)
+   - `reactions:write` - Add emoji reactions (optional, for ✅/❌ reactions)
    - `channels:read` - View channel info (optional, for validation)
 
 ---
@@ -43,10 +44,12 @@ Bot tokens provide more capabilities than webhooks:
 ## Step 3: Install App to Workspace
 
 1. Scroll to top of **"OAuth & Permissions"** page
-2. Click **"Install to Workspace"**
+2. Click **"Install to Workspace"** (or **"Reinstall to Workspace"** if updating scopes)
 3. Review permissions and click **"Allow"**
 4. **Copy the "Bot User OAuth Token"** (starts with `xoxb-`)
    - ⚠️ **Keep this secret!** Never commit to code or share publicly
+
+**Note:** If you add scopes after initial installation, you must **reinstall** the app for the new scopes to take effect. The token will remain the same.
 
 ---
 

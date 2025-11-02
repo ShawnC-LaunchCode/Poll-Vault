@@ -141,14 +141,19 @@ export async function postSlackSummary() {
     console.log("✅ Main message posted successfully");
     console.log(`   Message timestamp: ${mainMessage.ts}`);
 
-    // Add reaction
-    console.log("📌 Adding reaction...");
-    await slack.reactions.add({
-      name: buildStatus === "passed" ? "white_check_mark" : "x",
-      channel,
-      timestamp: mainMessage.ts,
-    });
-    console.log("✅ Reaction added");
+    // Add reaction (optional - requires reactions:write scope)
+    try {
+      console.log("📌 Adding reaction...");
+      await slack.reactions.add({
+        name: buildStatus === "passed" ? "white_check_mark" : "x",
+        channel,
+        timestamp: mainMessage.ts,
+      });
+      console.log("✅ Reaction added");
+    } catch (reactionError) {
+      console.log("⚠️ Could not add reaction (missing reactions:write scope)");
+      console.log("   The notification was posted successfully without reaction");
+    }
 
     // Threaded failed tests if any
     if (failed > 0 && fs.existsSync("failed-tests.txt")) {
