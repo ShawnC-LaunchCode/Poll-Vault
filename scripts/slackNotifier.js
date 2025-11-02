@@ -34,8 +34,13 @@ export async function postSlackSummary() {
 
   if (fs.existsSync("playwright-summary.json")) {
     const playwrightSummary = JSON.parse(fs.readFileSync("playwright-summary.json", "utf8"));
+    console.log(`📊 Playwright JSON structure: ${JSON.stringify({
+      hasSuites: !!playwrightSummary.suites,
+      suitesCount: playwrightSummary.suites?.length || 0
+    })}`);
+
     // Parse Playwright format
-    if (playwrightSummary.suites) {
+    if (playwrightSummary.suites && playwrightSummary.suites.length > 0) {
       const allTests = [];
       playwrightSummary.suites.forEach(suite => {
         if (suite.specs) {
@@ -50,8 +55,10 @@ export async function postSlackSummary() {
       playwrightPassed = allTests.filter(t => t.status === "expected" || t.status === "passed").length;
       playwrightFailed = allTests.filter(t => t.status === "unexpected" || t.status === "failed").length;
       playwrightSkipped = allTests.filter(t => t.status === "skipped").length;
+      console.log(`✓ Loaded playwright-summary.json: ${playwrightPassed}/${playwrightTotal} passed (${playwrightFailed} failed, ${playwrightSkipped} skipped)`);
+    } else {
+      console.log("ℹ️ Playwright summary has no test suites");
     }
-    console.log(`✓ Loaded playwright-summary.json: ${playwrightPassed}/${playwrightTotal} passed`);
   } else {
     console.log("ℹ️ No playwright-summary.json found");
   }
