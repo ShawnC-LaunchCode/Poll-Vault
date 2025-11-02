@@ -16,17 +16,63 @@ export async function postSlackSummary() {
 
   // Load Vitest JSON if available
   let vitestSummary = {};
-  if (fs.existsSync("vitest-results.json")) {
-    vitestSummary = JSON.parse(fs.readFileSync("vitest-results.json", "utf8"));
-    console.log("✓ Loaded vitest-results.json");
+  let vitestTotal = 0, vitestPassed = 0, vitestFailed = 0, vitestSkipped = 0;
+
+  if (fs.existsSync("vitest-summary.json")) {
+    vitestSummary = JSON.parse(fs.readFileSync("vitest-summary.json", "utf8"));
+    vitestTotal = vitestSummary.numTotalTests || 0;
+    vitestPassed = vitestSummary.numPassedTests || 0;
+    vitestFailed = vitestSummary.numFailedTests || 0;
+    vitestSkipped = vitestSummary.numPendingTests || 0;
+    console.log(`✓ Loaded vitest-summary.json: ${vitestPassed}/${vitestTotal} passed`);
   } else {
-    console.log("ℹ️ No vitest-results.json found, using mock data");
+    console.log("ℹ️ No vitest-summary.json found");
   }
 
-  const total = vitestSummary.numTotalTests || 0;
-  const passed = vitestSummary.numPassedTests || 0;
-  const failed = vitestSummary.numFailedTests || 0;
-  const coverage = vitestSummary.coverage || "N/A";
+  // Load Playwright JSON if available
+  let playwrightTotal = 0, playwrightPassed = 0, playwrightFailed = 0, playwrightSkipped = 0;
+
+  if (fs.existsSync("playwright-summary.json")) {
+    const playwrightSummary = JSON.parse(fs.readFileSync("playwright-summary.json", "utf8"));
+    // Parse Playwright format
+    if (playwrightSummary.suites) {
+      const allTests = [];
+      playwrightSummary.suites.forEach(suite => {
+        if (suite.specs) {
+          suite.specs.forEach(spec => {
+            if (spec.tests) {
+              allTests.push(...spec.tests);
+            }
+          });
+        }
+      });
+      playwrightTotal = allTests.length;
+      playwrightPassed = allTests.filter(t => t.status === "expected" || t.status === "passed").length;
+      playwrightFailed = allTests.filter(t => t.status === "unexpected" || t.status === "failed").length;
+      playwrightSkipped = allTests.filter(t => t.status === "skipped").length;
+    }
+    console.log(`✓ Loaded playwright-summary.json: ${playwrightPassed}/${playwrightTotal} passed`);
+  } else {
+    console.log("ℹ️ No playwright-summary.json found");
+  }
+
+  // Load coverage from text summary
+  let coverage = "N/A";
+  if (fs.existsSync("coverage-summary.txt")) {
+    const coverageText = fs.readFileSync("coverage-summary.txt", "utf8");
+    const match = coverageText.match(/(\d+\.\d+)%/);
+    if (match) {
+      coverage = `${match[1]}%`;
+      console.log(`✓ Loaded coverage: ${coverage}`);
+    }
+  } else {
+    console.log("ℹ️ No coverage-summary.txt found");
+  }
+
+  // Calculate totals
+  const total = vitestTotal + playwrightTotal;
+  const passed = vitestPassed + playwrightPassed;
+  const failed = vitestFailed + playwrightFailed;
 
   const buildStatus = failed > 0 ? "failed" : "passed";
   const color = buildStatus === "passed" ? "#10B981" : "#EF4444";
@@ -57,18 +103,32 @@ export async function postSlackSummary() {
           fields: [
             { type: "mrkdwn", text: `*Commit:*\n${commit}` },
             { type: "mrkdwn", text: `*By:*\n${actor}` },
-            { type: "mrkdwn", text: `*Tests Passed:*\n${passed}/${total}` },
             { type: "mrkdwn", text: `*Coverage:*\n${coverage}` },
+            { type: "mrkdwn", text: `*Total Tests:*\n${passed}/${total} passed` },
           ],
+        },
+        {
+          type: "divider",
+        },
+        {
+          type: "section",
+          text: { type: "mrkdwn", text: "🧪 *Test Results*" },
+        },
+        {
+          type: "section",
+          fields: [
+            { type: "mrkdwn", text: `*Vitest (Unit/Integration):*\n${vitestPassed}/${vitestTotal} passed${vitestFailed > 0 ? ` (${vitestFailed} failed)` : ''}` },
+            { type: "mrkdwn", text: `*Playwright (E2E):*\n${playwrightPassed}/${playwrightTotal} passed${playwrightFailed > 0 ? ` (${playwrightFailed} failed)` : ''}` },
+          ],
+        },
+        {
+          type: "divider",
         },
         {
           type: "context",
           elements: [
             { type: "mrkdwn", text: `<${buildUrl}|View Build Logs>` },
           ],
-        },
-        {
-          type: "divider",
         },
         {
           type: "section",
@@ -90,27 +150,45 @@ export async function postSlackSummary() {
     });
     console.log("✅ Reaction added");
 
-    // Threaded Vitest summary
-    if (Object.keys(vitestSummary).length) {
-      console.log("🧵 Posting Vitest summary thread...");
+    // Threaded failed tests if any
+    if (failed > 0 && fs.existsSync("failed-tests.txt")) {
+      console.log("🧵 Posting failed tests thread...");
+      const failedTests = fs.readFileSync("failed-tests.txt", "utf8");
       await slack.chat.postMessage({
         channel,
         thread_ts: mainMessage.ts,
-        text: "🧪 *Vitest Summary*:\n```" + JSON.stringify(vitestSummary, null, 2) + "```",
+        text: `🚨 *Test Failures (${failed}):*\n\`\`\`\n${failedTests.slice(0, 2000)}\n\`\`\``,
       });
-      console.log("✅ Vitest thread posted");
+      console.log("✅ Failed tests thread posted");
     }
 
-    // Threaded coverage (if present)
-    if (vitestSummary.coverageMap) {
-      console.log("🧵 Posting coverage thread...");
+    // Threaded detailed test summary
+    if (vitestTotal > 0 || playwrightTotal > 0) {
+      console.log("🧵 Posting detailed test summary thread...");
+      let summaryText = "📊 *Detailed Test Summary*\n\n";
+
+      if (vitestTotal > 0) {
+        summaryText += `*Vitest (Unit & Integration):*\n`;
+        summaryText += `• Total: ${vitestTotal}\n`;
+        summaryText += `• Passed: ${vitestPassed}\n`;
+        summaryText += `• Failed: ${vitestFailed}\n`;
+        summaryText += `• Skipped: ${vitestSkipped}\n\n`;
+      }
+
+      if (playwrightTotal > 0) {
+        summaryText += `*Playwright (E2E):*\n`;
+        summaryText += `• Total: ${playwrightTotal}\n`;
+        summaryText += `• Passed: ${playwrightPassed}\n`;
+        summaryText += `• Failed: ${playwrightFailed}\n`;
+        summaryText += `• Skipped: ${playwrightSkipped}\n`;
+      }
+
       await slack.chat.postMessage({
         channel,
         thread_ts: mainMessage.ts,
-        text: "📊 *Coverage Details*:\n```" +
-          JSON.stringify(vitestSummary.coverageMap, null, 2) + "```",
+        text: summaryText,
       });
-      console.log("✅ Coverage thread posted");
+      console.log("✅ Detailed summary thread posted");
     }
 
     console.log("\n🎉 Slack notification complete!");
