@@ -2,12 +2,15 @@
 
 ## Issue: No Slack notifications received after deployment
 
+**Note:** This project now uses **Slack Bot Token** instead of webhooks for better functionality (threading, etc.). See `docs/SLACK_BOT_SETUP.md` for complete setup instructions.
+
 ### Most Common Causes:
 
-1. **Missing SLACK_WEBHOOK_URL Secret**
+1. **Missing Bot Token or Channel ID Secrets**
    - Go to: https://github.com/ShawnC-LaunchCode/Poll-Vault/settings/secrets/actions
-   - Verify `SLACK_WEBHOOK_URL` exists
-   - If missing, create it with your Slack webhook URL
+   - Verify both `SLACK_BOT_TOKEN` and `SLACK_CHANNEL_ID` exist
+   - If missing, follow setup guide in `docs/SLACK_BOT_SETUP.md`
+   - **Legacy:** If you still have `SLACK_WEBHOOK_URL`, it's no longer used
 
 2. **Workflow Job Failed Silently**
    - Check logs: https://github.com/ShawnC-LaunchCode/Poll-Vault/actions

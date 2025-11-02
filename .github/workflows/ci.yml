@@ -490,44 +490,55 @@ jobs:
         id: send-slack
         uses: slackapi/slack-github-action@v1.24.0
         with:
+          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
           payload-file-path: ./payload.json
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
 
       - name: Post Threaded Reply for Failures
         if: always() && steps.parse-failures.outputs.failed_count > 0
         run: |
-          # Note: Threading requires Slack Web API (bot token) instead of webhook
-          # If using webhook, this step will post as a separate message
+          # Post failure details as a threaded reply using Slack Web API
           FAIL_CONTENT=$(cat failed-tests.txt)
+          THREAD_TS="${{ steps.send-slack.outputs.ts }}"
+          CHANNEL_ID="${{ secrets.SLACK_CHANNEL_ID }}"
 
-          # Escape special characters for JSON
-          FAIL_CONTENT_ESCAPED=$(echo "$FAIL_CONTENT" | jq -Rs .)
-
-          # Build threaded message payload
-          if [ -n "${{ steps.send-slack.outputs.ts }}" ]; then
-            # If we have a thread timestamp (bot token mode)
-            THREAD_TS="${{ steps.send-slack.outputs.ts }}"
-            cat << EOF > thread-payload.json
-          {
-            "thread_ts": "$THREAD_TS",
-            "text": "🚨 *Test Failure Details:*\n$FAIL_CONTENT",
-            "mrkdwn": true
-          }
-          EOF
-          else
-            # Fallback for webhook mode (posts as separate message with context)
-            cat << EOF > thread-payload.json
-          {
-            "text": "🚨 *Test Failure Details for Latest CI Run:*\n\`\`\`\n$FAIL_CONTENT\n\`\`\`\n_Thread replies require Slack Bot Token. Currently using webhook mode._"
-          }
-          EOF
+          if [ -z "$THREAD_TS" ]; then
+            echo "⚠️ No thread timestamp available, skipping threaded reply"
+            exit 0
           fi
 
-          echo "Posting failure details to Slack..."
+          # Build threaded message payload with Block Kit formatting
+          cat << EOF > thread-payload.json
+          {
+            "channel": "$CHANNEL_ID",
+            "thread_ts": "$THREAD_TS",
+            "text": "🚨 Test Failure Details",
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "*🚨 Test Failure Details:*"
+                }
+              },
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "\`\`\`\n$(cat failed-tests.txt | head -20)\n\`\`\`"
+                }
+              }
+            ]
+          }
+          EOF
+
+          echo "Posting failure details as threaded reply..."
           cat thread-payload.json
 
-          # Post to Slack
-          curl -X POST -H 'Content-type: application/json' \
+          # Post to Slack Web API using bot token
+          curl -X POST https://slack.com/api/chat.postMessage \
+            -H "Authorization: Bearer ${{ secrets.SLACK_BOT_TOKEN }}" \
+            -H "Content-Type: application/json" \
             --data @thread-payload.json \
-            "${{ secrets.SLACK_WEBHOOK_URL }}" || echo "Failed to post thread reply"
+            | jq '.'
