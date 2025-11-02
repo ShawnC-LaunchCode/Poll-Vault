@@ -31,6 +31,7 @@ export async function postSlackSummary() {
 
   // Load Playwright JSON if available
   let playwrightTotal = 0, playwrightPassed = 0, playwrightFailed = 0, playwrightSkipped = 0;
+  let playwrightDidNotRun = false;
 
   if (fs.existsSync("playwright-summary.json")) {
     const playwrightSummary = JSON.parse(fs.readFileSync("playwright-summary.json", "utf8"));
@@ -38,16 +39,32 @@ export async function postSlackSummary() {
     // Debug: Log full structure
     console.log(`📊 Playwright JSON keys: ${Object.keys(playwrightSummary).join(", ")}`);
 
+    // Check if tests didn't run at all
+    if (playwrightSummary.testDidNotRun) {
+      playwrightDidNotRun = true;
+      console.log("⚠️ Playwright tests did not run");
+    }
+
     // Playwright JSON reporter format has different structure
     // It can have: { suites: [], config: {}, ... } or { stats: { expected, unexpected, ... } }
 
     // Try method 1: Check for stats object (some Playwright versions)
     if (playwrightSummary.stats) {
-      playwrightTotal = playwrightSummary.stats.expected + playwrightSummary.stats.unexpected + playwrightSummary.stats.skipped || 0;
+      const statsTotal = (playwrightSummary.stats.expected || 0) + (playwrightSummary.stats.unexpected || 0) + (playwrightSummary.stats.skipped || 0);
+      playwrightTotal = statsTotal;
       playwrightPassed = playwrightSummary.stats.expected || 0;
       playwrightFailed = playwrightSummary.stats.unexpected || 0;
       playwrightSkipped = playwrightSummary.stats.skipped || 0;
       console.log(`✓ Loaded from stats: ${playwrightPassed}/${playwrightTotal} passed`);
+
+      // Warn if no tests ran but file exists
+      if (statsTotal === 0) {
+        playwrightDidNotRun = true;
+        console.log("⚠️ Playwright stats show 0 tests (webserver or startup failure?)");
+        if (playwrightSummary.errors && playwrightSummary.errors.length > 0) {
+          console.log("   Errors:", playwrightSummary.errors.map(e => e.message).join(", "));
+        }
+      }
     }
     // Try method 2: Parse suites structure
     else if (playwrightSummary.suites && playwrightSummary.suites.length > 0) {
@@ -101,9 +118,20 @@ export async function postSlackSummary() {
   const passed = vitestPassed + playwrightPassed;
   const failed = vitestFailed + playwrightFailed;
 
-  const buildStatus = failed > 0 ? "failed" : "passed";
-  const color = buildStatus === "passed" ? "#10B981" : "#EF4444";
-  const emoji = buildStatus === "passed" ? "✅" : "❌";
+  // Determine build status
+  let buildStatus = "passed";
+  let color = "#10B981"; // green
+  let emoji = "✅";
+
+  if (playwrightDidNotRun) {
+    buildStatus = "warning";
+    color = "#F59E0B"; // amber
+    emoji = "⚠️";
+  } else if (failed > 0) {
+    buildStatus = "failed";
+    color = "#EF4444"; // red
+    emoji = "❌";
+  }
 
   const commit = process.env.GITHUB_SHA?.slice(0, 7) || "local";
   const actor = process.env.GITHUB_ACTOR || "local";
@@ -116,52 +144,70 @@ export async function postSlackSummary() {
 
   console.log(`📬 Posting main message to channel ${channel}...`);
 
+  // Build blocks array
+  const blocks = [
+    {
+      type: "header",
+      text: { type: "plain_text", text: headerText },
+    },
+    {
+      type: "section",
+      fields: [
+        { type: "mrkdwn", text: `*Commit:*\n${commit}` },
+        { type: "mrkdwn", text: `*By:*\n${actor}` },
+        { type: "mrkdwn", text: `*Coverage:*\n${coverage}` },
+        { type: "mrkdwn", text: `*Total Tests:*\n${passed}/${total} passed` },
+      ],
+    },
+    {
+      type: "divider",
+    },
+    {
+      type: "section",
+      text: { type: "mrkdwn", text: "🧪 *Test Results*" },
+    },
+    {
+      type: "section",
+      fields: [
+        { type: "mrkdwn", text: `*Vitest (Unit/Integration):*\n${vitestPassed}/${vitestTotal} passed${vitestFailed > 0 ? ` (${vitestFailed} failed)` : ''}` },
+        { type: "mrkdwn", text: `*Playwright (E2E):*\n${playwrightDidNotRun ? '⚠️ Tests did not run' : `${playwrightPassed}/${playwrightTotal} passed${playwrightFailed > 0 ? ` (${playwrightFailed} failed)` : ''}`}` },
+      ],
+    },
+  ];
+
+  // Add warning section if Playwright didn't run
+  if (playwrightDidNotRun) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: "⚠️ *Warning:* Playwright E2E tests did not execute. This usually means the webserver failed to start. Check the build logs for details.",
+      },
+    });
+  }
+
+  // Continue with remaining blocks
+  blocks.push(
+    {
+      type: "divider",
+    },
+    {
+      type: "context",
+      elements: [
+        { type: "mrkdwn", text: `<${buildUrl}|View Build Logs>` },
+      ],
+    },
+    {
+      type: "section",
+      text: { type: "mrkdwn", text: "_AI Summary (coming soon)_ 🤖" },
+    }
+  );
+
   try {
     const mainMessage = await slack.chat.postMessage({
       channel,
       text: `${headerText} – ${actor}`,
-      blocks: [
-        {
-          type: "header",
-          text: { type: "plain_text", text: headerText },
-        },
-        {
-          type: "section",
-          fields: [
-            { type: "mrkdwn", text: `*Commit:*\n${commit}` },
-            { type: "mrkdwn", text: `*By:*\n${actor}` },
-            { type: "mrkdwn", text: `*Coverage:*\n${coverage}` },
-            { type: "mrkdwn", text: `*Total Tests:*\n${passed}/${total} passed` },
-          ],
-        },
-        {
-          type: "divider",
-        },
-        {
-          type: "section",
-          text: { type: "mrkdwn", text: "🧪 *Test Results*" },
-        },
-        {
-          type: "section",
-          fields: [
-            { type: "mrkdwn", text: `*Vitest (Unit/Integration):*\n${vitestPassed}/${vitestTotal} passed${vitestFailed > 0 ? ` (${vitestFailed} failed)` : ''}` },
-            { type: "mrkdwn", text: `*Playwright (E2E):*\n${playwrightPassed}/${playwrightTotal} passed${playwrightFailed > 0 ? ` (${playwrightFailed} failed)` : ''}` },
-          ],
-        },
-        {
-          type: "divider",
-        },
-        {
-          type: "context",
-          elements: [
-            { type: "mrkdwn", text: `<${buildUrl}|View Build Logs>` },
-          ],
-        },
-        {
-          type: "section",
-          text: { type: "mrkdwn", text: "_AI Summary (coming soon)_ 🤖" },
-        },
-      ],
+      blocks,
       attachments: [{ color }],
     });
 
@@ -171,8 +217,15 @@ export async function postSlackSummary() {
     // Add reaction (optional - requires reactions:write scope)
     try {
       console.log("📌 Adding reaction...");
+      let reactionName = "white_check_mark";
+      if (buildStatus === "failed") {
+        reactionName = "x";
+      } else if (buildStatus === "warning") {
+        reactionName = "warning";
+      }
+
       await slack.reactions.add({
-        name: buildStatus === "passed" ? "white_check_mark" : "x",
+        name: reactionName,
         channel,
         timestamp: mainMessage.ts,
       });

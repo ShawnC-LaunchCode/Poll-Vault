@@ -28,21 +28,27 @@ export function __setGoogleClient(client: OAuth2Client | null) {
 }
 
 export function getSession() {
-  const sessionTtl = 365 * 24 * 60 * 60 * 1000; // 1 year (maximum lifespan)
+  // Session lifetime configuration
+  // Note: connect-pg-simple uses TTL in SECONDS, cookie maxAge uses MILLISECONDS
+  const sessionTtlSeconds = 365 * 24 * 60 * 60; // 1 year in seconds (31,536,000)
+
+  // Cookie maxAge must fit in 32-bit signed integer (max 2,147,483,647 ms = ~24.8 days)
+  // Use 24 days as a safe cookie lifetime that fits in 32-bit integer
+  const cookieMaxAgeMs = 24 * 24 * 60 * 60 * 1000; // 24 days in milliseconds (2,073,600,000)
 
   // Use in-memory session store for tests to avoid database connection issues
   let sessionStore;
   if (process.env.NODE_ENV === 'test') {
     const MemoryStore = createMemoryStore(session);
     sessionStore = new MemoryStore({
-      checkPeriod: sessionTtl,
+      checkPeriod: cookieMaxAgeMs, // Use ms for memory store
     });
   } else {
     const pgStore = connectPg(session);
     sessionStore = new pgStore({
       conString: process.env.DATABASE_URL,
       createTableIfMissing: false,
-      ttl: sessionTtl,
+      ttl: sessionTtlSeconds, // Use SECONDS for pg store
       tableName: "sessions",
     });
   }
@@ -67,7 +73,7 @@ export function getSession() {
       // For cross-origin deployments, use SameSite=None to allow cross-origin cookies
       // For same-origin deployments, use SameSite=lax for CSRF protection
       sameSite: isCrossOrigin ? 'none' : 'lax',
-      maxAge: sessionTtl,
+      maxAge: cookieMaxAgeMs, // 24 days (fits in 32-bit integer)
       // Additional cookie settings for cross-origin scenarios
       ...(isCrossOrigin && {
         domain: undefined, // Let browser determine the correct domain

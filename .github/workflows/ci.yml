@@ -158,15 +158,29 @@ jobs:
 
           if [ -f "test-results/results.json" ]; then
             echo "✓ Found test-results/results.json"
-            echo "📊 First 500 chars of Playwright JSON:"
-            head -c 500 test-results/results.json
+            echo "📊 Full Playwright JSON:"
+            cat test-results/results.json
             echo ""
+
+            # Check if any tests actually ran
+            TEST_COUNT=$(jq -r '.stats.expected + .stats.unexpected + .stats.skipped' test-results/results.json)
+            echo "📊 Tests found: $TEST_COUNT"
+
             cp test-results/results.json playwright-summary.json
             echo "✓ Copied Playwright results to playwright-summary.json"
+
+            # Fail if no tests ran (indicates webserver or other startup failure)
+            if [ "$TEST_COUNT" -eq "0" ]; then
+              echo "❌ ERROR: Playwright ran but executed 0 tests"
+              echo "   This usually means the webserver failed to start"
+              jq -r '.errors[]?.message // "No error details"' test-results/results.json
+              exit 1
+            fi
           else
             # Fallback: create empty results if tests didn't run
-            echo '{"suites":[],"stats":{"total":0,"expected":0,"unexpected":0,"skipped":0}}' > playwright-summary.json
-            echo "⚠️ No Playwright results found, using empty summary"
+            echo '{"suites":[],"stats":{"expected":0,"unexpected":0,"skipped":0},"testDidNotRun":true}' > playwright-summary.json
+            echo "❌ ERROR: No Playwright results found - tests did not run at all"
+            exit 1
           fi
 
       - name: Upload Playwright report
