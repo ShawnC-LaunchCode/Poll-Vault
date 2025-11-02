@@ -145,9 +145,16 @@ jobs:
         if: always()
         run: |
           # Playwright outputs JSON to test-results/results.json (configured in playwright.config.ts)
+          echo "📂 Checking for Playwright results..."
+          ls -la test-results/ || echo "No test-results directory"
+
           if [ -f "test-results/results.json" ]; then
+            echo "✓ Found test-results/results.json"
+            echo "📊 First 500 chars of Playwright JSON:"
+            head -c 500 test-results/results.json
+            echo ""
             cp test-results/results.json playwright-summary.json
-            echo "✓ Copied Playwright results"
+            echo "✓ Copied Playwright results to playwright-summary.json"
           else
             # Fallback: create empty results if tests didn't run
             echo '{"suites":[],"stats":{"total":0,"expected":0,"unexpected":0,"skipped":0}}' > playwright-summary.json

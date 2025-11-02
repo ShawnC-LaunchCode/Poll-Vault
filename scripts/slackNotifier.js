@@ -34,13 +34,23 @@ export async function postSlackSummary() {
 
   if (fs.existsSync("playwright-summary.json")) {
     const playwrightSummary = JSON.parse(fs.readFileSync("playwright-summary.json", "utf8"));
-    console.log(`📊 Playwright JSON structure: ${JSON.stringify({
-      hasSuites: !!playwrightSummary.suites,
-      suitesCount: playwrightSummary.suites?.length || 0
-    })}`);
 
-    // Parse Playwright format
-    if (playwrightSummary.suites && playwrightSummary.suites.length > 0) {
+    // Debug: Log full structure
+    console.log(`📊 Playwright JSON keys: ${Object.keys(playwrightSummary).join(", ")}`);
+
+    // Playwright JSON reporter format has different structure
+    // It can have: { suites: [], config: {}, ... } or { stats: { expected, unexpected, ... } }
+
+    // Try method 1: Check for stats object (some Playwright versions)
+    if (playwrightSummary.stats) {
+      playwrightTotal = playwrightSummary.stats.expected + playwrightSummary.stats.unexpected + playwrightSummary.stats.skipped || 0;
+      playwrightPassed = playwrightSummary.stats.expected || 0;
+      playwrightFailed = playwrightSummary.stats.unexpected || 0;
+      playwrightSkipped = playwrightSummary.stats.skipped || 0;
+      console.log(`✓ Loaded from stats: ${playwrightPassed}/${playwrightTotal} passed`);
+    }
+    // Try method 2: Parse suites structure
+    else if (playwrightSummary.suites && playwrightSummary.suites.length > 0) {
       const allTests = [];
       playwrightSummary.suites.forEach(suite => {
         if (suite.specs) {
@@ -55,9 +65,19 @@ export async function postSlackSummary() {
       playwrightPassed = allTests.filter(t => t.status === "expected" || t.status === "passed").length;
       playwrightFailed = allTests.filter(t => t.status === "unexpected" || t.status === "failed").length;
       playwrightSkipped = allTests.filter(t => t.status === "skipped").length;
-      console.log(`✓ Loaded playwright-summary.json: ${playwrightPassed}/${playwrightTotal} passed (${playwrightFailed} failed, ${playwrightSkipped} skipped)`);
+      console.log(`✓ Loaded from suites: ${playwrightPassed}/${playwrightTotal} passed`);
+    }
+    // Try method 3: Look for test results in different structure
+    else if (playwrightSummary.testResults) {
+      const allTests = playwrightSummary.testResults.flatMap(r => r.assertionResults || []);
+      playwrightTotal = allTests.length;
+      playwrightPassed = allTests.filter(t => t.status === "passed").length;
+      playwrightFailed = allTests.filter(t => t.status === "failed").length;
+      playwrightSkipped = allTests.filter(t => t.status === "skipped").length;
+      console.log(`✓ Loaded from testResults: ${playwrightPassed}/${playwrightTotal} passed`);
     } else {
-      console.log("ℹ️ Playwright summary has no test suites");
+      console.log("⚠️ Playwright summary has unknown format");
+      console.log(`   Sample: ${JSON.stringify(playwrightSummary).substring(0, 200)}`);
     }
   } else {
     console.log("ℹ️ No playwright-summary.json found");
