@@ -265,6 +265,79 @@ export class RecipientRepository extends BaseRepository<typeof recipients, Recip
 
     return newRecipients;
   }
+
+  /**
+   * Upsert many global recipients (for CSV import)
+   * Returns counts of imported, updated, and skipped records
+   */
+  async upsertManyGlobal(
+    creatorId: string,
+    rows: Array<{ name?: string | null; email: string; tags?: string[] | null }>,
+    tx?: DbTransaction
+  ): Promise<{ imported: number; updated: number; skipped: number }> {
+    const database = this.getDb(tx);
+    let imported = 0;
+    let updated = 0;
+    let skipped = 0;
+
+    for (const r of rows) {
+      const email = r.email.trim().toLowerCase();
+      if (!email) {
+        skipped++;
+        continue;
+      }
+
+      const existing = await this.findGlobalByCreatorAndEmail(creatorId, email, tx);
+
+      if (existing) {
+        // Merge tags - combine existing and new tags
+        const mergedTags = Array.from(
+          new Set([...(existing.tags || []), ...(r.tags || [])])
+        );
+
+        await database
+          .update(globalRecipients)
+          .set({
+            name: r.name || existing.name,
+            tags: mergedTags,
+            updatedAt: new Date(),
+          } as any)
+          .where(eq(globalRecipients.id, existing.id));
+        updated++;
+      } else {
+        await database
+          .insert(globalRecipients)
+          .values({
+            creatorId,
+            name: r.name || '',
+            email,
+            tags: r.tags || null,
+          } as any);
+        imported++;
+      }
+    }
+
+    return { imported, updated, skipped };
+  }
+
+  /**
+   * List global recipients with pagination
+   */
+  async listGlobal(
+    creatorId: string,
+    limit = 100,
+    offset = 0,
+    tx?: DbTransaction
+  ): Promise<GlobalRecipient[]> {
+    const database = this.getDb(tx);
+    return await database
+      .select()
+      .from(globalRecipients)
+      .where(eq(globalRecipients.creatorId, creatorId))
+      .orderBy(desc(globalRecipients.email))
+      .limit(limit)
+      .offset(offset);
+  }
 }
 
 export const recipientRepository = new RecipientRepository();

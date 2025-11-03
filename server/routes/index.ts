@@ -4,6 +4,8 @@ import { registerSurveyRoutes } from "./surveys.routes";
 import { registerPageRoutes } from "./pages.routes";
 import { registerQuestionRoutes } from "./questions.routes";
 import { registerRecipientRoutes } from "./recipients.routes";
+import { registerRecipientGroupRoutes } from "./recipientGroups.routes";
+import { registerRecipientImportRoutes } from "./recipients.import.routes";
 import { registerResponseRoutes } from "./responses.routes";
 import { registerAnalyticsRoutes } from "./analytics.routes";
 import { registerFileRoutes } from "./files.routes";
@@ -34,6 +36,12 @@ export function registerAllRoutes(app: Express): void {
 
   // Recipient management routes
   registerRecipientRoutes(app);
+
+  // Recipient group management routes
+  registerRecipientGroupRoutes(app);
+
+  // Recipient CSV import/export routes
+  registerRecipientImportRoutes(app);
 
   // Response collection routes
   registerResponseRoutes(app);

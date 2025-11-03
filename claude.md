@@ -1,12 +1,20 @@
 # Poll-Vault: Developer Reference Guide
 
-**Last Updated:** 2025-10-23
+**Last Updated:** 2025-11-03
 **Project Type:** Survey/Polling Platform
 **Tech Stack:** Node.js/Express, React, PostgreSQL (Neon), Drizzle ORM
 
 ---
 
 ## Recent Updates
+
+### 2025-11-03: Recipient Groups & CSV Import/Export (Phase 1)
+- Added `recipientGroups` and `recipientGroupMembers` tables for organizing contacts
+- Implemented recipient group CRUD operations with member management
+- Added CSV import functionality for bulk recipient uploads with deduplication
+- Added CSV template download and export functionality
+- Created RecipientGroupRepository, RecipientGroupService, and RecipientImportService
+- Added unit and integration tests for recipient import and group management
 
 ### 2025-10-22: Historical Statistics & Admin Enhancements
 - Added `systemStats` table tracking lifetime totals (surveys/responses created/deleted)
@@ -62,13 +70,15 @@ shared/              # Drizzle schema & shared utilities
 6. **conditionalRules** - UUID, surveyId (FK), conditionQuestionId, operator enum(equals, not_equals, contains, greater_than, less_than, between, is_empty, etc.), targetQuestionId/targetPageId, action enum(show, hide, require, make_optional)
 7. **recipients** - UUID, surveyId (FK cascade), email, token (unique)
 8. **globalRecipients** - UUID, creatorId (FK), email, tags (text[])
-9. **responses** - UUID, surveyId (FK cascade), recipientId, completed, isAnonymous, ipAddress, sessionId
-10. **answers** - UUID, responseId (FK cascade), questionId, subquestionId, value (jsonb)
-11. **files** - UUID, answerId (FK cascade), filename, mimeType, size
-12. **analyticsEvents** - UUID, surveyId/responseId/pageId/questionId (FK cascade), event enum(page_view, question_focus, survey_complete, etc.), data (jsonb), duration
-13. **anonymousResponseTracking** - UUID, surveyId (FK), ipAddress, sessionId (for rate limiting)
-14. **sessions** - sid (PK), sess (jsonb), expire
-15. **systemStats** - Single-row table: totalSurveysCreated, totalSurveysDeleted, totalResponsesCollected, totalResponsesDeleted
+9. **recipientGroups** - UUID, creatorId (FK cascade), name, description
+10. **recipientGroupMembers** - groupId + recipientId (composite PK), addedAt (many-to-many join table)
+11. **responses** - UUID, surveyId (FK cascade), recipientId, completed, isAnonymous, ipAddress, sessionId
+12. **answers** - UUID, responseId (FK cascade), questionId, subquestionId, value (jsonb)
+13. **files** - UUID, answerId (FK cascade), filename, mimeType, size
+14. **analyticsEvents** - UUID, surveyId/responseId/pageId/questionId (FK cascade), event enum(page_view, question_focus, survey_complete, etc.), data (jsonb), duration
+15. **anonymousResponseTracking** - UUID, surveyId (FK), ipAddress, sessionId (for rate limiting)
+16. **sessions** - sid (PK), sess (jsonb), expire
+17. **systemStats** - Single-row table: totalSurveysCreated, totalSurveysDeleted, totalResponsesCollected, totalResponsesDeleted
 
 ---
 
@@ -83,6 +93,8 @@ shared/              # Drizzle schema & shared utilities
 - Question types: short_text, long_text, multiple_choice, radio, yes_no, date_time, file_upload, loop_group
 - Conditional logic (show/hide, require/optional)
 - Recipient management (add, bulk, global list, import)
+- Recipient groups (CRUD operations, member management)
+- CSV import/export (template download, bulk import with deduplication, export)
 - Email service (SendGrid invitations)
 - Response collection (authenticated & anonymous with rate limiting)
 - File uploads (max 10MB, MIME validation)
@@ -157,6 +169,24 @@ shared/              # Drizzle schema & shared utilities
 | PUT | /api/recipients/:recipientId | Yes | Update recipient |
 | DELETE | /api/recipients/:recipientId | Yes | Delete recipient |
 | POST | /api/surveys/:surveyId/recipients/import-global | Yes | Import (body: { recipientIds: [...] } or { tags: [...] }) |
+
+### Recipient Groups
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | /api/recipient-groups | Yes | Create group (body: { name, description? }) |
+| GET | /api/recipient-groups | Yes | List all groups with member counts |
+| PUT | /api/recipient-groups/:id | Yes | Update group (body: { name?, description? }) |
+| DELETE | /api/recipient-groups/:id | Yes | Delete group (cascade deletes members) |
+| GET | /api/recipient-groups/:id/members | Yes | List all members of a group |
+| POST | /api/recipient-groups/:id/members | Yes | Add members (body: { recipientIds: [...] }) |
+| DELETE | /api/recipient-groups/:id/members/:recipientId | Yes | Remove member from group |
+
+### Recipients CSV Import/Export
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | /api/recipients/template.csv | Yes | Download CSV template (Excel/Sheets friendly) |
+| POST | /api/recipients/import | Yes | Import recipients from CSV (body: raw CSV text or { csv: "..." }) |
+| GET | /api/recipients/export.csv | Yes | Export all global recipients to CSV |
 
 ### Responses
 | Method | Endpoint | Auth | Description |

@@ -9,7 +9,8 @@ import {
   uuid,
   boolean,
   integer,
-  pgEnum
+  pgEnum,
+  primaryKey
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -179,6 +180,30 @@ export const globalRecipients = pgTable("global_recipients", {
   index("global_recipients_creator_email_idx").on(table.creatorId, table.email),
 ]);
 
+// Recipient groups table
+export const recipientGroups = pgTable("recipient_groups", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  creatorId: varchar("creator_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("recipient_groups_creator_idx").on(table.creatorId),
+  index("recipient_groups_name_idx").on(table.name),
+]);
+
+// Recipient group members table (many-to-many relationship)
+export const recipientGroupMembers = pgTable("recipient_group_members", {
+  groupId: uuid("group_id").notNull().references(() => recipientGroups.id, { onDelete: "cascade" }),
+  recipientId: uuid("recipient_id").notNull().references(() => globalRecipients.id, { onDelete: "cascade" }),
+  addedAt: timestamp("added_at").defaultNow().notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.groupId, table.recipientId] }),
+  index("recipient_group_members_group_idx").on(table.groupId),
+  index("recipient_group_members_recipient_idx").on(table.recipientId),
+]);
+
 // Responses table
 export const responses = pgTable("responses", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -314,10 +339,30 @@ export const recipientsRelations = relations(recipients, ({ one, many }) => ({
   responses: many(responses),
 }));
 
-export const globalRecipientsRelations = relations(globalRecipients, ({ one }) => ({
+export const globalRecipientsRelations = relations(globalRecipients, ({ one, many }) => ({
   creator: one(users, {
     fields: [globalRecipients.creatorId],
     references: [users.id],
+  }),
+  groupMemberships: many(recipientGroupMembers),
+}));
+
+export const recipientGroupsRelations = relations(recipientGroups, ({ one, many }) => ({
+  creator: one(users, {
+    fields: [recipientGroups.creatorId],
+    references: [users.id],
+  }),
+  members: many(recipientGroupMembers),
+}));
+
+export const recipientGroupMembersRelations = relations(recipientGroupMembers, ({ one }) => ({
+  group: one(recipientGroups, {
+    fields: [recipientGroupMembers.groupId],
+    references: [recipientGroups.id],
+  }),
+  recipient: one(globalRecipients, {
+    fields: [recipientGroupMembers.recipientId],
+    references: [globalRecipients.id],
   }),
 }));
 
@@ -371,6 +416,8 @@ export const insertLoopGroupSubquestionSchema = createInsertSchema(loopGroupSubq
 export const insertConditionalRuleSchema = createInsertSchema(conditionalRules).omit({ id: true, createdAt: true });
 export const insertRecipientSchema = createInsertSchema(recipients).omit({ id: true, createdAt: true, token: true });
 export const insertGlobalRecipientSchema = createInsertSchema(globalRecipients).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertRecipientGroupSchema = createInsertSchema(recipientGroups).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertRecipientGroupMemberSchema = createInsertSchema(recipientGroupMembers).omit({ addedAt: true });
 export const insertResponseSchema = createInsertSchema(responses).omit({ id: true, createdAt: true });
 export const insertAnswerSchema = createInsertSchema(answers).omit({ id: true, createdAt: true });
 export const insertAnonymousResponseTrackingSchema = createInsertSchema(anonymousResponseTracking).omit({ id: true, createdAt: true });
@@ -407,6 +454,10 @@ export type Recipient = typeof recipients.$inferSelect;
 export type InsertRecipient = typeof insertRecipientSchema._type;
 export type GlobalRecipient = typeof globalRecipients.$inferSelect;
 export type InsertGlobalRecipient = typeof insertGlobalRecipientSchema._type;
+export type RecipientGroup = typeof recipientGroups.$inferSelect;
+export type InsertRecipientGroup = typeof insertRecipientGroupSchema._type;
+export type RecipientGroupMember = typeof recipientGroupMembers.$inferSelect;
+export type InsertRecipientGroupMember = typeof insertRecipientGroupMemberSchema._type;
 export type Response = typeof responses.$inferSelect;
 export type InsertResponse = typeof insertResponseSchema._type;
 export type Answer = typeof answers.$inferSelect;
