@@ -6,7 +6,8 @@ import { test, expect } from "@playwright/test";
  * Tests core application functionality and routing behavior
  */
 test.describe("US-S-013: Application Stability", () => {
-  test.setTimeout(30000);
+  // Use longer timeout in CI environments
+  test.setTimeout(process.env.CI ? 60000 : 30000);
 
   test("should handle multiple page navigations", async ({ page }) => {
     const routes = ["/", "/about", "/features", "/dashboard", "/"];

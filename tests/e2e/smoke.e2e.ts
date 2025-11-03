@@ -5,8 +5,8 @@ import { test, expect } from "@playwright/test";
  * Note: These tests run without authentication (landing page only)
  */
 test.describe("Smoke Tests", () => {
-  // Increase timeout for CI environments
-  test.setTimeout(60000); // 60 seconds per test
+  // Use 60s timeout for all environments (these tests wait for full page loads)
+  test.setTimeout(60000);
 
   test("should load homepage successfully", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });

@@ -23,3 +23,4 @@ test-results/
 # Claude Code settings
 .claude/settings.local.json
 cookies.txt
+test-output.txt

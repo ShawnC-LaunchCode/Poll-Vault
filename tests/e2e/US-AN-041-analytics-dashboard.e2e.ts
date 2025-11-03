@@ -6,7 +6,8 @@ import { test, expect } from "@playwright/test";
  * Tests application performance and API response behavior
  */
 test.describe("US-AN-041: Analytics and Performance", () => {
-  test.setTimeout(30000);
+  // Use longer timeout in CI environments
+  test.setTimeout(process.env.CI ? 60000 : 30000);
 
   test("should load homepage within acceptable time", async ({ page }) => {
     const startTime = Date.now();

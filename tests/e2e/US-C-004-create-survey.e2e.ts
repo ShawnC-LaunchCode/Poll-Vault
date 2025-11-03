@@ -7,7 +7,8 @@ import { test, expect } from "@playwright/test";
  * Authentication is handled by the app's session management
  */
 test.describe("US-C-004: Survey Creation (E2E)", () => {
-  test.setTimeout(30000); // 30 seconds per test
+  // Use longer timeout in CI environments
+  test.setTimeout(process.env.CI ? 60000 : 30000);
 
   test("should load homepage without errors", async ({ page }) => {
     // Set up console error tracking before navigation

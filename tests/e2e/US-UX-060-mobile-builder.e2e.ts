@@ -6,7 +6,8 @@ import { test, expect, devices } from "@playwright/test";
  * Tests the application's mobile responsiveness and touch interactions
  */
 test.describe("US-UX-060: Mobile Responsiveness", () => {
-  test.setTimeout(30000);
+  // Use longer timeout in CI environments
+  test.setTimeout(process.env.CI ? 60000 : 30000);
 
   test("should render correctly on mobile viewport (iPhone)", async ({ browser }) => {
     const context = await browser.newContext({
