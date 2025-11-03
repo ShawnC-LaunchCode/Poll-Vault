@@ -52,6 +52,9 @@ export default defineConfig({
     {
       name: "firefox",
       use: { ...devices["Desktop Firefox"] },
+      // Firefox does not properly support mobile device emulation in Playwright
+      // Skip mobile responsiveness tests to avoid false failures
+      testIgnore: "**/US-UX-060-mobile-builder.e2e.ts",
     },
 
     {

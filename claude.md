@@ -267,7 +267,14 @@ npm run dev           # http://localhost:5000
 
 **Integration Tests (Supertest):** `npm run test:integration` - Survey flows, recipient management, response submission
 
-**E2E Tests (Playwright):** `npm run test:e2e` - Creator & respondent journeys
+**E2E Tests (Playwright):** `npm run test:e2e` - 171 tests across 5 browsers (Chromium, Firefox, WebKit, Mobile Chrome, Mobile Safari)
+- Smoke tests: Page loading, navigation, routing
+- Application stability: Multi-page navigation, refresh handling, error handling
+- Performance & analytics: Load times, concurrent loads, network failures
+- Mobile responsiveness: Touch events, orientation changes, viewport handling
+
+**Known Limitations:**
+- Firefox does not properly support mobile device emulation in Playwright, so mobile responsiveness tests are skipped for Firefox browser only
 
 ---
 
