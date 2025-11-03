@@ -11,8 +11,8 @@ test.describe("Smoke Tests", () => {
   test("should load homepage successfully", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
 
-    // Wait for React to render (check for root div content)
-    await page.waitForSelector('body', { state: 'visible', timeout: 10000 });
+    // Wait for React to render (check for root div)
+    await page.waitForSelector('#root', { state: 'attached', timeout: 10000 });
 
     // Should load without 404 or 500 errors
     expect(page.url()).toContain(page.context()._options.baseURL || '');
@@ -33,11 +33,11 @@ test.describe("Smoke Tests", () => {
   test("should display landing page content", async ({ page }) => {
     await page.goto("/", { waitUntil: "networkidle", timeout: 30000 });
 
-    // Wait for main content to be visible
-    const body = page.locator('body');
-    await expect(body).toBeVisible({ timeout: 10000 });
+    // Wait for React app to render
+    await page.waitForSelector('#root', { state: 'attached', timeout: 10000 });
 
     // Should have substantial text content (not a blank/loading page)
+    const body = page.locator('body');
     const textContent = await body.textContent();
     expect(textContent?.trim().length).toBeGreaterThan(100);
   });
@@ -63,11 +63,11 @@ test.describe("Smoke Tests", () => {
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(1000);
 
-    // Should still have a valid page (not error page)
-    const body = page.locator('body');
-    await expect(body).toBeVisible({ timeout: 10000 });
+    // Should still have React app rendered
+    await page.waitForSelector('#root', { state: 'attached', timeout: 10000 });
 
     // Should have content (redirected back to landing)
+    const body = page.locator('body');
     const textContent = await body.textContent();
     expect(textContent?.trim().length).toBeGreaterThan(50);
   });

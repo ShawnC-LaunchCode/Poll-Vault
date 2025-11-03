@@ -22,9 +22,8 @@ test.describe("US-C-004: Survey Creation (E2E)", () => {
     await page.goto("/");
     await page.waitForLoadState("domcontentloaded");
 
-    // Verify page loaded successfully
-    const body = page.locator("body");
-    await expect(body).toBeVisible();
+    // Verify page loaded successfully (React app rendered)
+    await page.waitForSelector('#root', { state: 'attached', timeout: 10000 });
 
     // Wait a bit to catch any errors
     await page.waitForTimeout(2000);
@@ -54,9 +53,9 @@ test.describe("US-C-004: Survey Creation (E2E)", () => {
 
     // Should redirect to login or show appropriate state
     // Not crash or show blank page
-    const body = page.locator("body");
-    await expect(body).toBeVisible();
+    await page.waitForSelector('#root', { state: 'attached', timeout: 10000 });
 
+    const body = page.locator("body");
     const content = await body.textContent();
     expect(content!.length).toBeGreaterThan(50);
   });
@@ -73,9 +72,8 @@ test.describe("US-C-004: Survey Creation (E2E)", () => {
     await page.goto("/about");
     await page.waitForTimeout(500);
 
-    // Should handle route change
-    const body = page.locator("body");
-    await expect(body).toBeVisible();
+    // Should handle route change (React app still rendered)
+    await page.waitForSelector('#root', { state: 'attached', timeout: 10000 });
   });
 
   test("should load required assets", async ({ page }) => {

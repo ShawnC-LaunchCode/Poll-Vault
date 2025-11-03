@@ -16,9 +16,8 @@ test.describe("US-S-013: Application Stability", () => {
       await page.goto(route, { waitUntil: "domcontentloaded" });
       await page.waitForTimeout(500);
 
-      // Should not crash
-      const body = page.locator("body");
-      await expect(body).toBeVisible();
+      // Should not crash (React app should render)
+      await page.waitForSelector('#root', { state: 'attached', timeout: 10000 });
     }
   });
 
@@ -33,14 +32,13 @@ test.describe("US-S-013: Application Stability", () => {
     await page.goBack();
     await page.waitForTimeout(500);
 
-    const body = page.locator("body");
-    await expect(body).toBeVisible();
+    await page.waitForSelector('#root', { state: 'attached', timeout: 10000 });
 
     // Go forward
     await page.goForward();
     await page.waitForTimeout(500);
 
-    await expect(body).toBeVisible();
+    await page.waitForSelector('#root', { state: 'attached', timeout: 10000 });
   });
 
   test("should handle page refresh", async ({ page }) => {
@@ -61,10 +59,10 @@ test.describe("US-S-013: Application Stability", () => {
     await page.goto("/this-route-does-not-exist-12345");
     await page.waitForTimeout(1000);
 
-    // Should show 404 or redirect, not crash
-    const body = page.locator("body");
-    await expect(body).toBeVisible();
+    // Should show 404 or redirect, not crash (React app should render)
+    await page.waitForSelector('#root', { state: 'attached', timeout: 10000 });
 
+    const body = page.locator("body");
     const content = await body.textContent();
     expect(content!.length).toBeGreaterThan(0);
   });

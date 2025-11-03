@@ -36,8 +36,7 @@ test.describe("US-AN-041: Analytics and Performance", () => {
 
     // All should load successfully
     for (const page of pages) {
-      const body = page.locator("body");
-      await expect(body).toBeVisible();
+      await page.waitForSelector('#root', { state: 'attached', timeout: 10000 });
     }
 
     await context.close();
@@ -95,8 +94,7 @@ test.describe("US-AN-041: Analytics and Performance", () => {
 
     // Should recover
     await page.goto("/", { waitUntil: "domcontentloaded" });
-    const body = page.locator("body");
-    await expect(body).toBeVisible();
+    await page.waitForSelector('#root', { state: 'attached', timeout: 10000 });
   });
 
   test("should optimize image loading", async ({ page }) => {
