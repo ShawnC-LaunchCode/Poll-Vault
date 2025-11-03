@@ -5,59 +5,70 @@ import { test, expect } from "@playwright/test";
  * Note: These tests run without authentication (landing page only)
  */
 test.describe("Smoke Tests", () => {
-  test("should load homepage successfully", async ({ page }) => {
-    await page.goto("/");
+  // Increase timeout for CI environments
+  test.setTimeout(60000); // 60 seconds per test
 
-    // Wait for page to load
-    await page.waitForLoadState('domcontentloaded');
+  test("should load homepage successfully", async ({ page }) => {
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+
+    // Wait for React to render (check for root div content)
+    await page.waitForSelector('body', { state: 'visible', timeout: 10000 });
 
     // Should load without 404 or 500 errors
     expect(page.url()).toContain(page.context()._options.baseURL || '');
   });
 
   test("should have valid page title", async ({ page }) => {
-    await page.goto("/");
-    await page.waitForLoadState('domcontentloaded');
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+
+    // Wait a bit for title to be set by React
+    await page.waitForTimeout(2000);
 
     // Check title is set (not empty)
     const title = await page.title();
     expect(title.length).toBeGreaterThan(0);
+    expect(title).toContain("Poll");
   });
 
   test("should display landing page content", async ({ page }) => {
-    await page.goto("/");
-    await page.waitForLoadState('domcontentloaded');
+    await page.goto("/", { waitUntil: "networkidle", timeout: 30000 });
 
-    // Landing page should have some visible content
+    // Wait for main content to be visible
     const body = page.locator('body');
-    await expect(body).toBeVisible();
+    await expect(body).toBeVisible({ timeout: 10000 });
 
-    // Should have some text content (not a blank page)
+    // Should have substantial text content (not a blank/loading page)
     const textContent = await body.textContent();
-    expect(textContent?.trim().length).toBeGreaterThan(0);
+    expect(textContent?.trim().length).toBeGreaterThan(100);
   });
 
   test("should have working CSS and layout", async ({ page }) => {
-    await page.goto("/");
-    await page.waitForLoadState('networkidle');
+    await page.goto("/", { waitUntil: "networkidle", timeout: 30000 });
+
+    // Wait for styles to load and apply
+    await page.waitForTimeout(2000);
 
     // Check that the page has loaded styles (body should have some height)
     const body = page.locator('body');
     const bodyHeight = await body.evaluate(el => el.clientHeight);
-    expect(bodyHeight).toBeGreaterThan(0);
+    expect(bodyHeight).toBeGreaterThan(100);
   });
 
   test("should handle navigation without crashing", async ({ page }) => {
     // Navigate to homepage
-    await page.goto("/");
-    await page.waitForLoadState('domcontentloaded');
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1000);
 
     // Try navigating to a protected route (should redirect to landing, not crash)
-    await page.goto("/dashboard");
-    await page.waitForLoadState('domcontentloaded');
+    await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1000);
 
     // Should still have a valid page (not error page)
     const body = page.locator('body');
-    await expect(body).toBeVisible();
+    await expect(body).toBeVisible({ timeout: 10000 });
+
+    // Should have content (redirected back to landing)
+    const textContent = await body.textContent();
+    expect(textContent?.trim().length).toBeGreaterThan(50);
   });
 });
