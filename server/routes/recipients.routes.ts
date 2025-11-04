@@ -3,7 +3,7 @@ import { isAuthenticated } from "../googleAuth";
 import { storage } from "../storage";
 import { insertRecipientSchema, insertGlobalRecipientSchema } from "@shared/schema";
 import { sendSurveyInvitation } from "../services/sendgrid";
-import { surveyService } from "../services";
+import { surveyService, recipientService } from "../services";
 
 /**
  * Register recipient-related routes
@@ -180,6 +180,99 @@ export function registerRecipientRoutes(app: Express): void {
     } catch (error) {
       console.error("Error sending survey invitations:", error);
       res.status(500).json({ message: "Failed to send survey invitations" });
+    }
+  });
+
+  /**
+   * GET /api/surveys/:surveyId/recipients/status
+   * Get recipient status with response tracking
+   */
+  app.get('/api/surveys/:surveyId/recipients/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized - no user ID" });
+      }
+
+      const status = await recipientService.getRecipientStatus(req.params.surveyId, userId);
+      res.json(status);
+    } catch (error: any) {
+      console.error("Error fetching recipient status:", error);
+      if (error.message === "Survey not found") {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message.includes("Access denied")) {
+        return res.status(403).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to fetch recipient status" });
+    }
+  });
+
+  /**
+   * POST /api/recipients/:recipientId/send-reminder
+   * Send a reminder to a single recipient
+   */
+  app.post('/api/recipients/:recipientId/send-reminder', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized - no user ID" });
+      }
+
+      const result = await recipientService.sendReminder(req.params.recipientId, userId);
+
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error: any) {
+      console.error("Error sending reminder:", error);
+      if (error.message === "Recipient not found" || error.message === "Survey not found") {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message.includes("Access denied")) {
+        return res.status(403).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to send reminder" });
+    }
+  });
+
+  /**
+   * POST /api/surveys/:surveyId/send-reminders
+   * Send reminders to multiple recipients
+   */
+  app.post('/api/surveys/:surveyId/send-reminders', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized - no user ID" });
+      }
+
+      const { recipientIds } = req.body;
+      if (!recipientIds || !Array.isArray(recipientIds) || recipientIds.length === 0) {
+        return res.status(400).json({ message: "Recipient IDs are required" });
+      }
+
+      const result = await recipientService.sendReminders(req.params.surveyId, userId, recipientIds);
+
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error: any) {
+      console.error("Error sending reminders:", error);
+      if (error.message === "Survey not found") {
+        return res.status(404).json({ message: error.message });
+      }
+      if (error.message.includes("Access denied")) {
+        return res.status(403).json({ message: error.message });
+      }
+      if (error.message.includes("required")) {
+        return res.status(400).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to send reminders" });
     }
   });
 

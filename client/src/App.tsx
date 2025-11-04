@@ -23,6 +23,7 @@ import AdminUserSurveys from "@/pages/AdminUserSurveys";
 import AdminSurveys from "@/pages/AdminSurveys";
 import AdminLogs from "@/pages/AdminLogs";
 import AISurveyCreator from "@/pages/AISurveyCreator";
+import TemplatesPage from "@/pages/TemplatesPage";
 import FeedbackWidget from "@/components/FeedbackWidget";
 
 function Router() {
@@ -47,6 +48,7 @@ function Router() {
             <Route path="/surveys" component={SurveysList} />
             <Route path="/surveys/new" component={SurveyBuilder} />
             <Route path="/ai-survey" component={AISurveyCreator} />
+            <Route path="/templates" component={TemplatesPage} />
             <Route path="/builder/:surveyId" component={SurveyBuilder} />
             <Route path="/builder/:surveyId/preview" component={SurveyPreview} />
             <Route path="/surveys/:id/preview" component={SurveyPreview} />

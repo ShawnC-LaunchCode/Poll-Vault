@@ -42,6 +42,7 @@ export default function Header({ title, description, actions }: HeaderProps) {
   const navigation = [
     { name: "Dashboard", href: "/", icon: "fas fa-home" },
     { name: "My Surveys", href: "/surveys", icon: "fas fa-list-ul" },
+    { name: "Templates", href: "/templates", icon: "fas fa-puzzle-piece" },
     { name: "Recipients", href: "/recipients", icon: "fas fa-users" },
   ];
 

@@ -8,6 +8,29 @@
 
 ## Recent Updates
 
+### 2025-11-03: Group Performance Dashboard & Analytics (Phase 4)
+- Added GroupAnalyticsService for recipient group performance metrics
+- Implemented group-level completion statistics with SQL aggregations
+- Created interactive Group Performance Dashboard with multiple visualizations
+- Added pie chart for group distribution, bar chart for completion comparison
+- Added line chart for completion trends over time
+- Implemented summary cards showing overall metrics (completion rate, totals, in-progress)
+- Added CSV export functionality for group analytics data
+- Integrated Groups tab into Survey Analytics page
+- Added 60-second auto-refresh for live data updates
+- Implemented Framer Motion animations for smooth UI transitions
+
+### 2025-11-03: Recipient Management UX Enhancements (Phase 3.5)
+- Added `reminderSentAt` timestamp to recipients schema for tracking reminder emails
+- Implemented survey reminder email functionality with custom templates
+- Added live recipient status tracking with 15-second auto-refresh
+- Created Recipients tab in Survey Results with real-time progress tracking
+- Implemented individual and bulk reminder sending endpoints
+- Added confetti celebration animation on 100% completion
+- Added visual status indicators (not_started, in_progress, complete)
+- Implemented animated progress bars with Framer Motion
+- Added toast notifications for all reminder and invitation actions
+
 ### 2025-11-03: Recipient Groups & CSV Import/Export (Phase 1)
 - Added `recipientGroups` and `recipientGroupMembers` tables for organizing contacts
 - Implemented recipient group CRUD operations with member management
@@ -157,9 +180,12 @@ shared/              # Drizzle schema & shared utilities
 | POST | /api/surveys/:surveyId/recipients | Yes | Add recipient (generates token) |
 | POST | /api/surveys/:surveyId/recipients/bulk | Yes | Bulk add (body: { recipients: [{ name, email }] }) |
 | GET | /api/surveys/:surveyId/recipients | Yes | List recipients (pagination, filter by sent/unsent) |
+| GET | /api/surveys/:surveyId/recipients/status | Yes | Get recipient status with response tracking |
 | DELETE | /api/surveys/:surveyId/recipients/:recipientId | Yes | Remove recipient |
 | POST | /api/surveys/:surveyId/recipients/:recipientId/resend | Yes | Resend invitation (new token) |
-| POST | /api/surveys/:surveyId/send-invitations | Yes | Send all invitations |
+| POST | /api/surveys/:surveyId/send-invitations | Yes | Send invitations (body: { recipientIds: [...] }) |
+| POST | /api/recipients/:recipientId/send-reminder | Yes | Send reminder to single recipient |
+| POST | /api/surveys/:surveyId/send-reminders | Yes | Send bulk reminders (body: { recipientIds: [...] }) |
 
 ### Global Recipients
 | Method | Endpoint | Auth | Description |
@@ -217,12 +243,15 @@ shared/              # Drizzle schema & shared utilities
 | GET | /api/surveys/:surveyId/analytics/questions | Yes | Question-level analytics (answer rate, time spent) |
 | GET | /api/surveys/:surveyId/analytics/funnel | Yes | Completion funnel (page-level drop-off) |
 | GET | /api/surveys/:surveyId/analytics/engagement | Yes | Engagement metrics (session duration, bounce rate) |
+| GET | /api/surveys/:surveyId/analytics/groups | Yes | Group performance statistics and trends |
+| GET | /api/surveys/:surveyId/analytics/groups/summary | Yes | Group summary statistics only |
 
 ### Export
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | GET | /api/surveys/:surveyId/export?format=csv | Yes | Export responses as CSV |
 | GET | /api/surveys/:surveyId/export?format=pdf | Yes | Export responses as PDF |
+| GET | /api/surveys/:surveyId/export?format=csv&scope=groups | Yes | Export group analytics as CSV |
 
 ### Dashboard
 | Method | Endpoint | Auth | Description |

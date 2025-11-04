@@ -106,7 +106,7 @@ export class RecipientGroupRepository {
       .from(globalRecipients)
       .where(and(eq(globalRecipients.creatorId, creatorId), inArray(globalRecipients.id, recipientIds)));
 
-    const values = recs.map((r) => ({ groupId, recipientId: r.id }));
+    const values = recs.map((r: { id: string }) => ({ groupId, recipientId: r.id }));
     if (!values.length) {
       return 0;
     }

@@ -13,6 +13,9 @@ import { registerDashboardRoutes } from "./dashboard.routes";
 import { registerAdminRoutes } from "./admin.routes";
 import { registerExportRoutes } from "./export.routes";
 import { registerAiRoutes } from "./ai.routes";
+import { registerGroupAnalyticsRoutes } from "./groupAnalytics.routes";
+import { registerTemplateRoutes } from "./templates.routes";
+import { registerTemplateSharingRoutes } from "./templateSharing.routes";
 
 /**
  * Register all modular routes
@@ -27,6 +30,12 @@ export function registerAllRoutes(app: Express): void {
 
   // Survey management routes
   registerSurveyRoutes(app);
+
+  // Template management routes
+  registerTemplateRoutes(app);
+
+  // Template sharing and collaboration routes
+  registerTemplateSharingRoutes(app);
 
   // Survey page routes
   registerPageRoutes(app);
@@ -48,6 +57,9 @@ export function registerAllRoutes(app: Express): void {
 
   // Analytics and reporting routes
   registerAnalyticsRoutes(app);
+
+  // Group analytics routes
+  registerGroupAnalyticsRoutes(app);
 
   // File upload and management routes
   registerFileRoutes(app);

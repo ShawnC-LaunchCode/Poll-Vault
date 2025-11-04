@@ -161,6 +161,7 @@ export const recipients = pgTable("recipients", {
   email: varchar("email").notNull(),
   token: varchar("token").unique().notNull(),
   sentAt: timestamp("sent_at"),
+  reminderSentAt: timestamp("reminder_sent_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -290,10 +291,46 @@ export const systemStats = pgTable("system_stats", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Survey templates table for reusable survey sections
+export const surveyTemplates = pgTable("survey_templates", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  content: jsonb("content").notNull(), // Full serialized survey/page/question tree
+  creatorId: varchar("creator_id").references(() => users.id),
+  isSystem: boolean("is_system").default(false).notNull(),
+  tags: text("tags").array().default(sql`ARRAY[]::text[]`), // Tags for categorization
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("survey_templates_creator_idx").on(table.creatorId),
+  index("survey_templates_system_idx").on(table.isSystem),
+]);
+
+// Template access enum
+export const templateAccessEnum = pgEnum('template_access', ['use', 'edit']);
+
+// Template shares table for collaboration
+export const templateShares = pgTable("template_shares", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateId: uuid("template_id").references(() => surveyTemplates.id, { onDelete: 'cascade' }).notNull(),
+  // Either userId (resolved user) or pendingEmail (invite not yet accepted)
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }),
+  pendingEmail: text("pending_email"),
+  access: templateAccessEnum("access").notNull().default('use'),
+  invitedAt: timestamp("invited_at", { withTimezone: true }).defaultNow(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+}, (table) => [
+  index("template_shares_template_idx").on(table.templateId),
+  index("template_shares_user_idx").on(table.userId),
+  index("template_shares_pending_email_idx").on(table.pendingEmail),
+]);
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   surveys: many(surveys),
   globalRecipients: many(globalRecipients),
+  surveyTemplates: many(surveyTemplates),
 }));
 
 export const surveysRelations = relations(surveys, ({ one, many }) => ({
@@ -407,6 +444,25 @@ export const answersRelations = relations(answers, ({ one, many }) => ({
   files: many(files),
 }));
 
+export const surveyTemplatesRelations = relations(surveyTemplates, ({ one, many }) => ({
+  creator: one(users, {
+    fields: [surveyTemplates.creatorId],
+    references: [users.id],
+  }),
+  shares: many(templateShares),
+}));
+
+export const templateSharesRelations = relations(templateShares, ({ one }) => ({
+  template: one(surveyTemplates, {
+    fields: [templateShares.templateId],
+    references: [surveyTemplates.id],
+  }),
+  user: one(users, {
+    fields: [templateShares.userId],
+    references: [users.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSurveySchema = createInsertSchema(surveys).omit({ id: true, createdAt: true, updatedAt: true, publicLink: true });
@@ -422,6 +478,8 @@ export const insertResponseSchema = createInsertSchema(responses).omit({ id: tru
 export const insertAnswerSchema = createInsertSchema(answers).omit({ id: true, createdAt: true });
 export const insertAnonymousResponseTrackingSchema = createInsertSchema(anonymousResponseTracking).omit({ id: true, createdAt: true });
 export const insertFileSchema = createInsertSchema(files).omit({ id: true, uploadedAt: true });
+export const insertSurveyTemplateSchema = createInsertSchema(surveyTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertTemplateShareSchema = createInsertSchema(templateShares).omit({ id: true, invitedAt: true, acceptedAt: true });
 
 // Analytics event validation schema with strict validation
 export const insertAnalyticsEventSchema = createInsertSchema(analyticsEvents).omit({ 
@@ -468,6 +526,10 @@ export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
 export type AnonymousResponseTracking = typeof anonymousResponseTracking.$inferSelect;
 export type InsertAnonymousResponseTracking = typeof insertAnonymousResponseTrackingSchema._type;
 export type SystemStats = typeof systemStats.$inferSelect;
+export type SurveyTemplate = typeof surveyTemplates.$inferSelect;
+export type InsertSurveyTemplate = typeof insertSurveyTemplateSchema._type;
+export type TemplateShare = typeof templateShares.$inferSelect;
+export type InsertTemplateShare = typeof insertTemplateShareSchema._type;
 
 // Additional API response types
 export interface DashboardStats {

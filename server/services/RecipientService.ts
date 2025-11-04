@@ -9,8 +9,9 @@ import type {
   InsertGlobalRecipient,
   User
 } from "@shared/schema";
-import { sendSurveyInvitation } from "./sendgrid";
+import { sendSurveyInvitation, sendSurveyReminder } from "./sendgrid";
 import { storage } from "../storage";
+import { db } from "../db";
 
 /**
  * Service layer for recipient-related business logic
@@ -314,6 +315,245 @@ export class RecipientService {
     }
 
     return await recipientRepository.bulkDeleteGlobal(recipientIds, userId);
+  }
+
+  // ============================================================================
+  // Reminder & Status Tracking
+  // ============================================================================
+
+  /**
+   * Send reminder to a single recipient
+   */
+  async sendReminder(
+    recipientId: string,
+    userId: string
+  ): Promise<{ success: boolean; message: string }> {
+    // Get recipient
+    const recipient = await recipientRepository.findById(recipientId);
+    if (!recipient) {
+      throw new Error("Recipient not found");
+    }
+
+    // Verify ownership
+    const survey = await surveyRepository.findById(recipient.surveyId);
+    if (!survey) {
+      throw new Error("Survey not found");
+    }
+
+    if (survey.creatorId !== userId) {
+      throw new Error("Access denied - you do not own this survey");
+    }
+
+    // Get creator info
+    const user = await storage.getUser(userId);
+    const creatorName = user ? `${user.firstName} ${user.lastName}`.trim() : undefined;
+    const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@pollvault.com';
+
+    // Send reminder
+    const surveyUrl = `${process.env.CLIENT_URL || 'http://localhost:5000'}/survey/${recipient.token}`;
+
+    const emailResult = await sendSurveyReminder(
+      {
+        recipientName: recipient.name,
+        recipientEmail: recipient.email,
+        surveyTitle: survey.title,
+        surveyUrl: surveyUrl,
+        creatorName: creatorName
+      },
+      fromEmail
+    );
+
+    if (emailResult.success) {
+      // Update reminderSentAt
+      await recipientRepository.update(recipient.id, { reminderSentAt: new Date() });
+      return {
+        success: true,
+        message: 'Reminder sent successfully'
+      };
+    } else {
+      return {
+        success: false,
+        message: emailResult.error || 'Failed to send reminder'
+      };
+    }
+  }
+
+  /**
+   * Send reminders to multiple recipients
+   */
+  async sendReminders(
+    surveyId: string,
+    userId: string,
+    recipientIds: string[]
+  ): Promise<{
+    success: boolean;
+    message: string;
+    results: Array<{
+      recipientId: string;
+      email: string;
+      status: 'sent' | 'failed';
+      message: string;
+    }>;
+    stats: {
+      total: number;
+      sent: number;
+      failed: number;
+    };
+  }> {
+    // Verify survey ownership
+    const survey = await surveyRepository.findById(surveyId);
+    if (!survey) {
+      throw new Error("Survey not found");
+    }
+
+    if (survey.creatorId !== userId) {
+      throw new Error("Access denied - you do not own this survey");
+    }
+
+    if (!recipientIds || recipientIds.length === 0) {
+      throw new Error("Recipient IDs are required");
+    }
+
+    // Get recipients
+    const allRecipients = await recipientRepository.findBySurvey(surveyId);
+    const recipientsToRemind = allRecipients.filter(recipient =>
+      recipientIds.includes(recipient.id)
+    );
+
+    if (recipientsToRemind.length === 0) {
+      throw new Error("No valid recipients found");
+    }
+
+    // Get creator info
+    const user = await storage.getUser(userId);
+    const creatorName = user ? `${user.firstName} ${user.lastName}`.trim() : undefined;
+    const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@pollvault.com';
+
+    // Send reminders
+    const results = [];
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const recipient of recipientsToRemind) {
+      try {
+        const surveyUrl = `${process.env.CLIENT_URL || 'http://localhost:5000'}/survey/${recipient.token}`;
+
+        const emailResult = await sendSurveyReminder(
+          {
+            recipientName: recipient.name,
+            recipientEmail: recipient.email,
+            surveyTitle: survey.title,
+            surveyUrl: surveyUrl,
+            creatorName: creatorName
+          },
+          fromEmail
+        );
+
+        if (emailResult.success) {
+          await recipientRepository.update(recipient.id, { reminderSentAt: new Date() });
+          successCount++;
+          results.push({
+            recipientId: recipient.id,
+            email: recipient.email,
+            status: 'sent' as const,
+            message: 'Reminder sent successfully'
+          });
+        } else {
+          errorCount++;
+          results.push({
+            recipientId: recipient.id,
+            email: recipient.email,
+            status: 'failed' as const,
+            message: emailResult.error || 'Failed to send reminder'
+          });
+        }
+      } catch (error: any) {
+        console.error(`Error sending reminder to ${recipient.email}:`, error);
+        errorCount++;
+        results.push({
+          recipientId: recipient.id,
+          email: recipient.email,
+          status: 'failed' as const,
+          message: error.message || 'Error sending reminder'
+        });
+      }
+    }
+
+    const allFailed = errorCount > 0 && successCount === 0;
+    const partialFailure = errorCount > 0 && successCount > 0;
+
+    return {
+      success: !allFailed,
+      message: allFailed
+        ? `Failed to send ${errorCount} reminder(s)`
+        : partialFailure
+        ? `${successCount} reminder(s) sent successfully, ${errorCount} failed`
+        : `${successCount} reminder(s) sent successfully`,
+      results,
+      stats: {
+        total: recipientsToRemind.length,
+        sent: successCount,
+        failed: errorCount
+      }
+    };
+  }
+
+  /**
+   * Get recipient status with response tracking
+   */
+  async getRecipientStatus(surveyId: string, userId: string): Promise<Array<{
+    id: string;
+    name: string;
+    email: string;
+    token: string;
+    sentAt: Date | null;
+    reminderSentAt: Date | null;
+    status: 'not_started' | 'in_progress' | 'complete';
+    responseId?: string;
+    completedAt?: Date;
+  }>> {
+    // Verify ownership
+    const survey = await surveyRepository.findById(surveyId);
+    if (!survey) {
+      throw new Error("Survey not found");
+    }
+
+    if (survey.creatorId !== userId) {
+      throw new Error("Access denied - you do not own this survey");
+    }
+
+    // Get recipients
+    const recipients = await recipientRepository.findBySurvey(surveyId);
+
+    // Get responses for this survey
+    const { responses } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+
+    const surveyResponses = await db.query.responses.findMany({
+      where: eq(responses.surveyId, surveyId),
+    });
+
+    // Map recipients with their response status
+    return recipients.map(recipient => {
+      const response = surveyResponses.find((r: any) => r.recipientId === recipient.id);
+
+      let status: 'not_started' | 'in_progress' | 'complete' = 'not_started';
+      if (response) {
+        status = response.completed ? 'complete' : 'in_progress';
+      }
+
+      return {
+        id: recipient.id,
+        name: recipient.name,
+        email: recipient.email,
+        token: recipient.token,
+        sentAt: recipient.sentAt,
+        reminderSentAt: recipient.reminderSentAt,
+        status,
+        responseId: response?.id,
+        completedAt: response?.submittedAt || undefined
+      };
+    });
   }
 }
 

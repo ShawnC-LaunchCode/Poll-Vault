@@ -4,13 +4,15 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useRecipients } from "@/hooks/useRecipients";
 import { useRecipientSelection } from "@/hooks/useRecipientSelection";
+import { useGroups, type RecipientGroup } from "@/hooks/useGroups";
 import { Link } from "wouter";
 import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Mail } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Users, Mail, FolderOpen, Upload, Download, FileText } from "lucide-react";
 import type { GlobalRecipient } from "@shared/schema";
 
 import {
@@ -21,7 +23,10 @@ import {
   AddRecipientDialog,
   SendInvitationsDialog,
   GlobalRecipientDialog,
-  BulkDeleteDialog
+  BulkDeleteDialog,
+  ImportModal,
+  GroupsList,
+  GroupMembersDrawer,
 } from "@/features/recipients/components";
 
 export default function Recipients() {
@@ -44,6 +49,13 @@ export default function Recipients() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSendInvitationsDialogOpen, setIsSendInvitationsDialogOpen] = useState(false);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+
+  // CSV Import/Export state
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+  // Groups state
+  const [selectedGroup, setSelectedGroup] = useState<RecipientGroup | null>(null);
+  const [isGroupMembersDrawerOpen, setIsGroupMembersDrawerOpen] = useState(false);
 
   // Use custom hooks
   const surveyId = selectedSurveyId || id;
@@ -69,7 +81,22 @@ export default function Recipients() {
     deleteGlobalRecipientPending,
     bulkDeleteGlobalRecipients,
     bulkDeleteGlobalRecipientsPending,
+    importCsv,
+    importCsvPending,
+    downloadTemplate,
+    exportCsv,
   } = useRecipients(surveyId);
+
+  const {
+    groups,
+    groupsLoading,
+    createGroup,
+    createGroupPending,
+    updateGroup,
+    updateGroupPending,
+    deleteGroup,
+    deleteGroupPending,
+  } = useGroups();
 
   const globalSelection = useRecipientSelection();
   const surveySelection = useRecipientSelection();
@@ -256,6 +283,12 @@ export default function Recipients() {
     setIsSendInvitationsDialogOpen(false);
   };
 
+  // Group handlers
+  const handleViewGroupMembers = (group: RecipientGroup) => {
+    setSelectedGroup(group);
+    setIsGroupMembersDrawerOpen(true);
+  };
+
   const currentSurvey = id ? survey : allSurveys?.find(s => s.id === selectedSurveyId);
   const showSurveySelector = !id && allSurveys && allSurveys.length > 0;
   const filteredGlobalRecipients = getFilteredGlobalRecipients();
@@ -267,36 +300,80 @@ export default function Recipients() {
 
       <main className="flex-1 flex flex-col overflow-hidden">
         <Header
-          title={activeTab === "global" ? "Global Recipients" : currentSurvey ? `Recipients - ${currentSurvey.title}` : "Survey Recipients"}
-          description={activeTab === "global" ? "Manage your global recipient database" : "Manage survey recipients and distribution"}
-          actions={activeTab === "global" ? (
-            <div className="flex items-center gap-2">
-              {globalSelection.count > 0 && (
-                <BulkDeleteDialog
-                  open={isBulkDeleteOpen}
-                  onOpenChange={setIsBulkDeleteOpen}
-                  selectedCount={globalSelection.count}
-                  onConfirm={handleBulkDelete}
-                  isPending={bulkDeleteGlobalRecipientsPending}
+          title={
+            activeTab === "global"
+              ? "Global Recipients"
+              : activeTab === "groups"
+              ? "Recipient Groups"
+              : currentSurvey
+              ? `Recipients - ${currentSurvey.title}`
+              : "Survey Recipients"
+          }
+          description={
+            activeTab === "global"
+              ? "Manage your global recipient database"
+              : activeTab === "groups"
+              ? "Organize recipients into groups for easier management"
+              : "Manage survey recipients and distribution"
+          }
+          actions={
+            activeTab === "global" ? (
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={downloadTemplate}
+                    className="gap-2 flex-1 sm:flex-initial"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span className="hidden sm:inline">Template</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={exportCsv}
+                    className="gap-2 flex-1 sm:flex-initial"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span className="hidden sm:inline">Export</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsImportModalOpen(true)}
+                    className="gap-2 flex-1 sm:flex-initial"
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span className="hidden sm:inline">Import</span>
+                  </Button>
+                </div>
+                {globalSelection.count > 0 && (
+                  <BulkDeleteDialog
+                    open={isBulkDeleteOpen}
+                    onOpenChange={setIsBulkDeleteOpen}
+                    selectedCount={globalSelection.count}
+                    onConfirm={handleBulkDelete}
+                    isPending={bulkDeleteGlobalRecipientsPending}
+                  />
+                )}
+                <GlobalRecipientDialog
+                  open={isGlobalDialogOpen}
+                  onOpenChange={(open) => {
+                    setIsGlobalDialogOpen(open);
+                    if (!open) {
+                      setEditingGlobalRecipient(null);
+                      setGlobalRecipient({ name: "", email: "", tags: "" });
+                    }
+                  }}
+                  editingRecipient={editingGlobalRecipient}
+                  recipientData={globalRecipient}
+                  onRecipientDataChange={setGlobalRecipient}
+                  onSave={handleAddGlobalRecipient}
+                  isSaving={createGlobalRecipientPending || updateGlobalRecipientPending}
                 />
-              )}
-              <GlobalRecipientDialog
-                open={isGlobalDialogOpen}
-                onOpenChange={(open) => {
-                  setIsGlobalDialogOpen(open);
-                  if (!open) {
-                    setEditingGlobalRecipient(null);
-                    setGlobalRecipient({ name: "", email: "", tags: "" });
-                  }
-                }}
-                editingRecipient={editingGlobalRecipient}
-                recipientData={globalRecipient}
-                onRecipientDataChange={setGlobalRecipient}
-                onSave={handleAddGlobalRecipient}
-                isSaving={createGlobalRecipientPending || updateGlobalRecipientPending}
-              />
-            </div>
-          ) : (
+              </div>
+            ) : activeTab === "groups" ? null : (
             <AddRecipientDialog
               open={isAddDialogOpen}
               onOpenChange={setIsAddDialogOpen}
@@ -314,13 +391,18 @@ export default function Recipients() {
 
         <div className="flex-1 overflow-auto p-4 sm:p-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 h-auto" data-testid="tabs-recipients">
-              <TabsTrigger value="global" data-testid="tab-global-recipients" className="text-xs sm:text-sm px-2 sm:px-4 py-2">
+            <TabsList className="grid w-full grid-cols-3 h-auto" data-testid="tabs-recipients">
+              <TabsTrigger value="global" data-testid="tab-global-recipients" className="text-xs sm:text-sm px-2 sm:px-3 py-2">
                 <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                 <span className="hidden sm:inline">Global Recipients</span>
                 <span className="sm:hidden">Global</span>
               </TabsTrigger>
-              <TabsTrigger value="survey" data-testid="tab-survey-recipients" className="text-xs sm:text-sm px-2 sm:px-4 py-2">
+              <TabsTrigger value="groups" data-testid="tab-groups" className="text-xs sm:text-sm px-2 sm:px-3 py-2">
+                <FolderOpen className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Groups</span>
+                <span className="sm:hidden">Groups</span>
+              </TabsTrigger>
+              <TabsTrigger value="survey" data-testid="tab-survey-recipients" className="text-xs sm:text-sm px-2 sm:px-3 py-2">
                 <Mail className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                 <span className="hidden sm:inline">Survey Recipients</span>
                 <span className="sm:hidden">Survey</span>
@@ -367,6 +449,24 @@ export default function Recipients() {
                     onAddClick={() => setIsGlobalDialogOpen(true)}
                     searchTerm={searchTerm}
                     filterTag={filterTag}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="groups" className="space-y-4 sm:space-y-6 mt-4 sm:mt-6">
+              <Card>
+                <CardContent className="pt-6">
+                  <GroupsList
+                    groups={groups || []}
+                    isLoading={groupsLoading}
+                    onCreateGroup={createGroup}
+                    onUpdateGroup={(id, data) => updateGroup({ id, data })}
+                    onDeleteGroup={deleteGroup}
+                    onViewMembers={handleViewGroupMembers}
+                    createPending={createGroupPending}
+                    updatePending={updateGroupPending}
+                    deletePending={deleteGroupPending}
                   />
                 </CardContent>
               </Card>
@@ -447,6 +547,24 @@ export default function Recipients() {
           </Tabs>
         </div>
       </main>
+
+      {/* Modals & Drawers */}
+      <ImportModal
+        open={isImportModalOpen}
+        onOpenChange={setIsImportModalOpen}
+        importCsv={importCsv}
+        downloadTemplate={downloadTemplate}
+      />
+
+      {selectedGroup && (
+        <GroupMembersDrawer
+          open={isGroupMembersDrawerOpen}
+          onOpenChange={setIsGroupMembersDrawerOpen}
+          groupId={selectedGroup.id}
+          groupName={selectedGroup.name}
+          globalRecipients={globalRecipients || []}
+        />
+      )}
     </div>
   );
 }

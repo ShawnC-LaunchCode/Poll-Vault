@@ -33,10 +33,22 @@ import {
   PageBlock,
   KeyboardShortcutsHelp,
 } from "@/features/survey-builder/components";
+import { AddTemplateModal } from "@/features/templates/components";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Plus, FileText, Save, X } from "lucide-react";
 import type { SurveyPage, Question } from "@shared/schema";
+import axios from "axios";
 
 interface ValidationError {
   field: string;
@@ -63,6 +75,15 @@ export default function SurveyBuilder() {
 
   // Keyboard shortcuts modal state
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+
+  // Template modal state
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [templateDescription, setTemplateDescription] = useState("");
+  const [templateTags, setTemplateTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
 
   // Validation error state
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
@@ -386,6 +407,67 @@ export default function SurveyBuilder() {
     return (page as any).questions || [];
   };
 
+  // Handler for adding tags
+  const handleAddTag = () => {
+    const tag = tagInput.trim();
+    if (tag && !templateTags.includes(tag)) {
+      setTemplateTags([...templateTags, tag]);
+      setTagInput("");
+    }
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setTemplateTags(templateTags.filter((tag) => tag !== tagToRemove));
+  };
+
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddTag();
+    }
+  };
+
+  // Handler for saving current survey as a template
+  const handleSaveAsTemplate = async () => {
+    if (!templateName.trim()) {
+      toast({
+        title: "Template name required",
+        description: "Please enter a name for the template",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingTemplate(true);
+    try {
+      await axios.post(`/api/templates/from-survey/${effectiveSurveyId}`, {
+        name: templateName,
+        description: templateDescription || undefined,
+        tags: templateTags,
+      });
+
+      toast({
+        title: "Template saved successfully",
+        description: `"${templateName}" is now available in your template library`,
+      });
+
+      // Reset form and close dialog
+      setTemplateName("");
+      setTemplateDescription("");
+      setTemplateTags([]);
+      setTagInput("");
+      setShowSaveTemplateDialog(false);
+    } catch (error: any) {
+      toast({
+        title: "Error saving template",
+        description: error.response?.data?.message || "Failed to save template",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  };
+
   // Filter pages and questions
   const filteredPages = useMemo(() => {
     if (!filterText.trim()) {
@@ -530,14 +612,36 @@ export default function SurveyBuilder() {
       {activeTab === "blocks" && (
         <div className="border-b bg-gray-50 px-4 sm:px-6 py-3">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleToggleCollapseAll}
-              className="gap-2 w-full sm:w-auto"
-            >
-              {allCollapsed ? "Expand All Blocks" : "Collapse All Blocks"}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleToggleCollapseAll}
+                className="gap-2"
+              >
+                {allCollapsed ? "Expand All Blocks" : "Collapse All Blocks"}
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowTemplateModal(true)}
+                className="gap-2"
+              >
+                <FileText className="h-4 w-4" />
+                <span className="hidden sm:inline">Add from Template</span>
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSaveTemplateDialog(true)}
+                className="gap-2"
+              >
+                <Save className="h-4 w-4" />
+                <span className="hidden sm:inline">Save as Template</span>
+              </Button>
+            </div>
 
             <input
               ref={filterInputRef}
@@ -712,6 +816,120 @@ export default function SurveyBuilder() {
         open={showShortcutsHelp}
         onClose={() => setShowShortcutsHelp(false)}
       />
+
+      {/* Add Template Modal */}
+      {effectiveSurveyId && (
+        <AddTemplateModal
+          open={showTemplateModal}
+          onOpenChange={setShowTemplateModal}
+          surveyId={effectiveSurveyId}
+        />
+      )}
+
+      {/* Save as Template Dialog */}
+      <Dialog open={showSaveTemplateDialog} onOpenChange={setShowSaveTemplateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save as Template</DialogTitle>
+            <DialogDescription>
+              Save this survey's structure as a reusable template. The template will include all pages and questions.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="template-name" className="text-sm font-medium">
+                Template Name *
+              </label>
+              <Input
+                id="template-name"
+                placeholder="e.g., Customer Feedback Survey"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                disabled={isSavingTemplate}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="template-description" className="text-sm font-medium">
+                Description (optional)
+              </label>
+              <Input
+                id="template-description"
+                placeholder="Brief description of this template"
+                value={templateDescription}
+                onChange={(e) => setTemplateDescription(e.target.value)}
+                disabled={isSavingTemplate}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="template-tags" className="text-sm font-medium">
+                Tags (optional)
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  id="template-tags"
+                  placeholder="Add a tag..."
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={handleTagKeyDown}
+                  disabled={isSavingTemplate}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddTag}
+                  disabled={isSavingTemplate || !tagInput.trim()}
+                >
+                  Add
+                </Button>
+              </div>
+              {templateTags.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {templateTags.map((tag) => (
+                    <Badge
+                      key={tag}
+                      variant="secondary"
+                      className="text-sm px-2 py-1 flex items-center gap-1"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTag(tag)}
+                        disabled={isSavingTemplate}
+                        className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setTemplateName("");
+                setTemplateDescription("");
+                setTemplateTags([]);
+                setTagInput("");
+                setShowSaveTemplateDialog(false);
+              }}
+              disabled={isSavingTemplate}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleSaveAsTemplate} disabled={isSavingTemplate || !templateName.trim()}>
+              {isSavingTemplate ? "Saving..." : "Save Template"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

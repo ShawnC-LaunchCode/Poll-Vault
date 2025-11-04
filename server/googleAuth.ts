@@ -6,6 +6,7 @@ import createMemoryStore from "memorystore";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { createLogger } from "./logger";
+import { templateSharingService } from "./services/TemplateSharingService";
 
 const logger = createLogger({ module: 'auth' });
 
@@ -286,6 +287,25 @@ export async function setupAuth(app: Express) {
 
       // Upsert user in database
       await upsertUser(payload);
+
+      // Accept any pending template shares for this user's email
+      try {
+        const userForSharing = {
+          id: payload.sub!,
+          email: payload.email!,
+          firstName: payload.given_name || "",
+          lastName: payload.family_name || "",
+          profileImageUrl: payload.picture || null,
+          role: 'creator' as const, // Default role
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        await templateSharingService.acceptPendingOnLogin(userForSharing);
+        logger.debug({ email: payload.email }, 'Accepted pending template shares');
+      } catch (error) {
+        // Don't fail login if this fails
+        logger.warn({ err: error, email: payload.email }, 'Failed to accept pending template shares');
+      }
 
       // Session fixation protection: regenerate session before login
       req.session.regenerate((err) => {

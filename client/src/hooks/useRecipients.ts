@@ -247,6 +247,43 @@ export function useRecipients(surveyId?: string) {
     onError: handleMutationError,
   });
 
+  // CSV Import/Export mutations
+  const importCsvMutation = useMutation({
+    mutationFn: async (csvText: string) => {
+      const response = await fetch("/api/recipients/import", {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain",
+        },
+        body: csvText,
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to import CSV");
+      }
+
+      return await response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/recipients/global"] });
+      toast({
+        title: "Import Complete",
+        description: `Imported ${data.imported} recipients, updated ${data.updated}, skipped ${data.skipped}`,
+      });
+    },
+    onError: handleMutationError,
+  });
+
+  const downloadTemplate = () => {
+    window.open("/api/recipients/template.csv", "_blank");
+  };
+
+  const exportCsv = () => {
+    window.open("/api/recipients/export.csv", "_blank");
+  };
+
   return {
     // Data
     survey,
@@ -278,5 +315,11 @@ export function useRecipients(surveyId?: string) {
     deleteGlobalRecipientPending: deleteGlobalRecipientMutation.isPending,
     bulkDeleteGlobalRecipients: bulkDeleteGlobalRecipientsMutation.mutate,
     bulkDeleteGlobalRecipientsPending: bulkDeleteGlobalRecipientsMutation.isPending,
+
+    // CSV Import/Export
+    importCsv: importCsvMutation.mutateAsync,
+    importCsvPending: importCsvMutation.isPending,
+    downloadTemplate,
+    exportCsv,
   };
 }

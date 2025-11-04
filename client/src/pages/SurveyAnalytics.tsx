@@ -16,7 +16,8 @@ import {
   Filter,
   Download,
   ArrowLeft,
-  XCircle
+  XCircle,
+  Users
 } from "lucide-react";
 import {
   OverviewStats,
@@ -27,6 +28,7 @@ import {
   EngagementTab
 } from "@/features/survey-analytics/components";
 import { AiInsights } from "@/components/results/AiInsights";
+import { GroupPerformanceDashboard } from "@/components/analytics/GroupPerformanceDashboard";
 
 export default function SurveyAnalytics() {
   const { surveyId } = useParams();
@@ -117,7 +119,7 @@ export default function SurveyAnalytics() {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
             <div className="relative">
               <div className="overflow-x-auto scrollbar-hide">
-                <TabsList className="inline-flex w-full min-w-max md:grid md:w-full md:grid-cols-5 h-auto">
+                <TabsList className="inline-flex w-full min-w-max md:grid md:w-full md:grid-cols-6 h-auto">
                   <TabsTrigger value="overview" data-testid="tab-overview" className="text-xs sm:text-sm px-3 sm:px-4 py-2 whitespace-nowrap">
                     <TrendingUp className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                     <span className="hidden sm:inline">Overview</span>
@@ -140,6 +142,10 @@ export default function SurveyAnalytics() {
                     <Activity className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                     <span className="hidden sm:inline">Engagement</span>
                     <span className="sm:hidden">Engage</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="groups" data-testid="tab-groups" className="text-xs sm:text-sm px-3 sm:px-4 py-2 whitespace-nowrap">
+                    <Users className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                    Groups
                   </TabsTrigger>
                 </TabsList>
               </div>
@@ -168,6 +174,10 @@ export default function SurveyAnalytics() {
 
             <TabsContent value="engagement" className="space-y-4 sm:space-y-6">
               <EngagementTab engagementMetrics={engagementMetrics} chartConfig={chartConfig} />
+            </TabsContent>
+
+            <TabsContent value="groups" className="space-y-4 sm:space-y-6">
+              <GroupPerformanceDashboard surveyId={surveyId!} />
             </TabsContent>
           </Tabs>
 
