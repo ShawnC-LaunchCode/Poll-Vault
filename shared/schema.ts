@@ -291,6 +291,18 @@ export const systemStats = pgTable("system_stats", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// User preferences table for personalization settings
+export const userPreferences = pgTable("user_preferences", {
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).primaryKey(),
+  settings: jsonb("settings").default({
+    celebrationEffects: true,
+    darkMode: "system",
+    aiHints: true,
+  }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Survey templates table for reusable survey sections
 export const surveyTemplates = pgTable("survey_templates", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -327,10 +339,21 @@ export const templateShares = pgTable("template_shares", {
 ]);
 
 // Relations
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   surveys: many(surveys),
   globalRecipients: many(globalRecipients),
   surveyTemplates: many(surveyTemplates),
+  preferences: one(userPreferences, {
+    fields: [users.id],
+    references: [userPreferences.userId],
+  }),
+}));
+
+export const userPreferencesRelations = relations(userPreferences, ({ one }) => ({
+  user: one(users, {
+    fields: [userPreferences.userId],
+    references: [users.id],
+  }),
 }));
 
 export const surveysRelations = relations(surveys, ({ one, many }) => ({
@@ -480,6 +503,7 @@ export const insertAnonymousResponseTrackingSchema = createInsertSchema(anonymou
 export const insertFileSchema = createInsertSchema(files).omit({ id: true, uploadedAt: true });
 export const insertSurveyTemplateSchema = createInsertSchema(surveyTemplates).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertTemplateShareSchema = createInsertSchema(templateShares).omit({ id: true, invitedAt: true, acceptedAt: true });
+export const insertUserPreferencesSchema = createInsertSchema(userPreferences).omit({ createdAt: true, updatedAt: true });
 
 // Analytics event validation schema with strict validation
 export const insertAnalyticsEventSchema = createInsertSchema(analyticsEvents).omit({ 
@@ -530,6 +554,8 @@ export type SurveyTemplate = typeof surveyTemplates.$inferSelect;
 export type InsertSurveyTemplate = typeof insertSurveyTemplateSchema._type;
 export type TemplateShare = typeof templateShares.$inferSelect;
 export type InsertTemplateShare = typeof insertTemplateShareSchema._type;
+export type UserPreferences = typeof userPreferences.$inferSelect;
+export type InsertUserPreferences = typeof insertUserPreferencesSchema._type;
 
 // Additional API response types
 export interface DashboardStats {

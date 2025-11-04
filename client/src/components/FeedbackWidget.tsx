@@ -1,49 +1,21 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { MessageSquare } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import confetti from "canvas-confetti";
+import { useConfetti } from "@/hooks/useConfetti";
 
 export default function FeedbackWidget() {
   const [open, setOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-
-  const triggerConfetti = useCallback(() => {
-    const duration = 2 * 1000;
-    const animationEnd = Date.now() + duration;
-    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 2000 };
-
-    const randomInRange = (min: number, max: number) =>
-      Math.random() * (max - min) + min;
-
-    const interval = setInterval(() => {
-      const timeLeft = animationEnd - Date.now();
-      if (timeLeft <= 0) {
-        return clearInterval(interval);
-      }
-      const particleCount = 80 * (timeLeft / duration);
-      confetti({
-        ...defaults,
-        particleCount,
-        origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
-        colors: ["#6366F1", "#EC4899", "#10B981", "#F59E0B", "#3B82F6"],
-      });
-      confetti({
-        ...defaults,
-        particleCount,
-        origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
-        colors: ["#6366F1", "#EC4899", "#10B981", "#F59E0B", "#3B82F6"],
-      });
-    }, 250);
-  }, []);
+  const { fire } = useConfetti();
 
   useEffect(() => {
     if (submitted) {
-      triggerConfetti();
+      fire("gentle");
       const t = setTimeout(() => setSubmitted(false), 4000);
       return () => clearTimeout(t);
     }
-  }, [submitted, triggerConfetti]);
+  }, [submitted, fire]);
 
   // Listen for postMessage from iframe if survey sends completion event
   useEffect(() => {

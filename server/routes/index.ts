@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { registerAuthRoutes } from "./auth.routes";
+import { registerUserPreferencesRoutes } from "./userPreferences.routes";
 import { registerSurveyRoutes } from "./surveys.routes";
 import { registerPageRoutes } from "./pages.routes";
 import { registerQuestionRoutes } from "./questions.routes";
@@ -24,6 +25,9 @@ import { registerTemplateSharingRoutes } from "./templateSharing.routes";
 export function registerAllRoutes(app: Express): void {
   // Authentication routes
   registerAuthRoutes(app);
+
+  // User preferences routes
+  registerUserPreferencesRoutes(app);
 
   // Dashboard routes
   registerDashboardRoutes(app);

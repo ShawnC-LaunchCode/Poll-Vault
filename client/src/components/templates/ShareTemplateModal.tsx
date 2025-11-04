@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTemplateSharing } from "@/hooks/useTemplates";
 import { useToast } from "@/hooks/use-toast";
+import { useConfetti } from "@/hooks/useConfetti";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,7 @@ export default function ShareTemplateModal({
   templateName,
 }: ShareTemplateModalProps) {
   const { toast } = useToast();
+  const { fire } = useConfetti();
   const { listShares, share, updateAccess, revoke } = useTemplateSharing(templateId);
 
   const [email, setEmail] = useState("");
@@ -80,6 +82,7 @@ export default function ShareTemplateModal({
         access,
       });
 
+      fire("party");
       toast({
         title: "Invitation sent",
         description: `${trimmedEmail} has been invited with ${access} access`,

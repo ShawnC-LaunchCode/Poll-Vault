@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Sparkles, CheckCircle2, AlertCircle } from "lucide-react";
+import { useConfetti } from "@/hooks/useConfetti";
 
 interface GeneratedSurvey {
   id: string;
@@ -28,6 +29,7 @@ export default function AISurveyCreator() {
   const [prompt, setPrompt] = useState("");
   const [preview, setPreview] = useState<GeneratedSurvey | null>(null);
   const [, setLocation] = useLocation();
+  const { fire } = useConfetti();
 
   // Analytics tracking helper
   const track = (name: string, props?: Record<string, any>) => {
@@ -48,6 +50,7 @@ export default function AISurveyCreator() {
     },
     onSuccess: (data) => {
       setPreview(data);
+      fire("ai");
       track("ai_survey_generated", {
         surveyId: data.id,
         pageCount: data.pages?.length || 0,

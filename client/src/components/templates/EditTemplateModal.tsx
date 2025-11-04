@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useTemplates } from "@/hooks/useTemplates";
 import { useToast } from "@/hooks/use-toast";
+import { useConfetti } from "@/hooks/useConfetti";
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 
@@ -24,6 +25,7 @@ interface EditTemplateModalProps {
 export default function EditTemplateModal({ open, onClose, template }: EditTemplateModalProps) {
   const { update } = useTemplates();
   const { toast } = useToast();
+  const { fire } = useConfetti();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState("");
@@ -60,6 +62,7 @@ export default function EditTemplateModal({ open, onClose, template }: EditTempl
             .filter(Boolean),
         },
       });
+      fire("success");
       toast({
         title: "Template updated",
         description: "Your changes have been saved successfully",

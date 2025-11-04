@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Loader2, FileText, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
+import { useConfetti } from "@/hooks/useConfetti";
 
 interface Template {
   id: string;
@@ -25,6 +26,7 @@ export function AddTemplateModal({ open, onOpenChange, surveyId }: AddTemplateMo
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const { fire } = useConfetti();
 
   // Fetch templates
   const { data: templates = [], isLoading } = useQuery({
@@ -45,6 +47,7 @@ export function AddTemplateModal({ open, onOpenChange, surveyId }: AddTemplateMo
       return response.data;
     },
     onSuccess: (data) => {
+      fire("party");
       toast({
         title: "Template added successfully",
         description: `${data.pagesAdded} page(s) and ${data.questionsAdded} question(s) added from "${data.templateName}"`,

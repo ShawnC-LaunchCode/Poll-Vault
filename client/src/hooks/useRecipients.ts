@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useConfetti } from "@/hooks/useConfetti";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { Survey, Recipient, GlobalRecipient } from "@shared/schema";
@@ -7,6 +8,7 @@ import type { Survey, Recipient, GlobalRecipient } from "@shared/schema";
 export function useRecipients(surveyId?: string) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { cascade } = useConfetti();
 
   // Helper for error handling
   const handleMutationError = (error: any) => {
@@ -167,6 +169,9 @@ export function useRecipients(surveyId?: string) {
         title = "Invitations Partially Sent";
         description = `${sent} sent, ${failed} failed out of ${total} total`;
         variant = "destructive";
+      } else {
+        // Only fire confetti if all invitations sent successfully
+        cascade("party");
       }
 
       toast({ title, description, variant });

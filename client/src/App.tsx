@@ -24,6 +24,7 @@ import AdminSurveys from "@/pages/AdminSurveys";
 import AdminLogs from "@/pages/AdminLogs";
 import AISurveyCreator from "@/pages/AISurveyCreator";
 import TemplatesPage from "@/pages/TemplatesPage";
+import SettingsPage from "@/pages/SettingsPage";
 import FeedbackWidget from "@/components/FeedbackWidget";
 
 function Router() {
@@ -60,6 +61,7 @@ function Router() {
             <Route path="/responses" component={Responses} />
             <Route path="/recipients" component={Recipients} />
             <Route path="/analytics" component={Dashboard} />
+            <Route path="/settings" component={SettingsPage} />
             {/* Admin routes */}
             <Route path="/admin" component={AdminDashboard} />
             <Route path="/admin/users" component={AdminUsers} />

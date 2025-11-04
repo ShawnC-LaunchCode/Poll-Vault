@@ -11,6 +11,7 @@ export { BaseRepository, type DbTransaction } from "./BaseRepository";
 
 // Export domain repositories
 export { UserRepository, userRepository } from "./UserRepository";
+export { UserPreferencesRepository, userPreferencesRepository } from "./UserPreferencesRepository";
 export { SurveyRepository, surveyRepository } from "./SurveyRepository";
 export { PageRepository, pageRepository } from "./PageRepository";
 export { QuestionRepository, questionRepository } from "./QuestionRepository";

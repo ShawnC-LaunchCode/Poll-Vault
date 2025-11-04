@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { useConfetti } from "@/hooks/useConfetti";
 
 interface AlreadyCompletedScreenProps {
   submittedAt?: string;
@@ -35,12 +36,16 @@ export function AlreadyCompletedScreen({ submittedAt }: AlreadyCompletedScreenPr
 }
 
 export function SubmittedScreen() {
-  // Notify parent window when survey is submitted (for FeedbackWidget confetti)
+  const { fire } = useConfetti();
+
+  // Fire confetti and notify parent window when survey is submitted
   useEffect(() => {
+    fire("success");
+
     if (window.parent && window.parent !== window) {
       window.parent.postMessage("surveySubmitted", "*");
     }
-  }, []);
+  }, [fire]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
