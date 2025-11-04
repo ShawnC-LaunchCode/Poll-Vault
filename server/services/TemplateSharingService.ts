@@ -2,7 +2,7 @@ import { TemplateRepository } from "../repositories/TemplateRepository";
 import { TemplateShareRepository } from "../repositories/TemplateShareRepository";
 import { UserRepository } from "../repositories/UserRepository";
 import { sendTemplateInvitation } from "./sendgrid";
-import type { User } from "@shared/schema";
+import type { User, SurveyTemplate } from "@shared/schema";
 
 export interface ShareTemplateParams {
   userId?: string;
@@ -229,12 +229,12 @@ export class TemplateSharingService {
 
     // Fetch full template data for shared templates
     const sharedTemplates = await Promise.all(
-      sharedTemplateIds.map(share => this.tplRepo.findById(share.templateId))
+      sharedTemplateIds.map((share: { templateId: string }) => this.tplRepo.findById(share.templateId))
     );
 
     // Combine and deduplicate
     const allTemplates = [...ownAndSystem];
-    const existingIds = new Set(ownAndSystem.map(t => t.id));
+    const existingIds = new Set(ownAndSystem.map((t: SurveyTemplate) => t.id));
 
     for (const tpl of sharedTemplates) {
       if (tpl && !existingIds.has(tpl.id)) {
