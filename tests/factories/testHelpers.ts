@@ -1,14 +1,11 @@
 import { testSqlite } from "../setup/setup";
 import { randomUUID } from "crypto";
-import request from "supertest";
-import type { Application } from "express";
-import type { User } from "@shared/schema";
-import { db } from "../../server/db";
-import { users } from "@shared/schema";
-import { eq } from "drizzle-orm";
 
 /**
  * Test helpers using raw SQL to avoid Drizzle type issues with SQLite
+ * These are for unit tests that use the in-memory SQLite database
+ *
+ * For integration tests that use the real database, see integrationTestHelpers.ts
  */
 
 export function createTestUser(overrides: Partial<{
@@ -34,33 +31,6 @@ export function createTestUser(overrides: Partial<{
   );
 
   return userId;
-}
-
-/**
- * Create an authenticated supertest agent for integration tests
- * Uses the dev-login endpoint to create a session
- *
- * Note: The user parameter is currently ignored. The session will be for the
- * hardcoded dev-user-123 created by dev-login. Tests should use this user ID.
- */
-export async function createAuthenticatedAgent(
-  app: Application,
-  user?: User
-): Promise<request.SuperAgentTest> {
-  // Create an agent
-  const agent = request.agent(app);
-
-  // Use dev-login to create a valid session
-  // This creates a session for the "dev-user-123" user
-  const response = await agent.post("/api/auth/dev-login");
-
-  if (response.status !== 200) {
-    throw new Error(`Dev login failed with status ${response.status}: ${JSON.stringify(response.body)}`);
-  }
-
-  // Return the authenticated agent
-  // The session is for dev-user-123 (id: "dev-user-123", email: "dev@example.com")
-  return agent;
 }
 
 export function createTestSurvey(userId?: string) {

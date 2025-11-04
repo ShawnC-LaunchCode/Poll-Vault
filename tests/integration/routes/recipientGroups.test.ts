@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import request from "supertest";
 import app from "../../../server/index";
-import { createAuthenticatedAgent } from "../../factories/testHelpers";
+import { createAuthenticatedAgent, DEV_USER } from "../../factories/integrationTestHelpers";
 import { db } from "../../../server/db";
 import { recipientGroups, globalRecipients, recipientGroupMembers } from "@shared/schema";
 import { eq } from "drizzle-orm";
@@ -18,12 +18,7 @@ describe("Recipient Groups API", () => {
 
   beforeEach(async () => {
     // Use the dev user that dev-login creates
-    user = {
-      id: "dev-user-123",
-      email: "dev@example.com",
-      firstName: "Dev",
-      lastName: "User",
-    };
+    user = DEV_USER;
     agent = await createAuthenticatedAgent(app);
 
     // Create a test global recipient for member tests
