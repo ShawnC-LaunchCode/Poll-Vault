@@ -7,10 +7,11 @@ import { beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 
 // Mock environment variables for tests
 process.env.NODE_ENV = "test";
-process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || "postgresql://test:test@localhost:5432/poll_vault_test";
-process.env.SESSION_SECRET = "test-secret-key-for-testing-only";
-process.env.GOOGLE_CLIENT_ID = "test-google-client-id";
-process.env.VITE_GOOGLE_CLIENT_ID = "test-google-client-id";
+// Only override DATABASE_URL if not already set (e.g., in CI with Neon database)
+process.env.DATABASE_URL = process.env.DATABASE_URL || process.env.TEST_DATABASE_URL || "postgresql://test:test@localhost:5432/poll_vault_test";
+process.env.SESSION_SECRET = process.env.SESSION_SECRET || "test-secret-key-for-testing-only";
+process.env.GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "test-google-client-id";
+process.env.VITE_GOOGLE_CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID || "test-google-client-id";
 
 // Global test hooks
 beforeAll(async () => {
