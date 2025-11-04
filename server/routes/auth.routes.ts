@@ -6,8 +6,8 @@ import { isAuthenticated } from "../googleAuth";
  * Register authentication-related routes
  */
 export function registerAuthRoutes(app: Express): void {
-  // Development authentication helper (only for testing in development)
-  if (process.env.NODE_ENV === 'development') {
+  // Development authentication helper (for development and testing)
+  if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
     const devLoginHandler = async (req: any, res: any) => {
       try {
         // Create a test user for development

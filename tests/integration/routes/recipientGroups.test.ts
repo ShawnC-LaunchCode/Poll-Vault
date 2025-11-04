@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import request from "supertest";
 import app from "../../../server/index";
-import { createTestUser } from "../../factories/userFactory";
 import { createAuthenticatedAgent } from "../../factories/testHelpers";
 import { db } from "../../../server/db";
 import { recipientGroups, globalRecipients, recipientGroupMembers } from "@shared/schema";
@@ -18,8 +17,14 @@ describe("Recipient Groups API", () => {
   let testRecipientId: string;
 
   beforeEach(async () => {
-    user = createTestUser();
-    agent = await createAuthenticatedAgent(app, user);
+    // Use the dev user that dev-login creates
+    user = {
+      id: "dev-user-123",
+      email: "dev@example.com",
+      firstName: "Dev",
+      lastName: "User",
+    };
+    agent = await createAuthenticatedAgent(app);
 
     // Create a test global recipient for member tests
     const [recipient] = await db
