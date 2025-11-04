@@ -8,6 +8,16 @@ export function serveStatic(app: Express) {
   const distPath = path.resolve(process.cwd(), "dist", "public");
 
   if (!fs.existsSync(distPath)) {
+    // In test mode, static files are not needed (tests only use API routes)
+    // Just log a warning and skip static file serving
+    if (process.env.NODE_ENV === "test") {
+      console.warn(
+        `[Static] Build directory not found: ${distPath} - skipping static file serving (test mode)`,
+      );
+      return;
+    }
+
+    // In production, this is a critical error
     throw new Error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`,
     );
