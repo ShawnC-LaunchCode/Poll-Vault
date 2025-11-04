@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { isAuthenticated } from "../googleAuth";
 import { templateService } from "../services/TemplateService";
 import { templateInsertionService } from "../services/TemplateInsertionService";
+import { templateSharingService } from "../services/TemplateSharingService";
 import { z } from "zod";
 
 /**
@@ -86,7 +87,8 @@ export function registerTemplateRoutes(app: Express): void {
    */
   app.get('/api/templates/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const user = req.user;
+      const userId = user?.claims?.sub;
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized - no user ID" });
       }
@@ -97,8 +99,9 @@ export function registerTemplateRoutes(app: Express): void {
         return res.status(404).json({ message: "Template not found" });
       }
 
-      // Check access: user's own template or system template
-      if (template.creatorId !== userId && !template.isSystem) {
+      // Check access: owner, system template, or has share
+      const canAccess = await templateSharingService.canAccess(req.params.id, user);
+      if (!canAccess) {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -115,9 +118,16 @@ export function registerTemplateRoutes(app: Express): void {
    */
   app.put('/api/templates/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const user = req.user;
+      const userId = user?.claims?.sub;
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized - no user ID" });
+      }
+
+      // Check if user can edit this template (owner, admin, or has "edit" share)
+      const canEdit = await templateSharingService.canEdit(req.params.id, user);
+      if (!canEdit) {
+        return res.status(403).json({ message: "Access denied - you don't have edit permissions" });
       }
 
       // Validate request body
@@ -185,12 +195,19 @@ export function registerTemplateRoutes(app: Express): void {
    */
   app.post('/api/templates/:templateId/insert/:surveyId', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const user = req.user;
+      const userId = user?.claims?.sub;
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized - no user ID" });
       }
 
       const { templateId, surveyId } = req.params;
+
+      // Check if user can access this template (owner, admin, system, or has "use" or "edit" share)
+      const canAccess = await templateSharingService.canAccess(templateId, user);
+      if (!canAccess) {
+        return res.status(403).json({ message: "Access denied - you don't have permission to use this template" });
+      }
 
       const result = await templateInsertionService.insertTemplateIntoSurvey(
         templateId,

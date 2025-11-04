@@ -50,14 +50,17 @@ interface Template {
 }
 
 type SortOption = "recent" | "az";
+type ViewFilter = "all" | "mine" | "shared";
 
 export default function TemplatesPage() {
   const [, setLocation] = useLocation();
   const { list, remove } = useTemplates();
+  const { listSharedWithMe } = useTemplateSharing();
   const { user } = useAuth();
   const { toast } = useToast();
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortOption>("recent");
+  const [viewFilter, setViewFilter] = useState<ViewFilter>("all");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [openAdd, setOpenAdd] = useState<{ open: boolean; templateId?: string }>({
     open: false,
@@ -67,7 +70,7 @@ export default function TemplatesPage() {
   const [sharingTemplate, setSharingTemplate] = useState<Template | null>(null);
 
   // Loading state
-  if (list.isLoading) {
+  if (list.isLoading || (viewFilter === "shared" && listSharedWithMe.isLoading)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -75,7 +78,18 @@ export default function TemplatesPage() {
     );
   }
 
-  const templates: Template[] = list.data || [];
+  // Get templates based on view filter
+  const allTemplates: Template[] = list.data || [];
+  const sharedTemplateIds = new Set((listSharedWithMe.data || []).map((s: any) => s.templateId));
+
+  // Fetch full template data for shared templates
+  const sharedTemplates = allTemplates.filter(t => sharedTemplateIds.has(t.id));
+
+  const templates: Template[] =
+    viewFilter === "all" ? allTemplates :
+    viewFilter === "mine" ? allTemplates.filter(t => t.creatorId === user?.id && !t.isSystem) :
+    viewFilter === "shared" ? sharedTemplates :
+    allTemplates;
 
   // Extract all unique tags from templates
   const allTags = useMemo(() => {
@@ -195,6 +209,41 @@ export default function TemplatesPage() {
           </div>
         </div>
 
+        {/* View Filter Pills */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-medium text-muted-foreground">View:</span>
+          <Button
+            variant={viewFilter === "all" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewFilter("all")}
+            className="h-8"
+          >
+            All Templates
+          </Button>
+          <Button
+            variant={viewFilter === "mine" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewFilter("mine")}
+            className="h-8"
+          >
+            My Templates
+          </Button>
+          <Button
+            variant={viewFilter === "shared" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewFilter("shared")}
+            className="h-8"
+          >
+            <Users className="w-3 h-3 mr-1.5" />
+            Shared with Me
+            {sharedTemplates.length > 0 && (
+              <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs">
+                {sharedTemplates.length}
+              </Badge>
+            )}
+          </Button>
+        </div>
+
         {/* Tag Filter Bar */}
         {allTags.length > 0 && (
           <div className="flex flex-col gap-3">
@@ -298,7 +347,7 @@ export default function TemplatesPage() {
             {userTemplates.length > 0 && (
               <div className="space-y-3">
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                  My Templates
+                  {viewFilter === "shared" ? "Shared with Me" : "My Templates"}
                 </h2>
                 <TemplateGrid
                   templates={userTemplates}
