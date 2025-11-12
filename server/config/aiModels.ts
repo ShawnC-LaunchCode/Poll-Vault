@@ -18,35 +18,37 @@ export interface AIModelConfig {
 /**
  * Gemini model configurations in priority order
  * Models are tried in sequence until one succeeds
+ *
+ * Updated: 2025-11-12 - Migrated to Gemini 2.x models (1.x models deprecated/unavailable)
  */
 export const GEMINI_MODELS: AIModelConfig[] = [
   {
-    name: 'gemini-1.5-flash-latest',
-    displayName: 'Gemini 1.5 Flash (Latest)',
+    name: 'gemini-2.5-flash',
+    displayName: 'Gemini 2.5 Flash',
+    provider: 'google',
+    costTier: 'low',
+    capabilities: ['text-generation', 'json-mode', 'fast-response', 'multimodal']
+  },
+  {
+    name: 'gemini-2.5-flash-lite',
+    displayName: 'Gemini 2.5 Flash Lite',
     provider: 'google',
     costTier: 'low',
     capabilities: ['text-generation', 'json-mode', 'fast-response']
   },
   {
-    name: 'gemini-1.5-flash',
-    displayName: 'Gemini 1.5 Flash',
+    name: 'gemini-2.5-pro',
+    displayName: 'Gemini 2.5 Pro',
+    provider: 'google',
+    costTier: 'medium',
+    capabilities: ['text-generation', 'json-mode', 'complex-reasoning', 'multimodal']
+  },
+  {
+    name: 'gemini-2.0-flash',
+    displayName: 'Gemini 2.0 Flash',
     provider: 'google',
     costTier: 'low',
     capabilities: ['text-generation', 'json-mode', 'fast-response']
-  },
-  {
-    name: 'gemini-1.5-pro',
-    displayName: 'Gemini 1.5 Pro',
-    provider: 'google',
-    costTier: 'medium',
-    capabilities: ['text-generation', 'json-mode', 'complex-reasoning']
-  },
-  {
-    name: 'gemini-1.0-pro',
-    displayName: 'Gemini 1.0 Pro',
-    provider: 'google',
-    costTier: 'medium',
-    capabilities: ['text-generation', 'basic-reasoning']
   }
 ];
 
