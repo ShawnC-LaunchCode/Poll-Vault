@@ -8,6 +8,11 @@ import {
 } from "../repositories";
 import { surveys, surveyPages, questions } from "@shared/schema";
 import type { Survey, Question } from "@shared/schema";
+import {
+  getPrimaryGeminiModel,
+  getFallbackGeminiModels,
+  shouldTryFallback
+} from "../config/aiModels";
 
 type QuestionType = Question['type'];
 
@@ -43,24 +48,26 @@ export class SurveyAIService {
     surveyRepo?: typeof surveyRepository,
     pageRepo?: typeof pageRepository,
     questionRepo?: typeof questionRepository,
-    modelName: string = "gemini-2.5-flash"
+    modelName?: string
   ) {
     this.surveyRepo = surveyRepo || surveyRepository;
     this.pageRepo = pageRepo || pageRepository;
     this.questionRepo = questionRepo || questionRepository;
-    this.modelName = modelName;
+    this.modelName = modelName || getPrimaryGeminiModel();
   }
 
   /**
    * Get configured Gemini model
    */
-  private getModel() {
+  private getModel(modelName?: string) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error("Missing GEMINI_API_KEY environment variable");
     }
     const genAI = new GoogleGenerativeAI(apiKey);
-    return genAI.getGenerativeModel({ model: this.modelName });
+    const model = modelName || this.modelName;
+    console.log(`[AI] Using model: ${model}`);
+    return genAI.getGenerativeModel({ model });
   }
 
   /**
@@ -140,6 +147,57 @@ export class SurveyAIService {
   }
 
   /**
+   * Generate content with automatic fallback to alternative models
+   */
+  private async generateContentWithFallback(prompt: string): Promise<string> {
+    const fallbackModels = getFallbackGeminiModels(this.modelName);
+    const modelsToTry = [this.modelName, ...fallbackModels];
+
+    let lastError: Error | null = null;
+
+    for (let i = 0; i < modelsToTry.length; i++) {
+      const currentModel = modelsToTry[i];
+
+      try {
+        console.log(`[AI] Attempt ${i + 1}/${modelsToTry.length}: Trying model ${currentModel}`);
+        const model = this.getModel(currentModel);
+        const response = await model.generateContent(prompt);
+        const text = response.response.text().trim();
+
+        console.log(`[AI] ✓ Success with model: ${currentModel}`);
+        return text;
+
+      } catch (error) {
+        lastError = error as Error;
+        const errorMsg = lastError.message;
+
+        console.error(`[AI] ✗ Model ${currentModel} failed:`, errorMsg);
+
+        // If this was the last model, throw the error
+        if (i === modelsToTry.length - 1) {
+          console.error(`[AI] All ${modelsToTry.length} models failed. Last error:`, errorMsg);
+          throw new Error(
+            `AI service unavailable. All models failed. Last error: ${errorMsg}`
+          );
+        }
+
+        // Check if we should try the next model
+        if (shouldTryFallback(lastError)) {
+          console.log(`[AI] Error is recoverable, trying next fallback model...`);
+          continue;
+        } else {
+          // Non-recoverable error (auth, validation, etc.)
+          console.error(`[AI] Error is not recoverable, aborting fallback chain`);
+          throw lastError;
+        }
+      }
+    }
+
+    // This should never be reached, but TypeScript needs it
+    throw lastError || new Error("Unknown error occurred during AI generation");
+  }
+
+  /**
    * Generates a survey using AI and persists it as a draft
    * Returns the created survey with all pages and questions
    */
@@ -154,12 +212,10 @@ export class SurveyAIService {
 
     const systemPrompt = (promptOverride && promptOverride.trim()) || DEFAULT_SURVEY_GEN_PROMPT;
 
-    // Generate content with Gemini
-    const model = this.getModel();
+    // Generate content with Gemini (with automatic fallback)
     const prompt = `${systemPrompt}\n\nTopic: ${topic}\n\nReturn JSON only.`;
 
-    const response = await model.generateContent(prompt);
-    const text = response.response.text().trim();
+    const text = await this.generateContentWithFallback(prompt);
 
     // Parse and validate response
     const surveyData = this.parseAndValidateResponse(text);

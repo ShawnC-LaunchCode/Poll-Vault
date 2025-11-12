@@ -3,6 +3,11 @@ import type { Survey, Question, Response, Answer } from "@shared/schema";
 import { SURVEY_ANALYSIS_PROMPT, fillPromptVariables } from "../config/aiPrompts";
 import { surveyRepository, pageRepository, responseRepository } from "../repositories";
 import { extractTextValue } from "../utils/answerFormatting";
+import {
+  getPrimaryGeminiModel,
+  getFallbackGeminiModels,
+  shouldTryFallback
+} from "../config/aiModels";
 
 /**
  * Service for Google Gemini AI integration
@@ -10,7 +15,7 @@ import { extractTextValue } from "../utils/answerFormatting";
  */
 export class GeminiService {
   private genAI!: GoogleGenerativeAI;
-  private model!: any;
+  private modelName: string = getPrimaryGeminiModel();
 
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -24,17 +29,79 @@ export class GeminiService {
     }
 
     this.genAI = new GoogleGenerativeAI(apiKey);
-    // Use gemini-2.5-flash for speed and cost efficiency
-    this.model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    this.modelName = getPrimaryGeminiModel();
+  }
+
+  /**
+   * Get a Gemini model instance
+   */
+  private getModel(modelName?: string) {
+    if (!this.genAI) {
+      throw new Error("GEMINI_API_KEY not configured - AI features are unavailable");
+    }
+    const model = modelName || this.modelName;
+    console.log(`[AI] Using model: ${model}`);
+    return this.genAI.getGenerativeModel({ model });
   }
 
   /**
    * Check if the service is properly initialized
    */
   private ensureInitialized(): void {
-    if (!this.model) {
+    if (!this.genAI) {
       throw new Error("GEMINI_API_KEY not configured - AI features are unavailable");
     }
+  }
+
+  /**
+   * Generate content with automatic fallback to alternative models
+   */
+  private async generateContentWithFallback(prompt: string): Promise<string> {
+    const fallbackModels = getFallbackGeminiModels(this.modelName);
+    const modelsToTry = [this.modelName, ...fallbackModels];
+
+    let lastError: Error | null = null;
+
+    for (let i = 0; i < modelsToTry.length; i++) {
+      const currentModel = modelsToTry[i];
+
+      try {
+        console.log(`[AI] Attempt ${i + 1}/${modelsToTry.length}: Trying model ${currentModel}`);
+        const model = this.getModel(currentModel);
+        const result = await model.generateContent(prompt);
+        const text = result.response.text().trim();
+
+        console.log(`[AI] ✓ Success with model: ${currentModel}`);
+        return text;
+
+      } catch (error) {
+        lastError = error as Error;
+        const errorMsg = lastError.message;
+
+        console.error(`[AI] ✗ Model ${currentModel} failed:`, errorMsg);
+
+        // If this was the last model, throw the error
+        if (i === modelsToTry.length - 1) {
+          console.error(`[AI] All ${modelsToTry.length} models failed. Last error:`, errorMsg);
+          throw new Error(
+            `AI service unavailable. All models failed. Last error: ${errorMsg}`
+          );
+        }
+
+        // Check if we should try the next model
+        if (shouldTryFallback(lastError)) {
+          console.log(`[AI] Error is recoverable, trying next fallback model...`);
+          continue;
+        } else {
+          // Non-recoverable error (auth, validation, etc.)
+          console.error(`[AI] Error is not recoverable, aborting fallback chain`);
+          throw lastError;
+        }
+      }
+    }
+
+    // This should never be reached, but TypeScript needs it
+    throw lastError || new Error("Unknown error occurred during AI generation");
   }
 
   /**
@@ -92,30 +159,15 @@ export class GeminiService {
     // 7. Combine prompt and data
     const fullPrompt = `${basePrompt}\n\n${surveyData}`;
 
-    // 8. Send to Gemini
-    const result = await this.model.generateContent(fullPrompt);
-    const response = result.response;
-    const insights = response.text();
-
-    // 9. Get token counts (if available)
-    let promptTokens = 0;
-    let responseTokens = 0;
-
-    try {
-      if (result.response.usageMetadata) {
-        promptTokens = result.response.usageMetadata.promptTokenCount || 0;
-        responseTokens = result.response.usageMetadata.candidatesTokenCount || 0;
-      }
-    } catch (e) {
-      // Token metadata might not be available
-    }
+    // 8. Send to Gemini with fallback
+    const insights = await this.generateContentWithFallback(fullPrompt);
 
     return {
       insights,
       metadata: {
-        model: "gemini-2.5-flash",
-        promptTokens,
-        responseTokens,
+        model: this.modelName,
+        promptTokens: 0, // Token counting would require response metadata
+        responseTokens: 0,
         analysisDate: new Date(),
       },
     };
@@ -265,8 +317,7 @@ Respond with:
   "reasoning": "brief explanation"
 }`;
 
-    const result = await this.model.generateContent(prompt);
-    const response = result.response.text();
+    const response = await this.generateContentWithFallback(prompt);
 
     // Parse JSON response
     try {

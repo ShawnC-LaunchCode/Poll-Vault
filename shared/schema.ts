@@ -298,10 +298,25 @@ export const userPreferences = pgTable("user_preferences", {
     celebrationEffects: true,
     darkMode: "system",
     aiHints: true,
+    aiAssistEnabled: true,
+    aiAutoSuggest: true,
+    aiTone: "friendly",
+    aiSummaryDepth: "standard",
   }).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// User preference presets table for saving named preference configurations
+export const userPreferencePresets = pgTable("user_preference_presets", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  name: text("name").notNull(),
+  settings: jsonb("settings").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("user_preference_presets_user_idx").on(table.userId),
+]);
 
 // Survey templates table for reusable survey sections
 export const surveyTemplates = pgTable("survey_templates", {
@@ -347,11 +362,19 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     fields: [users.id],
     references: [userPreferences.userId],
   }),
+  preferencePresets: many(userPreferencePresets),
 }));
 
 export const userPreferencesRelations = relations(userPreferences, ({ one }) => ({
   user: one(users, {
     fields: [userPreferences.userId],
+    references: [users.id],
+  }),
+}));
+
+export const userPreferencePresetsRelations = relations(userPreferencePresets, ({ one }) => ({
+  user: one(users, {
+    fields: [userPreferencePresets.userId],
     references: [users.id],
   }),
 }));
@@ -504,6 +527,7 @@ export const insertFileSchema = createInsertSchema(files).omit({ id: true, uploa
 export const insertSurveyTemplateSchema = createInsertSchema(surveyTemplates).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertTemplateShareSchema = createInsertSchema(templateShares).omit({ id: true, invitedAt: true, acceptedAt: true });
 export const insertUserPreferencesSchema = createInsertSchema(userPreferences).omit({ createdAt: true, updatedAt: true });
+export const insertUserPreferencePresetSchema = createInsertSchema(userPreferencePresets).omit({ id: true, createdAt: true });
 
 // Analytics event validation schema with strict validation
 export const insertAnalyticsEventSchema = createInsertSchema(analyticsEvents).omit({ 
@@ -556,6 +580,8 @@ export type TemplateShare = typeof templateShares.$inferSelect;
 export type InsertTemplateShare = typeof insertTemplateShareSchema._type;
 export type UserPreferences = typeof userPreferences.$inferSelect;
 export type InsertUserPreferences = typeof insertUserPreferencesSchema._type;
+export type UserPreferencePreset = typeof userPreferencePresets.$inferSelect;
+export type InsertUserPreferencePreset = typeof insertUserPreferencePresetSchema._type;
 
 // Additional API response types
 export interface DashboardStats {

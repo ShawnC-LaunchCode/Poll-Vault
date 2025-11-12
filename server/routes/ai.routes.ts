@@ -3,6 +3,7 @@ import { isAuthenticated } from "../googleAuth";
 import { geminiService } from "../services/geminiService";
 import { surveyService } from "../services";
 import { SurveyAIService } from "../services/SurveyAIService";
+import { getPrimaryGeminiModel, getAllGeminiModels } from "../config/aiModels";
 
 // Initialize AI service for survey generation
 const surveyAIService = new SurveyAIService();
@@ -187,11 +188,12 @@ export function registerAiRoutes(app: Express): void {
 
       res.json({
         available: hasApiKey,
-        model: hasApiKey ? "gemini-2.5-flash" : null,
+        primaryModel: hasApiKey ? getPrimaryGeminiModel() : null,
+        fallbackModels: hasApiKey ? getAllGeminiModels().slice(1) : [],
         features: hasApiKey ? [
+          "survey_generation",
           "survey_analysis",
-          "sentiment_analysis",
-          "text_summarization"
+          "sentiment_analysis"
         ] : []
       });
     } catch (error) {
