@@ -8,6 +8,7 @@ import {
   getFallbackGeminiModels,
   shouldTryFallback
 } from "../config/aiModels";
+import { slackNotificationService } from "./SlackNotificationService";
 
 /**
  * Service for Google Gemini AI integration
@@ -56,11 +57,18 @@ export class GeminiService {
   /**
    * Generate content with automatic fallback to alternative models
    */
-  private async generateContentWithFallback(prompt: string): Promise<string> {
+  private async generateContentWithFallback(
+    prompt: string,
+    endpoint: string = '/api/ai/analyze',
+    context?: any
+  ): Promise<string> {
     const fallbackModels = getFallbackGeminiModels(this.modelName);
     const modelsToTry = [this.modelName, ...fallbackModels];
 
     let lastError: Error | null = null;
+    let successfulModel: string | null = null;
+    let primaryModelFailed = false;
+    const errors: Array<{ model: string; error: string }> = [];
 
     for (let i = 0; i < modelsToTry.length; i++) {
       const currentModel = modelsToTry[i];
@@ -72,6 +80,23 @@ export class GeminiService {
         const text = result.response.text().trim();
 
         console.log(`[AI] ✓ Success with model: ${currentModel}`);
+        successfulModel = currentModel;
+
+        // If primary model failed but a fallback succeeded, send Slack notification
+        if (primaryModelFailed && slackNotificationService.isConfigured()) {
+          await slackNotificationService.notifyAIModelFailure({
+            primaryModel: this.modelName,
+            successfulModel: currentModel,
+            attemptedModels: modelsToTry.slice(0, i + 1),
+            totalAttempts: i + 1,
+            errors,
+            timestamp: new Date(),
+            environment: process.env.NODE_ENV || 'unknown',
+            endpoint,
+            requestData: context
+          });
+        }
+
         return text;
 
       } catch (error) {
@@ -80,9 +105,33 @@ export class GeminiService {
 
         console.error(`[AI] ✗ Model ${currentModel} failed:`, errorMsg);
 
+        // Track this error
+        errors.push({ model: currentModel, error: errorMsg });
+
+        // Mark that primary model failed
+        if (i === 0) {
+          primaryModelFailed = true;
+        }
+
         // If this was the last model, throw the error
         if (i === modelsToTry.length - 1) {
           console.error(`[AI] All ${modelsToTry.length} models failed. Last error:`, errorMsg);
+
+          // Send critical Slack notification - all models failed
+          if (slackNotificationService.isConfigured()) {
+            await slackNotificationService.notifyAIModelFailure({
+              primaryModel: this.modelName,
+              successfulModel: null,
+              attemptedModels: modelsToTry,
+              totalAttempts: modelsToTry.length,
+              errors,
+              timestamp: new Date(),
+              environment: process.env.NODE_ENV || 'unknown',
+              endpoint,
+              requestData: context
+            });
+          }
+
           throw new Error(
             `AI service unavailable. All models failed. Last error: ${errorMsg}`
           );
@@ -95,6 +144,22 @@ export class GeminiService {
         } else {
           // Non-recoverable error (auth, validation, etc.)
           console.error(`[AI] Error is not recoverable, aborting fallback chain`);
+
+          // Send Slack notification for non-recoverable error
+          if (slackNotificationService.isConfigured()) {
+            await slackNotificationService.notifyAIModelFailure({
+              primaryModel: this.modelName,
+              successfulModel: null,
+              attemptedModels: modelsToTry.slice(0, i + 1),
+              totalAttempts: i + 1,
+              errors,
+              timestamp: new Date(),
+              environment: process.env.NODE_ENV || 'unknown',
+              endpoint,
+              requestData: context
+            });
+          }
+
           throw lastError;
         }
       }
@@ -160,7 +225,11 @@ export class GeminiService {
     const fullPrompt = `${basePrompt}\n\n${surveyData}`;
 
     // 8. Send to Gemini with fallback
-    const insights = await this.generateContentWithFallback(fullPrompt);
+    const insights = await this.generateContentWithFallback(
+      fullPrompt,
+      `/api/ai/analyze-survey/${surveyId}`,
+      { surveyId, questionCount: questions.length, responseCount: responses.length }
+    );
 
     return {
       insights,
@@ -317,7 +386,11 @@ Respond with:
   "reasoning": "brief explanation"
 }`;
 
-    const response = await this.generateContentWithFallback(prompt);
+    const response = await this.generateContentWithFallback(
+      prompt,
+      '/api/ai/sentiment',
+      { textLength: text.length }
+    );
 
     // Parse JSON response
     try {

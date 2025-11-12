@@ -13,6 +13,7 @@ import {
   getFallbackGeminiModels,
   shouldTryFallback
 } from "../config/aiModels";
+import { slackNotificationService } from "./SlackNotificationService";
 
 type QuestionType = Question['type'];
 
@@ -149,11 +150,14 @@ export class SurveyAIService {
   /**
    * Generate content with automatic fallback to alternative models
    */
-  private async generateContentWithFallback(prompt: string): Promise<string> {
+  private async generateContentWithFallback(prompt: string, context?: any): Promise<string> {
     const fallbackModels = getFallbackGeminiModels(this.modelName);
     const modelsToTry = [this.modelName, ...fallbackModels];
 
     let lastError: Error | null = null;
+    let successfulModel: string | null = null;
+    let primaryModelFailed = false;
+    const errors: Array<{ model: string; error: string }> = [];
 
     for (let i = 0; i < modelsToTry.length; i++) {
       const currentModel = modelsToTry[i];
@@ -165,6 +169,23 @@ export class SurveyAIService {
         const text = response.response.text().trim();
 
         console.log(`[AI] ✓ Success with model: ${currentModel}`);
+        successfulModel = currentModel;
+
+        // If primary model failed but a fallback succeeded, send Slack notification
+        if (primaryModelFailed && slackNotificationService.isConfigured()) {
+          await slackNotificationService.notifyAIModelFailure({
+            primaryModel: this.modelName,
+            successfulModel: currentModel,
+            attemptedModels: modelsToTry.slice(0, i + 1),
+            totalAttempts: i + 1,
+            errors,
+            timestamp: new Date(),
+            environment: process.env.NODE_ENV || 'unknown',
+            endpoint: '/api/ai/generate',
+            requestData: context
+          });
+        }
+
         return text;
 
       } catch (error) {
@@ -173,9 +194,33 @@ export class SurveyAIService {
 
         console.error(`[AI] ✗ Model ${currentModel} failed:`, errorMsg);
 
+        // Track this error
+        errors.push({ model: currentModel, error: errorMsg });
+
+        // Mark that primary model failed
+        if (i === 0) {
+          primaryModelFailed = true;
+        }
+
         // If this was the last model, throw the error
         if (i === modelsToTry.length - 1) {
           console.error(`[AI] All ${modelsToTry.length} models failed. Last error:`, errorMsg);
+
+          // Send critical Slack notification - all models failed
+          if (slackNotificationService.isConfigured()) {
+            await slackNotificationService.notifyAIModelFailure({
+              primaryModel: this.modelName,
+              successfulModel: null,
+              attemptedModels: modelsToTry,
+              totalAttempts: modelsToTry.length,
+              errors,
+              timestamp: new Date(),
+              environment: process.env.NODE_ENV || 'unknown',
+              endpoint: '/api/ai/generate',
+              requestData: context
+            });
+          }
+
           throw new Error(
             `AI service unavailable. All models failed. Last error: ${errorMsg}`
           );
@@ -188,6 +233,22 @@ export class SurveyAIService {
         } else {
           // Non-recoverable error (auth, validation, etc.)
           console.error(`[AI] Error is not recoverable, aborting fallback chain`);
+
+          // Send Slack notification for non-recoverable error
+          if (slackNotificationService.isConfigured()) {
+            await slackNotificationService.notifyAIModelFailure({
+              primaryModel: this.modelName,
+              successfulModel: null,
+              attemptedModels: modelsToTry.slice(0, i + 1),
+              totalAttempts: i + 1,
+              errors,
+              timestamp: new Date(),
+              environment: process.env.NODE_ENV || 'unknown',
+              endpoint: '/api/ai/generate',
+              requestData: context
+            });
+          }
+
           throw lastError;
         }
       }
@@ -215,7 +276,7 @@ export class SurveyAIService {
     // Generate content with Gemini (with automatic fallback)
     const prompt = `${systemPrompt}\n\nTopic: ${topic}\n\nReturn JSON only.`;
 
-    const text = await this.generateContentWithFallback(prompt);
+    const text = await this.generateContentWithFallback(prompt, { topic });
 
     // Parse and validate response
     const surveyData = this.parseAndValidateResponse(text);

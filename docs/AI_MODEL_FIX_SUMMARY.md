@@ -43,9 +43,31 @@ The code was hard-coded to use `gemini-2.5-flash`, which doesn't exist in Google
    - Improved error messages to indicate which model failed
    - Added feature list to status endpoint
 
-### 5. **Configuration & Documentation**
-   - Updated `.env.example` with optional `GEMINI_MODEL` variable
-   - Created comprehensive documentation: `server/config/AI_FALLBACK_README.md`
+### 5. **Slack Alert Integration**
+
+   **SlackNotificationService** (`server/services/SlackNotificationService.ts`):
+   - Real-time alerts when primary model fails
+   - User mentions via `SLACK_USER_ID` (tags you directly)
+   - Comprehensive diagnostic data in every notification
+   - Threaded messages with error details, request context, and useful links
+   - Severity levels: WARNING (fallback succeeded) and CRITICAL (all failed)
+   - Automatic sanitization of sensitive data
+
+   **What You Get in Slack:**
+   - 🎯 Primary model that failed
+   - ✅ Successful fallback model (if any)
+   - 🔄 All attempted models
+   - 🔍 Full error messages for each attempt
+   - 📦 Request context (topic, endpoint, etc.)
+   - 📋 Action items checklist
+   - 🔗 Quick links to documentation and Google Console
+   - ⚠️ User mention to grab your attention
+
+### 6. **Configuration & Documentation**
+   - Updated `.env.example` with `GEMINI_MODEL` and Slack variables
+   - Created comprehensive documentation:
+     - `server/config/AI_FALLBACK_README.md` - Fallback system
+     - `docs/SLACK_AI_ALERTS.md` - Slack notification setup
    - Documented model priority chain and fallback logic
 
 ## Files Changed
@@ -53,13 +75,15 @@ The code was hard-coded to use `gemini-2.5-flash`, which doesn't exist in Google
 ### Created:
 - `server/config/aiModels.ts` - Model configuration and fallback logic
 - `server/config/AI_FALLBACK_README.md` - Comprehensive documentation
+- `server/services/SlackNotificationService.ts` - Slack alert service
 - `docs/AI_MODEL_FIX_SUMMARY.md` - This file
+- `docs/SLACK_AI_ALERTS.md` - Slack notification documentation
 
 ### Modified:
-- `server/services/SurveyAIService.ts` - Added fallback mechanism
-- `server/services/geminiService.ts` - Added fallback mechanism
+- `server/services/SurveyAIService.ts` - Added fallback mechanism + Slack alerts
+- `server/services/geminiService.ts` - Added fallback mechanism + Slack alerts
 - `server/routes/ai.routes.ts` - Updated status endpoint
-- `.env.example` - Added GEMINI_MODEL variable
+- `.env.example` - Added GEMINI_MODEL and Slack variables
 
 ## Testing
 
@@ -122,6 +146,11 @@ GEMINI_API_KEY=your_api_key_here
 
 # Optional - override primary model (defaults to gemini-1.5-flash-latest)
 GEMINI_MODEL=gemini-1.5-flash
+
+# Optional - Slack notifications (highly recommended for production)
+SLACK_BOT_TOKEN=xoxb-your-bot-token
+SLACK_CHANNEL_ID=C07XXXXXXXXX
+SLACK_USER_ID=U07XXXXXXXXX  # For @mentions
 ```
 
 ### Monitoring
@@ -138,6 +167,8 @@ Watch logs for:
 4. **Future-Proof**: Easy to add new models as Google releases them
 5. **Transparent**: All attempts logged for debugging
 6. **Configurable**: Primary model can be changed via environment variable
+7. **Proactive Alerts**: Slack notifications tag you before issues become critical
+8. **Rich Diagnostics**: Complete failure context delivered to Slack instantly
 
 ## Long-Term Maintenance
 
